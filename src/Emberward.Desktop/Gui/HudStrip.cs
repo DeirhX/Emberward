@@ -101,9 +101,12 @@ public sealed class HudStrip
         _heat.DrawTrend(dl, player, TempPlate.ReadoutRight - 12f, TempPlate.ReadoutY);
         _heat.DrawOffNetworkTag(dl, player, HeatX + HeatPanelW * 0.5f, time, reserve);
 
-        // HULL: the tank's armor (under the shield, when there is one).
+        // SHIELD / HULL: the shield's points and the hull's, as two numbers (the hull alone when the match has no shield).
         int health = Math.Max(0, player.Reactor.Health);
-        DrawReadout(dl, ShieldPlate, health.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        string hull = health.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        DrawReadout(dl, ShieldPlate, shield.Active && !player.IsDead
+            ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{shield.Shield} / {hull}")
+            : hull);
 
         // MATERIALS: the ore in the tank's hold against what it takes, the currency structures are built from. The
         // pile is a sheet of 8 x 5 frames drawn by tools/hud/make_hold_pyrite.py; each stone carries its own corona.
