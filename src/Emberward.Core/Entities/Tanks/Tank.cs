@@ -166,14 +166,14 @@ public class Tank
     /// <summary>Pyrite in the tank's hold, in units (DESIGN.md §6.3).</summary>
     public int OreHeld => Hold.Ore;
 
-    /// <summary>How much pyrite the hold takes (<see cref="Tweaks.Ore.TankHold"/> plus the base's cargo hold upgrades).</summary>
+    /// <summary>How much pyrite the hold takes (<see cref="Tweaks.Ore.TankHold"/> plus the base's insulated hold upgrades).</summary>
     public int OreHoldCapacity => Hold.Capacity;
 
     /// <summary>
-    /// True when the load is big enough to heat the tank hard (<see cref="Tweaks.Cargo.HeatStartOre"/> or more): from
-    /// here each unit more heats it faster (DESIGN.md §6.3).
+    /// True when the load is big enough to heat the tank hard (<see cref="Tweaks.Cargo.HeatStartOre"/> or more, later
+    /// with an insulated hold): from here each unit more heats it faster (DESIGN.md §6.3).
     /// </summary>
-    public bool IsCargoHot => OreHeld >= Tweaks.Cargo.HeatStartOre;
+    public bool IsCargoHot => _thermals.IsCargoHot;
 
     /// <summary>True when the hold has no room for another unit: the tank's dig leaves ore in the ground.</summary>
     public bool IsOreHoldFull => Hold.IsFull;
@@ -359,7 +359,7 @@ public class Tank
         _ => null,
     };
 
-    /// <summary>The hold takes what the cargo hold upgrades of the base allow.</summary>
+    /// <summary>The hold takes what the insulated hold upgrades of the base allow.</summary>
     private void SyncHoldCapacity()
     {
         if (Base != null)

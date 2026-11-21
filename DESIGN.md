@@ -241,7 +241,12 @@ Building has to pay off, and exploring has to lead somewhere.
     - **Sensors:** relays, generators and the base see 8 cells further per level. Relays and generators already see 10
       cells beyond their coverage circle at level 0. Sight is output only (§6.5), so this changes nothing but the ore it cost.
   - The **tank track**, keys 6-7:
-    - **Cargo hold:** +30 ore in the tank's hold per level (40, 70, 100, 130).
+    - **Insulated hold** (key 6, formerly the cargo hold): mostly insulation, a little room. Each level adds 10 ore
+      (40, 50, 60, 70), moves the point where the load starts to cook the tank 5 units later (20, 25, 30, 35) and
+      divides its heat by 1 + 0.25 per level, so a full hold at every level heats exactly as the stock hold does at 40
+      (74 degrees a second): a serious problem, never a worse one. The same load heats less at each level (40 units:
+      74, 45, 26, 12 degrees a second). It reworks the old slot rather than adding one, because the COMMAND keys 1-7
+      are all taken and an eighth would need a wider input encoding.
     - **Radar:** +20% on every radar range and +25% on each ray's heat budget per level (§6.6). The radar is output
       only, so this level changes nothing in the simulation but the ore it cost. A pulse that runs longer than the
       4-second period delays the next one.
@@ -539,7 +544,7 @@ A sector only completes when it runs without the player, so nothing may depend o
 
 ### 5.3 What the tank needs
 
-- Cargo capacity, as an upgradeable stat (in: the cargo hold upgrade, §4.8).
+- Cargo capacity and cargo insulation, as an upgradeable stat (in: the insulated hold upgrade, §4.8).
 - A placement interface for structures. This is real work: the default match is 320×200 cells, and the game builds with single key
   presses today.
 
@@ -685,13 +690,13 @@ The tank's ordinary dig clears plain ore, slower than dirt; a core cell needs th
 if all 3 units fit), so mining never destroys ore. The hold is put down only by touching: a tank whose hull comes
 within 2 cells of its own base's core banks it into the base's ore store quickly (10 units a tick), and one within
 2 cells of one of its own powered relays unloads there, slower (4 a second, §6.4). Being inside the base's walls or
-the network's coverage is not enough. The hold grows with the cargo hold upgrade (§4.8).
+the network's coverage is not enough. The insulated hold upgrade (§4.8) adds a little room and makes the load heat less.
 
 **Pyrite in the hold is hot** (`Tweaks.Cargo`, `TankHeatModel.ComputeCargoHeat`), linearly in the load, with no
 step or spike. Each unit warms the tank by 0.1 degrees a second before cooling, mild: 1.9 a second at 19 units, about
 what the off-network clock adds. From 20 every further unit adds 3.5 degrees a second more, so the rate is continuous at
 20 and climbs evenly past it: 20 units heat at 2 degrees a second, 30 at 38, 40 at 74, against a full link's 6; an
-upgraded hold goes on along the same line (70 at 182, 100 at 290, 130 at 398, so a big hold is only safe part full).
+insulated hold (§4.8) moves the start later and scales the line down, so its full hold is as hot as the stock one at 40.
 Ground soaks up a hot tank's heat fast, so in play 20 barely shows, 30 is a serious climb (in a tunnel about 50 degrees
 after 5 seconds; in the open past 100 in about 5), and 40 is an emergency: past 100 in about 2 seconds in the open and
 4 in a tunnel, on the network or off it. The heat is the ore's own energy, booked as injected in the ledger. Hot with
@@ -1026,7 +1031,7 @@ upgrades, throughput, turrets, removing the pylon and the tank's reserve are in)
 | Sensors upgrade: relays and generators see 10 cells past coverage, and 8 more per level (the base 8 more per level) | Prototype |
 | Every heat body is finite: no pinned temperatures or permanent sources; the outside is a loss, not a cell | Decided |
 | Stored heat is the match's supply; what keeps it up over a long match is open (§4.10) | Proposed |
-| Carried pyrite heats the tank linearly, steeply from 20 units and dangerously at 40, with no step or spike; the hold unloads only by touching the own core or a powered relay, and the core has no baffles round it (§6.3, §4.9) | Prototype |
+| Carried pyrite heats the tank linearly, steeply from 20 units and dangerously at 40, with no step or spike, and the hold upgrade insulates the load more than it enlarges the hold; the hold unloads only by touching the own core or a powered relay, and the core has no baffles round it (§6.3, §4.9) | Prototype |
 
 ## 14. Open questions
 

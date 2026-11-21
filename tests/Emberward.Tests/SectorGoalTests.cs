@@ -21,7 +21,7 @@ public class SectorGoalTests
 
     [Theory]
     [InlineData(BaseUpgrade.Radiator)]
-    [InlineData(BaseUpgrade.CargoHold)]
+    [InlineData(BaseUpgrade.InsulatedHold)]
     [InlineData(BaseUpgrade.Radar)]
     public void Upgrades_CostOreFromTheStore_25_60_140_AndStopAtTheMax(BaseUpgrade upgrade)
     {
@@ -52,25 +52,25 @@ public class SectorGoalTests
         var tracks = Enum.GetValues<BaseUpgrade>().Select(BaseUpgrades.TrackOf).ToArray();
         Assert.Equal(BaseUpgrades.Count, tracks.Length);
         Assert.Equal(5, tracks.Count(t => t == UpgradeTrack.Base));
-        Assert.Equal([BaseUpgrade.CargoHold, BaseUpgrade.Radar],
+        Assert.Equal([BaseUpgrade.InsulatedHold, BaseUpgrade.Radar],
             Enum.GetValues<BaseUpgrade>().Where(u => BaseUpgrades.TrackOf(u) == UpgradeTrack.Tank));
         foreach (BaseUpgrade u in Enum.GetValues<BaseUpgrade>())
             Assert.False(string.IsNullOrEmpty(BaseUpgrades.Describe(u).Effect));
     }
 
     [Fact]
-    public void ACargoHoldLevel_AddsThirtyToTheTanksHold()
+    public void AnInsulatedHoldLevel_AddsTenToTheTanksHold()
     {
         var s = RelayHeatTests.CreateScenario();
-        var press = new ControllerOutput { Upgrade = (int)BaseUpgrade.CargoHold + 1 };
-        int[] expected = [40, 70, 100, 130];
+        var press = new ControllerOutput { Upgrade = (int)BaseUpgrade.InsulatedHold + 1 };
+        int[] expected = [40, 50, 60, 70];
         Assert.Equal(expected[0], s.Tank.OreHoldCapacity);
         for (int level = 1; level <= BaseUpgrades.MaxLevel; level++)
         {
             Fund(s.Base, s.Base.Store.Capacity);
             s.World.Advance(i => i == 0 ? press : default);
             s.World.Advance(_ => default);
-            Assert.Equal(level, s.Base.Upgrades.Level(BaseUpgrade.CargoHold));
+            Assert.Equal(level, s.Base.Upgrades.Level(BaseUpgrade.InsulatedHold));
             Assert.Equal(expected[level], s.Tank.OreHoldCapacity);
         }
     }

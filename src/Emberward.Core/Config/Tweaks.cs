@@ -304,8 +304,9 @@ public static partial class Tweaks
         public const float InsulationPerLevel = 0.25f;
         // Each sensors level adds this many cells to the sight of every relay and the base (not to coverage).
         public const int SensorCellsPerLevel = 8;
-        // Tank track. The cargo hold takes this much more ore per level (Ore.TankHold 40, then 70, 100, 130).
-        public const int CargoHoldPerLevel = 30;
+        // Tank track. The insulated hold takes this much more ore per level (Ore.TankHold 40, then 50, 60, 70); mostly
+        // it insulates the load (Cargo.InsulationPerLevel, Cargo.HeatStartOrePerLevel).
+        public const int InsulatedHoldOrePerLevel = 10;
         // Each radar level adds this share of every radar range, and this share of the heat budget of its rays.
         public const float RadarRangePerLevel = 0.2f;
         public const float RadarHeatBudgetPerLevel = 0.25f;

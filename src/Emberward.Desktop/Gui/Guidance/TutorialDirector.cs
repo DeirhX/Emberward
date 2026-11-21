@@ -126,7 +126,7 @@ public sealed class TutorialDirector
                 EnergyBody: $"Harvesters draw charge through the network. Press {Key(MachineType.Generator)} to build a generator ({Cost(MachineType.Generator)} ore) and plant it beside hot ground. A generator can power nearby machines through their links even when cut off from the base."),
 
             new(UpgradeStepTitle,
-                "Dock and press 1-7 to spend the base ore store: radiator, network reach, engine, insulation and sensors for the base, a bigger cargo hold and a longer radar for your tank.",
+                "Dock and press 1-7 to spend the base ore store: radiator, network reach, engine, insulation and sensors for the base, an insulated hold and a longer radar for your tank.",
                 static (_, _, p) => p.Base is { } b && Enumerable.Range(0, BaseUpgrades.Count).Any(i => b.Upgrades.Level((BaseUpgrade)i) > 0),
                 Progress: static (_, p) => p.Base is { } b
                     ? Ratio("Base ore store", b.Store.Ore, Tweaks.Upgrades.LevelCosts[0])

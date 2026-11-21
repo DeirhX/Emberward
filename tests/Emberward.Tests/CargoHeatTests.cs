@@ -41,6 +41,32 @@ public class CargoHeatTests
         Assert.True(above > below, "past the start each unit should heat more");
     }
 
+    /// <summary>
+    /// The insulated hold (<see cref="Emberward.Core.Entities.Bases.BaseUpgrade.InsulatedHold"/>): at every level a full
+    /// hold heats exactly as the stock hold does at 40, the heating starts at half a hold, and the stock hold is
+    /// unchanged.
+    /// </summary>
+    [Theory]
+    [InlineData(0, 40, 20, 74f)]
+    [InlineData(1, 50, 25, 74f)]
+    [InlineData(2, 60, 30, 74f)]
+    [InlineData(3, 70, 35, 74f)]
+    public void AnInsulatedHold_FullIsAsHotAsTheStockHoldAtForty(int level, int capacity, int start, float fullRate)
+    {
+        // The hold's size at each level is checked by buying it (SectorGoalTests).
+        Assert.Equal(capacity, Tweaks.Ore.TankHold + level * Tweaks.Upgrades.InsulatedHoldOrePerLevel);
+        Assert.Equal(start, TankHeatModel.CargoHeatStartOre(Settings, level));
+
+        float Rate(int ore) => TankHeatModel.ComputeCargoHeat(Settings, ore, level) * Tweaks.Perf.TargetFps;
+        Assert.Equal(fullRate, Rate(capacity), precision: 2);
+        // Still linear on each side of the start, and every level is cooler than the one before at the same load.
+        float above = Rate(start + 1) - Rate(start);
+        for (int ore = start + 1; ore <= capacity; ore++)
+            Assert.Equal(above, Rate(ore) - Rate(ore - 1), precision: 3);
+        if (level > 0)
+            Assert.True(Rate(40) < TankHeatModel.ComputeCargoHeat(Settings, 40, level - 1) * Tweaks.Perf.TargetFps);
+    }
+
     [Fact]
     public void BelowTwenty_ItIsMild_AndFortySwampsAFullLink()
     {
