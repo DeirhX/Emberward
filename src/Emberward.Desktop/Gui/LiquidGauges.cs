@@ -6,7 +6,9 @@ using Emberward.Core.Entities.Tanks;
 using static Emberward.Desktop.Gui.HudDraw;
 
 /// <summary>
-/// The shield crystal is dark above its liquid surface. A low level pulses red and the crystal flashes when hit.
+/// The shield crystal is dark where it has emptied, from its edge inward, and the tank's hot centre glows through
+/// the empty part on the hull's heat ramp (<see cref="HudPalette.HullEmber"/>), brighter as the hull falls. A low level
+/// pulses red and the crystal flashes when hit.
 /// </summary>
 public sealed class LiquidGauges(HudLayout layout)
 {
@@ -15,6 +17,9 @@ public sealed class LiquidGauges(HudLayout layout)
         new(44f, 44f), new(60f, 40f), new(82f, 37f), new(104f, 40f), new(121f, 44f), new(121f, 80f),
         new(114f, 100f), new(100f, 116f), new(82f, 128f), new(64f, 116f), new(50f, 100f), new(44f, 80f),
     ];
+
+    // The glow through the empty crystal is drawn in rings from the centre (0) to the outline (1).
+    private const int GlowBands = 8;
 
     private float _shownShieldFill = -1f;
 
@@ -31,38 +36,69 @@ public sealed class LiquidGauges(HudLayout layout)
         // Shield crystal.
         var o = new Vector2(shieldPanelX, 0f);
         var poly = new Vector2[ShieldOutline.Length];
-        float sTop = float.MaxValue, sBottom = float.MinValue;
         for (int i = 0; i < poly.Length; i++)
         {
             poly[i] = layout.At(o + ShieldOutline[i]);
-            sTop = MathF.Min(sTop, poly[i].Y);
-            sBottom = MathF.Max(sBottom, poly[i].Y);
         }
-        float sLevel = sBottom - (sBottom - sTop) * _shownShieldFill;
+        // The crystal empties from its edge inward on every side: what is left is the outline shrunk toward its middle,
+        // so the area left follows the fill. The dark ring between the outline and the shrunk shape is the empty part.
+        var centre = Vector2.Zero;
+        foreach (var point in poly)
+            centre += point;
+        centre /= poly.Length;
+        float shrink = MathF.Sqrt(Math.Clamp(_shownShieldFill, 0f, 1f));
+        var inner = new Vector2[poly.Length];
+        for (int i = 0; i < poly.Length; i++)
+            inner[i] = centre + (poly[i] - centre) * shrink;
+
         if (player.HitFlashTicks > Tank.HitFlashDuration - 6)
-            FillPolygonBand(dl, poly, sLevel, sBottom, 0x90FFFFFFu);         // hit flash
+            dl.AddConvexPolyFilled(ref inner[0], inner.Length, 0x90FFFFFFu);        // hit flash
         else if (low && shieldFill > 0f && pulse)
-            FillPolygonBand(dl, poly, sLevel, sBottom, 0x703030FFu);         // low shield (red pulse)
-        FillPolygonBand(dl, poly, sTop, sLevel, 0xC8080808u);                // empty part
-        var (sx0, sx1) = PolygonSpanAtY(poly, sLevel);
-        if (sx1 > sx0)
-            DrawSurface(dl, sLevel, (sx1 - sx0) * 0.5f, (sx0 + sx1) * 0.5f, shieldFill > 0f ? 0xFFFFE0A0u : 0u, time);
+            dl.AddConvexPolyFilled(ref inner[0], inner.Length, 0x703030FFu);        // low shield (red pulse)
+        for (int i = 0; i < poly.Length; i++)
+        {
+            int n = (i + 1) % poly.Length;
+            var ring = new[] { poly[i], poly[n], inner[n], inner[i] };
+            dl.AddConvexPolyFilled(ref ring[0], ring.Length, 0xC8080808u);          // empty part
+        }
+        if (!player.IsDead)
+            DrawHotCentre(dl, poly, centre, shrink, player.HullFraction);
+        if (shieldFill > 0f)
+        {
+            // A bright line along the edge of what is left.
+            dl.AddPolyline(ref inner[0], inner.Length, HudTheme.WithAlphaByte(0xFFFFE0A0u, 0x50), ImDrawFlags.Closed, layout.S(4f));
+            dl.AddPolyline(ref inner[0], inner.Length, 0xFFFFE0A0u, ImDrawFlags.Closed, layout.S(1.5f));
+        }
     }
 
-    /// <summary>A gently waving bright line where the liquid meets the empty part.</summary>
-    private void DrawSurface(ImDrawListPtr dl, float y, float halfWidth, float centerX, uint color, float time)
+    /// <summary>
+    /// The tank's centre, red-hot through the empty part of the crystal (outside <paramref name="shrink"/>): a radial
+    /// glow along the hull's heat ramp, its middle at the hull's own heat and its rim the ramp's dull red, stronger as
+    /// the hull falls.
+    /// </summary>
+    private static void DrawHotCentre(ImDrawListPtr dl, Vector2[] poly, Vector2 centre, float shrink, float hullFraction)
     {
-        if (color == 0u || halfWidth < layout.S(3f))
-            return;
-        const int segments = 12;
-        var points = new Vector2[segments + 1];
-        for (int i = 0; i <= segments; i++)
+        float heat = Math.Min(hullFraction, HudPalette.HullHeatStart);
+        float strength = HudPalette.HullGlowStrength(hullFraction);
+        Span<Vector2> quad = stackalloc Vector2[4];
+        for (int band = 0; band < GlowBands; band++)
         {
-            float u = i / (float)segments;
-            float x = centerX - halfWidth + 2f * halfWidth * u;
-            points[i] = new Vector2(x, y + MathF.Sin(u * 9f + time * 5f) * layout.S(1.2f));
+            float from = band / (float)GlowBands, to = (band + 1) / (float)GlowBands;
+            if (to <= shrink)
+                continue;
+            from = MathF.Max(from, shrink);
+            float mid = (from + to) * 0.5f;
+            uint color = HudPalette.WithAlpha(HudPalette.HullEmber(heat + (HudPalette.HullHeatStart - heat) * mid),
+                strength * (1f - 0.8f * mid));
+            for (int i = 0; i < poly.Length; i++)
+            {
+                int n = (i + 1) % poly.Length;
+                quad[0] = centre + (poly[i] - centre) * to;
+                quad[1] = centre + (poly[n] - centre) * to;
+                quad[2] = centre + (poly[n] - centre) * from;
+                quad[3] = centre + (poly[i] - centre) * from;
+                dl.AddConvexPolyFilled(ref quad[0], 4, color);
+            }
         }
-        dl.AddPolyline(ref points[0], points.Length, HudTheme.WithAlphaByte(color, 0x50), ImDrawFlags.None, layout.S(4f));
-        dl.AddPolyline(ref points[0], points.Length, color, ImDrawFlags.None, layout.S(1.5f));
     }
 }

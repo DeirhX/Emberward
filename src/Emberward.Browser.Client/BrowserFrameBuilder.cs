@@ -61,7 +61,7 @@ public static class BrowserFrameBuilder
             Math.Max(0, player.Reactor.Health), HeatScale.Frozen(player.Heat), HeatScale.Boil(player.Heat),
             player.IsOverheating || player.IsAboveSafeHeat, player.IsHullLow(latched: false),
             player.HitFlashTicks > Tank.HitFlashDuration - HitFreshTicks, BuildSlotView.OrePileFrame(player), player.IsUnloadingOre,
-            player.IsOreHoldFull, player.IsOffNetworkUrgent, BuildSlotView.OreLine(player));
+            player.IsOreHoldFull, player.IsOffNetworkUrgent, BuildSlotView.OreLine(player), Plate(player, shield));
         return new BrowserFrame(session.Seed, world.AdvanceCount, Tweaks.Perf.TargetFps, status,
             session.Sounds.Frame(takePlays: includeEvents), builds, upgrades, preview, goal, Guidance(session.Guidance),
             includeDial ? Dial() : null, net?.Status(), BasePower(world, player), MachineUpgrade(session),
@@ -101,6 +101,19 @@ public static class BrowserFrameBuilder
 
     /// <summary>How many steps after a hit the desktop's shield crystal flashes white (<c>LiquidGauges</c>).</summary>
     private const int HitFreshTicks = 6;
+
+    /// <summary>The SHIELD/HULL plate as the desktop's <c>HudStrip</c> and <c>LiquidGauges</c> show it.</summary>
+    private static HullPlate Plate(Tank player, in TankShieldView shield)
+    {
+        var word = HullStatuses.Of(player, shield);
+        float hull = player.HullFraction;
+        return new HullPlate(word.Text, HudPalette.Hex(word.Color), HudPalette.Hex(word.FlashColor),
+            player.IsDead ? 0 : Math.Max(0, shield.Shield),
+            HudPalette.Hex(player.IsDead ? HudPalette.TextDim : HudPalette.HullHeat(hull)),
+            HudPalette.Hex(HudPalette.HullEmber(Math.Min(hull, HudPalette.HullHeatStart))),
+            HudPalette.Hex(HudPalette.HullEmber(HudPalette.HullHeatStart)),
+            player.IsDead ? 0f : HudPalette.HullGlowStrength(hull));
+    }
 
     /// <summary>The heat dial as the desktop's <c>HeatGauge</c> colours it.</summary>
     public static HeatDial Dial()
