@@ -361,7 +361,7 @@ public sealed class Radar
         // A reflector too hot to read returns nothing but the heat mark its cell already has (or gets now).
         bool scrambled = temperature >= Tweaks.Radar.HeatScrambleTemperature;
         TerrainPixel pixel = pixels[offset];
-        bool target = HitsTarget(cell, _onRay, out bool alive, out float signature);
+        bool target = HitsTarget(cell, _onRay, out bool alive, out float signature, out Position lifeAt);
         bool ore = !target && Pixel.IsOre(pixel);
         if (target || (Pixel.IsBlockingCollision(pixel) && !IsOwnBase(pixel, ownWall, cell)))
         {
@@ -374,8 +374,12 @@ public sealed class Radar
                 : FormationRange(ray, x, y, width, pixels, heat, ore: false);
             if (!Within(ray, range))
                 return true;
+            // Something alive returns where it is, not where the ray met the square that stands for it: a nest's
+            // square is far wider than a ray spacing, and every ray that met its face used to leave a blip along it,
+            // a straight line beside the nest instead of one echo on it. Rays that find the same thing in one tick
+            // leave one contact (Reconcile keeps one per cell).
             if (!scrambled)
-                Record(cell, echo, ray.Strength, width, pixels, isTerrain: !target);
+                Record(alive ? lifeAt : cell, echo, ray.Strength, width, pixels, isTerrain: !target);
             else if (!marked)
                 Record(cell, RadarEcho.Heat, HeatIntensity(temperature), width, pixels, isTerrain: false);
             return true;
@@ -469,14 +473,17 @@ public sealed class Radar
     }
 
     /// <summary>
-    /// Whether a target covers <paramref name="cell"/>, and if so whether a living one does and how strong the
-    /// strongest living one's signature is.
+    /// Whether a target covers <paramref name="cell"/>, and if so whether a living one does, how strong the
+    /// strongest living one's signature is and where that one is (<paramref name="lifeAt"/>, its centre; the first
+    /// in list order on a tie).
     /// </summary>
-    private static bool HitsTarget(Position cell, IReadOnlyList<RadarTarget> targets, out bool alive, out float signature)
+    private static bool HitsTarget(
+        Position cell, IReadOnlyList<RadarTarget> targets, out bool alive, out float signature, out Position lifeAt)
     {
         bool hit = false;
         alive = false;
         signature = 0f;
+        lifeAt = cell;
         for (int i = 0; i < targets.Count; i++)
         {
             RadarTarget target = targets[i];
@@ -484,14 +491,27 @@ public sealed class Radar
                 Math.Abs(cell.Y - target.Position.Y) <= target.HalfSize)
             {
                 hit = true;
-                if (target.Alive)
+                if (target.Alive && (!alive || target.Signature > signature))
                 {
                     alive = true;
-                    signature = Math.Max(signature, target.Signature);
+                    signature = target.Signature;
+                    lifeAt = target.Position;
                 }
             }
         }
         return hit;
+    }
+
+    /// <summary>
+    /// Whether something alive that gives an echo is still centred on <paramref name="cell"/>: a living contact holds
+    /// only while what returned it has not moved, since a later ray finds it where it went.
+    /// </summary>
+    private static bool LivesAt(Position cell, IReadOnlyList<RadarTarget> targets)
+    {
+        for (int i = 0; i < targets.Count; i++)
+            if (targets[i].Alive && targets[i].Signature > 0f && targets[i].Position == cell)
+                return true;
+        return false;
     }
 
     /// <summary>How hot a cell reads on the radar, 0..1 (<see cref="RadarContact.Strength"/> of a heat contact).</summary>
@@ -566,8 +586,15 @@ public sealed class Radar
                 int distanceSq = dx * dx + dy * dy;
                 if (distanceSq > passedFromSq && distanceSq <= frontSq)
                 {
+                    // A living contact sits at the centre of what returned it, past the face where its ray stopped, so
+                    // one an earlier pulse left is checked whenever the front passes it: one whose creature or tank has
+                    // moved on goes out (the ray that found it where it went leaves the new one) rather than trail
+                    // behind it. This pulse's own are left alone: a creature runs off its blip within a tick.
                     ref readonly Ray ray = ref _rays[NearestRay(dx, dy)];
-                    if (distanceSq > ray.PrevReachSq && distanceSq <= ray.ReachSq)
+                    bool check = contact.Echo == RadarEcho.Life
+                        ? contact.BornTick < _nextPulseTick - Tweaks.Radar.PulsePeriodTicks
+                        : distanceSq > ray.PrevReachSq && distanceSq <= ray.ReachSq;
+                    if (check)
                         keep = StillHolds(contact, offset, pixels, heat, ownWall, targets);
                 }
             }
@@ -607,8 +634,8 @@ public sealed class Radar
         {
             RadarEcho.Solid => IsRock(pixel) && !IsOwnBase(pixel, ownWall, contact.Position),
             RadarEcho.Ore => Pixel.IsOre(pixel),
-            RadarEcho.Metal => HitsTarget(contact.Position, targets, out bool living, out _) && !living,
-            RadarEcho.Life => HitsTarget(contact.Position, targets, out bool alive, out float signature) && alive && signature > 0f,
+            RadarEcho.Metal => HitsTarget(contact.Position, targets, out bool living, out _, out _) && !living,
+            RadarEcho.Life => LivesAt(contact.Position, targets),
             RadarEcho.Cavity => !Pixel.IsSoftCollision(pixel) && !Pixel.IsBlockingCollision(pixel),
             _ => heat.GetHeatTemperature(offset) > Tweaks.Radar.HeatThreshold,
         };

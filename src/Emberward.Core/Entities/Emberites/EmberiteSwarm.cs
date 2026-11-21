@@ -17,11 +17,13 @@ using Emberward.Core.Types;
 /// that runs hot. Present only in worlds whose rules ask for it (<see cref="Match.MatchRules.Emberites"/>), and costing
 /// nothing while no nest is awake and none is out: a dormant nest holds counters and is looked at once in
 /// <see cref="Tweaks.Emberites.WakeCheckTicks"/> ticks, a creature in its nest has no state of its own. A woken nest sends
-/// them in pulses sized by the hunted tank's heat, each after a stir that warns of it.
+/// them in pulses sized by the hunted tank's heat, each after a stir that warns of it. A creature that bites runs to the
+/// nearest hot ground, drinks a new charge there and bites again (<c>EmberiteSwarm.Hotspots.cs</c>).
 /// </summary>
 /// <remarks>
 /// Heat is conserved. A creature's charge is made, and booked as injected, when it first leaves its nest; a bite
-/// moves it into the tank; a kill spills it into the ground where it dies; a resting creature recharges by taking heat
+/// moves it into the tank; a kill spills it into the ground where it dies; a spent creature drinks a new one out of hot
+/// ground near the fight (<see cref="TerrainGrid.ExtractEnergyInRadiusArea"/>); a resting creature recharges by taking heat
 /// out of the deposit, leaves again only with a full charge, and starves where the deposit has none to give. <see cref="TotalCharge"/> is what the swarm holds, so the balance of
 /// <see cref="World.SumSystemThermalEnergy"/> closes. Burrowing writes no pixels.
 /// </remarks>
@@ -233,6 +235,8 @@ public sealed partial class EmberiteSwarm
             if (emberite.Pyrite != 0)
                 hash = Fnv1a.Mix(hash, emberite.Pyrite);
             hash = Fnv1a.Mix(Fnv1a.Mix(hash, emberite.SightTick), emberite.Sees);
+            if (emberite.State is EmberiteState.Seeking or EmberiteState.Recharging)
+                hash = Fnv1a.Mix(Fnv1a.Mix(Fnv1a.Mix(hash, emberite.Hotspot.X), emberite.Hotspot.Y), emberite.Timer);
         }
         return _trails.Mix(hash);
     }
@@ -276,12 +280,18 @@ public sealed partial class EmberiteSwarm
         return count;
     }
 
-    /// <summary>Adds the occupied nests as radar targets: a nest at rest gives a life echo.</summary>
+    /// <summary>
+    /// Adds the occupied nests and the creatures out as radar targets: each gives a life echo at its centre. A
+    /// creature costs this only while it is out.
+    /// </summary>
     internal void CollectRadarTargets(List<RadarTarget> targets)
     {
         foreach (Nest nest in _nests)
             if (nest.Inside > 0)
                 targets.Add(new RadarTarget(nest.Centre, Math.Max(2, nest.Radius / 2), Alive: true));
+        foreach (Emberite emberite in _emberites)
+            if (!emberite.Gone)
+                targets.Add(new RadarTarget((Position)emberite.Position, Tweaks.Radar.CreatureHalfSize, Alive: true));
     }
 
     /// <summary>The nests as the renderer draws them.</summary>

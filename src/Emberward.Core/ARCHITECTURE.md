@@ -435,6 +435,10 @@ new return in a cell replaces the old contact there, and a contact the front has
 when that ray got at least that far, is checked against the world and dropped unless it still holds (the rock is
 still there, the ore not yet mined, the ground still hot, a target still covers the cell) and is still news. A contact in the shadow of
 whatever its ray stopped at is not checked, so the radar never learns what it could not reach; it fades instead.
+A living target (`RadarTarget.Alive`: another tank, an occupied nest, an emberite out of its nest) is recorded at its
+centre, not at the cell where the ray met its square, so one thing gives one blip however many rays meet it. Since
+that cell lies past the face where its ray stopped, a living contact from an earlier pulse is checked whenever the
+front passes it, and holds only while a living target is still centred on it (`LivesAt`).
 A tick of a pulse walks about `RaysPerPulse * FrontCellsPerTick` cells and looks at each contact once; ticks
 between pulses only age contacts. Neither depends on the size of the map.
 
@@ -574,6 +578,11 @@ Desktop:
 counters (creatures never released, resting, out, stored charge); only creatures out of the nest are in the swarm's
 `List<Emberite>`, so a world with nothing out does no per-creature work (`EmberiteSwarm.CreatureSteps` stays 0). A dormant nest
 looks at each tank once in six ticks; digging a nest's ore (read from `OreCollected` step events) wakes it at once.
+A creature out is a small state machine (`EmberiteState`): `Hunting` with a charge, a bite, then `Seeking` the hot cell
+`TryFindHotspot` found near where it bit (one fixed scan per bite, `Emberite.Hotspot`, straight steering, given up after
+`HotspotSeekTicks`), `Recharging` there for `HotspotRechargeTicks` (`Emberite.Timer`) before it takes a full charge with
+`ExtractEnergyInRadiusArea` and hunts again, and `Returning` home when it has lost its tank or found no hot ground
+(`EmberiteSwarm.Hotspots.cs`). A tank on ground at `HotZoneHeat` is kept whatever its heat (one heat read per hunting creature).
 A woken nest lets its creatures out in pulses (`Nest.Phase`, `AdvancePulse`): a stir of `StirTicks` (`StepEventKind.NestStirred`,
 the warning), a group sized by the hunted tank's heat (`EmberiteSwarm.PulseSize`), then a lull. A resting creature leaves
 only with a full charge, and while the nest cannot fill one for `StarveTicks` its hungry creatures die one by one
