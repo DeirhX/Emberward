@@ -86,10 +86,10 @@ public sealed class HudStrip
         DrawPanelArt(dl, _shieldIconTex, ShieldX, ShieldPanelW);
         DrawPanelArt(dl, _panelFrameTex, MaterialsX, MaterialsPanelW);
         DrawPanelArt(dl, _buildPanelTex, BuildX, BuildPanelW);
-        DrawPanelLabels(dl, burning: !player.IsDead && player.FireLevel > 0f, shielded: shield.Active);
+        DrawPanelLabels(dl, burning: !player.IsDead && player.FireLevel > 0f, shielded: shield.Active && !player.IsDead);
 
         _heat.DrawOrb(dl, player, time);
-        // The crystal holds the shield when the match has one, else the hull; the number under it is always the hull.
+        // The crystal holds the shield when the match has one, else the hull; the number under it is shield / hull (the hull alone with no shield).
         float crystal = shield.Active ? shield.ShieldFill : player.HullFraction;
         bool crystalLow = shield.Active ? shield.Low : player.IsHullLow(latched: false);
         _liquids.Draw(dl, player, ShieldX, time, crystal, crystalLow);
@@ -105,7 +105,7 @@ public sealed class HudStrip
         int health = Math.Max(0, player.Reactor.Health);
         string hull = health.ToString(System.Globalization.CultureInfo.InvariantCulture);
         DrawReadout(dl, ShieldPlate, shield.Active && !player.IsDead
-            ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{shield.Shield} / {hull}")
+            ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{shield.Shield}/{hull}")
             : hull);
 
         // MATERIALS: the ore in the tank's hold against what it takes, the currency structures are built from. The
