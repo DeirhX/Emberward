@@ -18,9 +18,9 @@ public static class TankDamageEvents
         var taken = tank.LastDamageTaken;
         // A hit that empties the shield is recorded as the break alone (its sound is the zap and the shatter in one).
         if (taken.ShieldBroken)
-            log.Record(new StepEvent(StepEventKind.TankShieldBroken, at, tank.Color, Count: taken.Shield));
+            log.Record(new StepEvent(StepEventKind.TankShieldBroken, at, tank.Color, Count: taken.Shield, Cause: tank.LastDamageCause));
         else if (taken.Shield > 0)
-            log.Record(new StepEvent(StepEventKind.TankShieldHit, at, tank.Color, Count: taken.Shield));
+            log.Record(new StepEvent(StepEventKind.TankShieldHit, at, tank.Color, Count: taken.Shield, Cause: tank.LastDamageCause));
         if (hullEvent && taken.Hull > 0)
             log.Record(new StepEvent(StepEventKind.TankHit, tank.Position, tank.Color));
     }

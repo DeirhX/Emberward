@@ -193,7 +193,8 @@ public readonly record struct StepEvent(
     MachineType Machine = default,
     ImpactTarget Target = default,
     int Count = 0,
-    bool Torch = false);
+    bool Torch = false,
+    Entities.DamageCause Cause = default);
 
 /// <summary>
 /// The events of the current step, cleared when the next one begins. It is output only: nothing in the simulation

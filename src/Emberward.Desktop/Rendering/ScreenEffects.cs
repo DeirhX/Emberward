@@ -86,7 +86,7 @@ public sealed class ScreenEffects
                 || e.Color != player.Color)
                 continue;
             // A shield takes bites and shells alike, but only a shell has a direction to shake along.
-            if (e.Kind != StepEventKind.TankHit && player.LastDamageCause != DamageCause.EnemyFire)
+            if (e.Kind != StepEventKind.TankHit && e.Cause != DamageCause.EnemyFire)
                 continue;
             _hitPending = true;
             var v = player.LastHitVelocity;

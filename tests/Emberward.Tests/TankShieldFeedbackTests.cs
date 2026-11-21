@@ -75,7 +75,8 @@ public class TankShieldFeedbackTests
         var effects = new ScreenEffects();
         effects.Update(victim, 0.016f);
 
-        effects.AfterStep([new StepEvent(StepEventKind.TankShieldHit, victim.Position, victim.Color, Count: 10)], victim);
+        effects.AfterStep([new StepEvent(StepEventKind.TankShieldHit, victim.Position, victim.Color, Count: 10,
+            Cause: DamageCause.EnemyFire)], victim);
         var levels = effects.Update(victim, 0.016f);
 
         Assert.True(levels.Hit > 0f);
@@ -85,11 +86,11 @@ public class TankShieldFeedbackTests
     public void ABiteOnTheShield_DoesNotShakeTheScreen()
     {
         var (_, victim) = Shot(Tweaks.Weapon.BulletDamage);
-        victim.TakeDamage(10, DamageCause.Emberite);
         var effects = new ScreenEffects();
         effects.Update(victim, 0.016f);
 
-        effects.AfterStep([new StepEvent(StepEventKind.TankShieldHit, victim.Position, victim.Color, Count: 10)], victim);
+        effects.AfterStep([new StepEvent(StepEventKind.TankShieldHit, victim.Position, victim.Color, Count: 10,
+            Cause: DamageCause.Emberite)], victim);
         var levels = effects.Update(victim, 0.016f);
 
         Assert.Equal(0f, levels.Hit);
