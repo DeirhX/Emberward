@@ -89,7 +89,8 @@ public sealed class TankShieldSystem
         int shield = Tweaks.TankShield.Capacity - state.Missing;
         return new TankShieldView(true, shield, Tweaks.TankShield.Capacity,
             shield / (float)Tweaks.TankShield.Capacity, tank.HullFraction,
-            Regenerating: state.Missing > 0 && state.Refilling, state.DelayTicks, FireLevelOf(tank));
+            Regenerating: state.Missing > 0 && state.Refilling, state.DelayTicks, FireLevelOf(tank),
+            Low: shield < Tweaks.TankShield.LowFraction * Tweaks.TankShield.Capacity);
     }
 
     /// <summary>Mixes every tank's shield, for <see cref="WorldStateHash.Compute"/>.</summary>
@@ -139,4 +140,4 @@ public readonly record struct DamageTaken(int Shield, int Hull, bool ShieldBroke
 /// when the match rules run no shield.
 /// </summary>
 public readonly record struct TankShieldView(bool Active, int Shield, int ShieldCapacity, float ShieldFill, float HullFill,
-    bool Regenerating, int RegenDelayTicks, float FireLevel = 0f);
+    bool Regenerating, int RegenDelayTicks, float FireLevel = 0f, bool Low = false);

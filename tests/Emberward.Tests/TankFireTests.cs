@@ -109,4 +109,26 @@ public class TankFireTests
 
         Assert.True(settings.TankFireHeatPerTickMax <= settings.TankNetworkCoolingPerTick + 1e-6f);
     }
+
+    [Fact]
+    public void ABurningTank_RaisesTheFireWarning_AndAnUnhurtOneDoesNot()
+    {
+        var (_, burning) = Burning(300);
+        var (_, calm) = Burning(1000);
+        var warnings = new Emberward.Desktop.Gui.Guidance.PlayerWarnings();
+
+        Assert.Equal(Emberward.Desktop.Gui.Guidance.WarningKind.FireAboard, warnings.Update(burning, offerThermalView: false, 0f)?.Kind);
+        Assert.NotEqual(Emberward.Desktop.Gui.Guidance.WarningKind.FireAboard, new Emberward.Desktop.Gui.Guidance.PlayerWarnings()
+            .Update(calm, offerThermalView: false, 0f)?.Kind);
+    }
+
+    [Fact]
+    public void AVeryDamagedHull_ShowsHullLow_NotJustTheFire()
+    {
+        var (_, tank) = Burning(200);
+
+        var kind = new Emberward.Desktop.Gui.Guidance.PlayerWarnings().Update(tank, offerThermalView: false, 0f)?.Kind;
+
+        Assert.Equal(Emberward.Desktop.Gui.Guidance.WarningKind.HullLow, kind);
+    }
 }
