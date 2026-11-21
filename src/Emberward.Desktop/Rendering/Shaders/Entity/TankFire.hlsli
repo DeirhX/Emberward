@@ -44,7 +44,9 @@ float4 TankFire(float2 p, float3 team, float4 params, float aa)
 
     // Smoke: dark puffs that rise from the hull and drift along the lean, thinner as they climb.
     // The puffs' pattern scrolls toward -y by a whole number of blocks each cycle, so it rises and the loop is seamless.
-    float puffSeed = FireNoise(floor(float2(p.x * 0.9, p.y * 0.9 + t)));
+    // The rows repeat every four blocks, and the pattern moves four blocks in the 4 s cycle, so it wraps without a jump.
+    float puffRow = floor(p.y * 0.9 + t);
+    float puffSeed = FireNoise(float2(floor(p.x * 0.9), puffRow - 4.0 * floor(puffRow * 0.25)));
     float puff = 0.5 + 0.5 * sin(6.283185 * (t * 0.5 + puffSeed));
     float smokeCentre = p.x - lean.x * (-p.y);
     float smoke = smoothstep(2.6, 0.0, abs(smokeCentre)) * smoothstep(1.0, -1.5, p.y) * smoothstep(-11.0, -2.0, p.y)

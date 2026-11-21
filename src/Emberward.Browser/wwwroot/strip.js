@@ -240,6 +240,10 @@ export class StripView {
 
         this.drawOrb(left, p, time);
         this.drawLiquids(left, p, time);
+        // The plate's title changes with fire and shield, so it is drawn each frame, not in the cached layer.
+        // A burning hull says so, in fire colours; otherwise the plate names the crystal and the number under it.
+        if (p.fireLevel > 0) stripText(left, "FIRE ABOARD", SHIELD.x, SHIELD.title, 18, abgr(0xff50a0ff), abgr(0x402060ff));
+        else stripText(left, p.shieldActive ? "SHIELD/HULL" : "HULL", SHIELD.x, SHIELD.title, p.shieldActive ? 17 : 20, abgr(0xfff8e890), abgr(0x20ffa030));
 
         const readout = (text, plate) =>
             stripText(left, text, plate.x, plate.readout, 22, abgr(0xffaafacd), abgr(0x2830ff60));
@@ -298,9 +302,6 @@ export class StripView {
         ])
             left.drawImage(image, px, 0, w, STRIP_H);
         stripText(left, "TEMP", TEMP.x, TEMP.title, 19, abgr(0xff78c8ff), abgr(0x181880ff));
-        // A burning hull says so, in fire colours; otherwise the plate names the crystal and the number under it.
-        if (p.fireLevel > 0) stripText(left, "FIRE ABOARD", SHIELD.x, SHIELD.title, 18, abgr(0xff50a0ff), abgr(0x402060ff));
-        else stripText(left, p.shieldActive ? "SHIELD/HULL" : "HULL", SHIELD.x, SHIELD.title, p.shieldActive ? 17 : 20, abgr(0xfff8e890), abgr(0x20ffa030));
         stripText(left, "MATERIALS", MATERIALS.x, MATERIALS.title, 21, abgr(0xff68e0ff), abgr(0x282090ff));
         // Dark glass behind the liquid (hides the energy bolt baked into the art), and the dial's dim track.
         left.fillStyle = abgr(0xff0a0c0e);
