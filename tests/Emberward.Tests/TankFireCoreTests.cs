@@ -279,20 +279,16 @@ public class TankFireCoreTests
     }
 
     /// <summary>
-    /// The HUD colours the hull gauge with the same ramp (HudPalette.HullHeat, ABGR). Checked when that function is in
-    /// the build, so the two cannot drift once both are merged.
+    /// The HUD colours the hull gauge with the same ramp (HudPalette.HullHeat, ABGR), so the two cannot drift.
     /// </summary>
     [Fact]
     public void TheHudRamp_MatchesTheShaderStops()
     {
-        var method = typeof(Emberward.Desktop.Gui.HudPalette).GetMethod("HullHeat", [typeof(float)]);
-        if (method == null || method.ReturnType != typeof(uint))
-            return;
         foreach (var (name, hull, hex) in HullHeatStops)
         {
             if (float.IsNaN(hull))
                 continue;
-            uint color = (uint)method.Invoke(null, [hull])!;
+            uint color = Emberward.Desktop.Gui.HudPalette.HullHeat(hull);
             string actual = string.Create(CultureInfo.InvariantCulture,
                 $"{color & 0xFF:X2}{(color >> 8) & 0xFF:X2}{(color >> 16) & 0xFF:X2}");
             Assert.True(actual == hex, $"HudPalette.HullHeat({hull}) is #{actual}, {name} is #{hex}");
