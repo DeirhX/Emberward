@@ -584,7 +584,13 @@ Pyrite pockets and lumps at least 60 cells from every base hold a nest (a pocket
 60 by size); specks hold none. Heat is the noise a tank makes and the fight makes heat:
 
 - *Scout.* A guarded deposit shows resting embers on the ore, and the radar returns a life echo from the nest's centre
-  and from each creature out where it is.
+  and from each creature out where it is. Once a side has discovered a nest (seen its centre, or had a life echo
+  from it), and for as long as the nest has creatures, a thin pink danger ring is drawn over it at the distance
+  from which it senses that side's tank now (40 cells for a tank too cool to be sensed, the nearest it ever senses
+  one, growing with the tank's heat to 110 at 100 degrees), titled "EMBERITE NEST" over "DANGER: EMBERITES". It is
+  faint while the nest sleeps, full once it is awake, and pulses while its creatures are out; a cleared nest has
+  none. The ring stays on remembered ground like explored terrain does. Rock blocking the nest's sense, and digging
+  its ore, which wakes it from anywhere, are not drawn.
 - *Sneak or fight.* A cool tank is not sensed. A tank at 45 degrees is sensed from 40 cells, one at 100 from 110. Digging
   the nest's ore wakes it whatever the tank's heat, and the thief is hunted for six seconds. A tank that cools below 35
   degrees loses the scent and the creatures go home.
@@ -979,6 +985,7 @@ upgrades, throughput, turrets, removing the pylon and the tank's reserve are in)
 | The ore formerly called emberite is renamed pyrite; the creatures formerly called emberlings (and "mobs" in code) are now emberites | Decided |
 | A spent emberite drinks a new charge from the nearest hot ground (one second) and bites again instead of going home; a tank on ground at the scent heat is kept whatever its own heat (§6.2) | Decided |
 | An emberite short of a charge drinks at hot ground on its way home (a modest detour) before it goes home (§6.2) | Decided |
+| A discovered nest with creatures shows a danger ring at the distance it senses the player's tank from, with a title (§6.2) | Decided |
 | A living radar echo is one blip at the centre of what returned it, and emberites out of their nests return one (§6.6) | Decided |
 | Gatlings are the structure that fights emberites: fast light rounds that lead a runner and pass a little soil; the turret stays the answer to tanks (§6.2) | Decided |
 | A dying emberite now and then drops a unit of its nest's own deposit; the unit is a cell moved, so no new world data counts it (§6.2) | Decided |

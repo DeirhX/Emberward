@@ -82,6 +82,23 @@ float4 NetworkCoverage(float2 p, float3 tint, float4 params, float aa)
     return float4(cool * glow, (rim * 0.04 + inside * 0.02) * level * quadFade);
 }
 
+// A discovered nest's danger ring: a thin line at the distance from which the nest senses the player's tank, with a
+// faint glow just inside it. Opacity comes from the C# side (faint for a dormant nest); a nest whose creatures are out
+// (level 2) breathes, brighter and a touch wider, so the ring reads as live.
+float4 DangerRing(float2 p, float3 color, float4 params, float aa)
+{
+    float radius = params.x;
+    float level = params.y;
+    float phase = params.z;
+    float opacity = saturate(params.w);
+    float pulse = level > 1.5 ? 0.5 + 0.5 * sin(phase * 5.0) : 0.0;
+    float d = length(p) - radius;
+    float stroke = FillAlpha(abs(d) - (0.16 + 0.10 * pulse), aa);
+    float glow = exp(-abs(d) * 1.6) * (0.10 + 0.25 * pulse) * step(d, 0.0);
+    float alpha = (stroke * (0.75 + 0.25 * pulse) + glow) * opacity;
+    return float4(color * alpha, stroke * 0.6 * opacity);
+}
+
 // One radar return, on ground out of the player's sight. It flares when the pulse finds it and then fades over its
 // life. Green for rock and walls, amber for metal (machines), a dim blue-green for the weak return of a
 // cave: a small dot with a soft glow, dimmer the more heat the ray crossed (data.r). Hot ground the ray went through,

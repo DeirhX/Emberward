@@ -573,6 +573,13 @@ Desktop:
 
 ### The emberites
 
+Which nests a side has discovered is output, like its vision and radar: `SideSensing` keeps a `NestDiscovery` for each
+side whose vision it tracks, which marks a nest found once that side's vision has explored its centre or its radar
+has returned a life echo from it this tick (read from the newest contacts back), and costs nothing once every nest is
+found. `World.CopyNestDangers(tank)` lists the discovered nests that are not cleared, with the ring radius
+`EmberiteSwarm.DangerRadius(tank.Heat)` and a `NestDangerLevel`; a side whose vision is not tracked (no fog) knows
+every nest.
+
 `EmberiteSwarm` (`Entities/Emberites`) exists only when `MatchRules.Emberites` is on and is stepped as `"emberites"` after `"tanks"`.
 `Initialize` seeds a nest in each pocket and lump of `World.OreDeposits` that is far enough from every base. A nest is
 counters (creatures never released, resting, out, stored charge); only creatures out of the nest are in the swarm's

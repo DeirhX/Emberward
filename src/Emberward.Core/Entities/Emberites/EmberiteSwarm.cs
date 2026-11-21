@@ -189,6 +189,29 @@ public sealed partial class EmberiteSwarm
         return Tweaks.Emberites.HuntLeashMinCells + t * (Tweaks.Emberites.HuntLeashCells - Tweaks.Emberites.HuntLeashMinCells);
     }
 
+    /// <summary>
+    /// The radius of a nest's danger ring for a tank at <paramref name="heat"/>: how far the nest senses it from
+    /// (<see cref="SenseRange"/>), and never less than <see cref="Tweaks.Emberites.WakeRange"/>, the nearest it senses
+    /// a tank at all, so that a tank too cool to be sensed still sees where warming up would wake it.
+    /// </summary>
+    public static float DangerRadius(float heat) => Math.Max(Tweaks.Emberites.WakeRange, SenseRange(heat));
+
+    /// <summary>
+    /// Nest <paramref name="index"/>'s danger for a tank at <paramref name="heat"/>; false for a cleared nest, which is
+    /// no danger.
+    /// </summary>
+    public bool TryGetDanger(int index, float heat, out NestDanger danger)
+    {
+        danger = default;
+        if (index < 0 || index >= _nests.Count || _nests[index].IsCleared)
+            return false;
+        Nest nest = _nests[index];
+        NestDangerLevel level = nest.Out > 0 ? NestDangerLevel.Swarming
+            : nest.Awake ? NestDangerLevel.Awake : NestDangerLevel.Dormant;
+        danger = new NestDanger(nest.Centre, DangerRadius(heat), level);
+        return true;
+    }
+
     /// <summary>What a creature finds in a cell: the ground a nest's own creatures burrow through is soil to them.</summary>
     public static EmberiteGround Classify(TerrainPixel pixel, Position cell, Position zoneCentre, int zoneRadius)
     {

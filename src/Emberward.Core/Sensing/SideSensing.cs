@@ -7,6 +7,7 @@ using Emberward.Core.Entities.Machines;
 using Emberward.Core.Entities.Tanks;
 using Emberward.Core.Terrain;
 using Emberward.Core.Network;
+using Emberward.Core.Rendering;
 
 /// <summary>
 /// What each side someone asked about sees (fog of war, <see cref="VisionMap"/>) and its tank's radar
@@ -21,6 +22,7 @@ internal sealed class SideSensing(TerrainGrid terrain, MachineList machines, Tan
     private readonly List<(Tank Tank, Radar Radar)> _radars = new();
     private readonly List<VisionSource> _visionSources = new();
     private readonly List<RadarTarget> _radarTargets = new();
+    private readonly List<(Tank Tank, NestDiscovery Nests)> _discoveries = new();
 
     /// <summary>
     /// Starts tracking what <paramref name="tank"/>'s side sees and returns the map, which every
@@ -35,6 +37,8 @@ internal sealed class SideSensing(TerrainGrid terrain, MachineList machines, Tan
                 return tracked.Map;
         var map = new VisionMap(terrain);
         _visions.Add((tank, map));
+        if (emberites != null)
+            _discoveries.Add((tank, new NestDiscovery()));
         UpdateVision(tank, map);
         return map;
     }
@@ -88,6 +92,31 @@ internal sealed class SideSensing(TerrainGrid terrain, MachineList machines, Tan
                     : RadarReach.Base,
                 tank.Base?.Position);
         }
+
+        // After the radars, so that a life echo born this tick counts.
+        if (emberites != null)
+            foreach (var (tank, nests) in _discoveries)
+                nests.Update(emberites.Nests, TrackVision(tank), RadarOf(tank));
+    }
+
+    /// <summary>
+    /// Writes the nests <paramref name="tank"/>'s side has discovered and that still have creatures, each with its
+    /// danger ring for that tank's heat; returns how many. A side whose vision is not tracked plays without fog of
+    /// war and knows every nest.
+    /// </summary>
+    public int CopyNestDangers(Tank tank, Span<NestDanger> destination)
+    {
+        if (emberites == null)
+            return 0;
+        NestDiscovery? found = null;
+        foreach (var (owner, nests) in _discoveries)
+            if (owner == tank)
+                found = nests;
+        int count = 0;
+        for (int i = 0; i < emberites.Nests.Count && count < destination.Length; i++)
+            if ((found is null || found.IsFound(i)) && emberites.TryGetDanger(i, tank.Heat, out NestDanger danger))
+                destination[count++] = danger;
+        return count;
     }
 
     /// <summary>

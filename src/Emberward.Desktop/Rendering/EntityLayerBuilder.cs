@@ -45,6 +45,7 @@ public sealed class EntityLayerBuilder
     private readonly PreviewQuads _preview = new();
     private readonly ProjectileQuads _projectiles = new();
     private readonly EmberiteQuads _emberites = new();
+    private readonly NestDangerQuads _nestDangers = new();
     private readonly PowerLabelQuads _powerLabels = new();
     private TankRenderState[] _tankScratch = [];
     private MachineRenderState[] _machineScratch = [];
@@ -73,6 +74,7 @@ public sealed class EntityLayerBuilder
         _tankFires.CaptureStep(world);
         _projectiles.Capture(world);
         _emberites.Capture(world);
+        _nestDangers.CaptureStep(world, localSlot);
         _powerLabels.CaptureStep(world, localSlot);
     }
 
@@ -117,7 +119,8 @@ public sealed class EntityLayerBuilder
         if (radar != null && vision != null)
             RadarQuads.Emit(_quads, radar, vision);
 
-        // Beams (links, the tether) under machines, machines under tanks (a tank carrying one draws on top).
+        // Danger rings and beams (links, the tether) under machines, machines under tanks (a tank carrying one draws on top).
+        _nestDangers.EmitRings(_quads);
         _coverage.Emit(_quads);
         _beams.Begin(visualSeconds);
         if (tankPositions.Length > 0)
@@ -137,5 +140,6 @@ public sealed class EntityLayerBuilder
         _tankShields.Emit(_quads, _motion, vision);
         _baseShields.Emit(_quads, vision);
         _powerLabels.Emit(_quads, vision, powerLabelCellSize);
+        _nestDangers.EmitLabels(_quads);
     }
 }

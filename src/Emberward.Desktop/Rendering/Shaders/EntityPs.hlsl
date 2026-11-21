@@ -85,7 +85,9 @@ float4 main(PSIn input) : SV_Target
         result = ShieldHit(p, input.color.rgb, input.params, aa);
     else if (kind < kKindTankShield + 0.5)
         result = TankShield(p, input.color.rgb, input.params, aa);
-    else // kKindTankFire
+    else if (kind < kKindTankFire + 0.5)
         result = TankFire(p, input.color.rgb, input.params, aa);
+    else // kKindDangerRing
+        result = DangerRing(p, input.color.rgb, input.params, aa);
     return result;
 }
