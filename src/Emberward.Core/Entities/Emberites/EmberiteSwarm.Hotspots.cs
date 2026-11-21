@@ -24,11 +24,20 @@ public sealed partial class EmberiteSwarm
             GoHome(ref emberite);
             return;
         }
+        StartSeeking(ref emberite, spot);
+    }
+
+    /// <summary>Sets off for the hot cell <paramref name="spot"/>, to drink there.</summary>
+    private void StartSeeking(ref Emberite emberite, Position spot)
+    {
         emberite.State = EmberiteState.Seeking;
         emberite.Hotspot = spot;
         emberite.Timer = Tweaks.Emberites.HotspotSeekTicks;
         Seek(ref emberite);
     }
+
+    /// <summary>Whether a creature carries a whole charge. A hair under counts: the grid hands heat back in single precision.</summary>
+    private bool HasFullCharge(in Emberite emberite) => emberite.Charge >= _fullCharge * (1.0 - 1e-6);
 
     /// <summary>Runs to the hot ground; there it starts to drink. One that cannot reach it in time goes home.</summary>
     private void Seek(ref Emberite emberite)
@@ -53,7 +62,7 @@ public sealed partial class EmberiteSwarm
     /// <summary>
     /// Holds still at the hot ground for <see cref="Tweaks.Emberites.HotspotRechargeTicks"/>, then takes a full charge
     /// out of the ground around it and hunts again. Ground that has cooled and gives less sends it home with what it
-    /// got, so a creature never bites on part of a charge.
+    /// got, so a creature never bites on part of a charge; on its way it looks for other hot ground (<see cref="GoHome"/>).
     /// </summary>
     private void Drink(ref Emberite emberite)
     {
@@ -63,8 +72,7 @@ public sealed partial class EmberiteSwarm
         double want = _fullCharge - emberite.Charge;
         if (want > 0.0 && _terrain.IsInside(emberite.Hotspot))
             emberite.Charge += _terrain.ExtractEnergyInRadiusArea(emberite.Hotspot, Tweaks.Emberites.HotspotDrinkRadius, want, TerrainGrid.ThermalField.Terrain);
-        // A hair under counts: the grid hands heat back in single precision.
-        if (emberite.Charge < _fullCharge * (1.0 - 1e-6))
+        if (!HasFullCharge(emberite))
         {
             GoHome(ref emberite);
             return;
@@ -103,6 +111,46 @@ public sealed partial class EmberiteSwarm
             }
         return best <= limit;
     }
+
+    /// <summary>
+    /// Hot ground a creature short of a charge can drink at on its way home: the nearest cell within
+    /// <see cref="Tweaks.Emberites.HomeScanCells"/> (sampled every <see cref="Tweaks.Emberites.HotspotSearchStep"/> cells)
+    /// at <see cref="Tweaks.Emberites.HotspotHeat"/> or hotter that it can stand in, whose detour (there, then to the nest,
+    /// against straight to the nest) is at most <see cref="Tweaks.Emberites.HomeDetourCells"/>, and that is not the ground
+    /// it last drank from or failed to (within <see cref="Tweaks.Emberites.HotspotDrinkRadius"/> twice over of
+    /// <see cref="Emberite.Hotspot"/>). Looks at a fixed number of cells, at most once in <see cref="Tweaks.Emberites.HomeScanTicks"/>.
+    /// </summary>
+    private bool TryFindHotspotOnWayHome(in Emberite emberite, Nest nest, out Position spot)
+    {
+        spot = default;
+        const int reach = Tweaks.Emberites.HomeScanCells, step = Tweaks.Emberites.HotspotSearchStep;
+        const int spent = 2 * Tweaks.Emberites.HotspotDrinkRadius;
+        const long limit = (long)reach * reach;
+        var from = (Position)emberite.Position;
+        float straight = Distance(from, nest.Centre);
+        long best = limit + 1;
+        for (int dy = -reach; dy <= reach; dy += step)
+            for (int dx = -reach; dx <= reach; dx += step)
+            {
+                long distance = (long)dx * dx + (long)dy * dy;
+                if (distance >= best)
+                    continue;
+                var cell = new Position(from.X + dx, from.Y + dy);
+                if (Math.Abs(cell.X - emberite.Hotspot.X) <= spent && Math.Abs(cell.Y - emberite.Hotspot.Y) <= spent)
+                    continue;
+                if (!_terrain.IsInside(cell) || _terrain.GetHeatTemperature(cell) < Tweaks.Emberites.HotspotHeat)
+                    continue;
+                if (MathF.Sqrt(distance) + Distance(cell, nest.Centre) > straight + Tweaks.Emberites.HomeDetourCells)
+                    continue;
+                if (Classify(_terrain.GetPixelRaw(cell), cell, nest.Centre, nest.Radius) == EmberiteGround.Blocked)
+                    continue;
+                spot = cell;
+                best = distance;
+            }
+        return best <= limit;
+    }
+
+    private static float Distance(Position a, Position b) => MathF.Sqrt(Position.DistanceSquared(a, b));
 
     /// <summary>
     /// Whether <paramref name="tank"/> stands on ground at <see cref="Tweaks.Emberites.HotZoneHeat"/> or hotter: creatures

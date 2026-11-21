@@ -601,10 +601,13 @@ Pyrite pockets and lumps at least 60 cells from every base hold a nest (a pocket
 - *Bite, drink, bite again.* A creature that has bitten does not go home. It runs to the nearest hot ground (a cell at
   20 degrees or hotter it can stand in, within 24 cells of where it bit), drinks a full charge out of the ground there
   for one second, and charges the tank again. So a fight on hot ground keeps going, and heat around the tank (its own
-  wake, a relay's dump, hot rock) is what feeds the creatures biting it; cool ground around the fight sends each
-  spent creature home after one bite. It goes home also if it cannot reach the hot ground within three seconds or
-  the ground gives less than a full charge, and a resting creature at home drinks heat out of the deposit and
-  leaves again only with a full charge. A tank standing on ground at 35 degrees or hotter (the scent threshold, so a
+  wake, a relay's dump, hot rock) is what feeds the creatures biting it. A creature that finds no hot ground near
+  the bite, cannot reach it within three seconds, or drinks the spot dry short of a full charge turns for home but
+  does not go straight there: on its way it looks (at once, then twice a second) for hot ground within 20 cells that
+  costs at most 12 cells of detour, skipping the ground it has just drained, and drinks there; full again, it
+  charges the tank. Only with no hot ground on its way does it carry on home, where a resting creature drinks heat
+  out of the deposit and leaves again only with a full charge. So cool ground around the fight and along the way
+  home sends each spent creature home after one bite. A tank standing on ground at 35 degrees or hotter (the scent threshold, so a
   tank cannot keep its ground that hot by itself once it has cooled) is kept by the creatures out whatever its own
   heat and whether they see it.
   A tank in its base, or just respawned, is not bitten.
@@ -975,6 +978,7 @@ upgrades, throughput, turrets, removing the pylon and the tank's reserve are in)
 | Take physical heat simulation seriously and build the loop on heat management | Decided |
 | The ore formerly called emberite is renamed pyrite; the creatures formerly called emberlings (and "mobs" in code) are now emberites | Decided |
 | A spent emberite drinks a new charge from the nearest hot ground (one second) and bites again instead of going home; a tank on ground at the scent heat is kept whatever its own heat (§6.2) | Decided |
+| An emberite short of a charge drinks at hot ground on its way home (a modest detour) before it goes home (§6.2) | Decided |
 | A living radar echo is one blip at the centre of what returned it, and emberites out of their nests return one (§6.6) | Decided |
 | Gatlings are the structure that fights emberites: fast light rounds that lead a runner and pass a little soil; the turret stays the answer to tanks (§6.2) | Decided |
 | A dying emberite now and then drops a unit of its nest's own deposit; the unit is a cell moved, so no new world data counts it (§6.2) | Decided |

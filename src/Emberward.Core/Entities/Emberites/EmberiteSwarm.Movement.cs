@@ -146,9 +146,18 @@ public sealed partial class EmberiteSwarm
         return emberite.Sees;
     }
 
+    /// <summary>
+    /// Goes home to rest. A creature short of a full charge looks, once in <see cref="Tweaks.Emberites.HomeScanTicks"/>
+    /// (at once when it turns for home), for hot ground on its way (<see cref="TryFindHotspotOnWayHome"/>) and drinks there
+    /// instead; only with none does it carry on home.
+    /// </summary>
     private void GoHome(ref Emberite emberite)
     {
-        emberite.State = EmberiteState.Returning;
+        if (emberite.State != EmberiteState.Returning)
+        {
+            emberite.State = EmberiteState.Returning;
+            emberite.Timer = 0;
+        }
         Nest nest = _nests[emberite.Nest];
         float dx = nest.Centre.X - emberite.Position.X, dy = nest.Centre.Y - emberite.Position.Y;
         float arrive = nest.Radius * 0.5f + 1f;
@@ -162,6 +171,15 @@ public sealed partial class EmberiteSwarm
             emberite.Gone = true;
             emberite.Velocity = default;
             return;
+        }
+        if (!HasFullCharge(emberite) && --emberite.Timer <= 0)
+        {
+            emberite.Timer = Tweaks.Emberites.HomeScanTicks;
+            if (TryFindHotspotOnWayHome(emberite, nest, out Position spot))
+            {
+                StartSeeking(ref emberite, spot);
+                return;
+            }
         }
         Steer(ref emberite, 1, emberite.Nest, nest.Centre, nest);
     }

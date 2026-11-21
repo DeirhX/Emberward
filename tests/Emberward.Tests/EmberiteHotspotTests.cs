@@ -10,8 +10,8 @@ namespace Emberward.Tests;
 /// <summary>
 /// What a creature does after a bite (<see cref="EmberiteSwarm"/>, DESIGN.md §6.2): with hot ground near the fight it
 /// runs there, drinks a new charge for <see cref="Tweaks.Emberites.HotspotRechargeTicks"/> and bites again instead of
-/// going home, taking the charge out of the ground so the energy balance holds; with none it goes home; and a tank on
-/// hot ground is kept whatever its own heat.
+/// going home, taking the charge out of the ground so the energy balance holds; short of a charge it drinks at hot ground
+/// on its way home; with none it goes home; and a tank on hot ground is kept whatever its own heat.
 /// </summary>
 public class EmberiteHotspotTests
 {
@@ -99,6 +99,78 @@ public class EmberiteHotspotTests
         Assert.Equal(0, nest.Resting);
         // The creature went home after neither bite, so its second charge was drunk beside the tank: a full bite's heat.
         Assert.True(gain > Tweaks.Emberites.BiteDegrees * 0.75f, $"the second bite should carry a full charge: +{gain}");
+    }
+
+    /// <summary>
+    /// The way-home arena: one dirt cell beside the tank warm enough to be found but holding less than a charge (the
+    /// first spot), and, if <paramref name="secondSpot"/>, a hot patch of dirt between the tank and the nest.
+    /// </summary>
+    private static (World World, Tank Tank, Nest Nest) WayHomeArena(bool secondSpot)
+    {
+        var (world, tank, nest) = Arena(creatures: 1);
+        var weak = Centre + new Offset(5, -5);
+        world.Terrain.SetPixel(weak, TerrainPixel.Dirt);
+        world.Terrain.AddHeat(weak, 24);
+        if (secondSpot)
+        {
+            var patch = Centre + new Offset(16, 7);
+            for (int y = -2; y <= 2; y++)
+                for (int x = -2; x <= 2; x++)
+                    world.Terrain.SetPixel(patch + new Offset(x, y), TerrainPixel.Dirt);
+            Heat(world.Terrain, patch, half: 2, temperature: 60f);
+        }
+        return (world, tank, nest);
+    }
+
+    /// <summary>
+    /// Runs the way-home arena without touching the tank's heat (setting it is heat the ledger does not see), checking the
+    /// balance every tick; returns the bites, the heat the second one added, whether the creature got home and how warm
+    /// the first spot is left.
+    /// </summary>
+    private static (int Bites, float SecondGain, bool Home, float FirstSpot) RunWayHome(bool secondSpot)
+    {
+        var (world, tank, nest) = WayHomeArena(secondSpot);
+        Assert.True(Tweaks.Emberites.BiteDegrees * Tweaks.Tank.TankHeatCapacity > 24f * 1.4f,
+            "the first spot must hold less than a charge");
+        var ledger = world.Terrain.Ledger;
+        double Balance() => world.SumSystemThermalEnergy() + world.SumSystemCharge() - ledger.Injected + ledger.TotalSunk;
+        double start = Balance();
+        int bites = 0;
+        float gain = 0f;
+        for (int i = 0; i < 600 && nest.Resting == 0; i++)
+        {
+            float before = tank.Heat;
+            world.Advance(_ => default);
+            if (Bit(world))
+            {
+                bites++;
+                if (bites == 2)
+                    gain = tank.Heat - before;
+            }
+            Assert.Equal(start, Balance(), tolerance: 1.0);
+        }
+        return (bites, gain, nest.Resting == 1, world.Terrain.GetHeatTemperature(Centre + new Offset(5, -5)));
+    }
+
+    [Fact]
+    public void AShortDrink_SendsItHome_ByWayOfHotGroundOnTheWay_WhereItChargesAndBitesAgain()
+    {
+        var (bites, gain, _, firstSpot) = RunWayHome(secondSpot: true);
+
+        // It drank the first spot dry (all it held, short of a charge) before it went on.
+        Assert.True(firstSpot < 5f, $"the first spot should have been drunk: {firstSpot}");
+        Assert.True(bites >= 2, $"the creature should have charged on the way home and bitten again: {bites} bites");
+        Assert.True(gain > Tweaks.Emberites.BiteDegrees * 0.75f, $"the second bite should carry a full charge: +{gain}");
+    }
+
+    [Fact]
+    public void AShortDrink_WithNoHotGroundOnTheWay_GoesHome()
+    {
+        var (bites, _, home, firstSpot) = RunWayHome(secondSpot: false);
+
+        Assert.True(firstSpot < 5f, $"the first spot should have been drunk: {firstSpot}");
+        Assert.Equal(1, bites);
+        Assert.True(home, "the creature should have gone home");
     }
 
     [Fact]

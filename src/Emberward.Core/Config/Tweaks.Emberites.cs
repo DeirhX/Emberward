@@ -93,6 +93,13 @@ public static partial class Tweaks
         public const int HotspotDrinkRadius = 3;
         public const int HotspotRechargeTicks = Perf.TargetFps;
         public const int HotspotSeekTicks = 3 * Perf.TargetFps;
+        // A creature going home short of a full charge (no hot ground near the bite, a spot it could not reach, or one
+        // that gave too little) looks for hot ground on its way, at once and then once in HomeScanTicks: the nearest
+        // cell within HomeScanCells whose detour (there, then home, against straight home) is at most HomeDetourCells,
+        // skipping the ground it last drank from. It drinks there as above; only with none does it carry on home.
+        public const int HomeScanTicks = Perf.TargetFps / 2;
+        public const int HomeScanCells = 20;
+        public const float HomeDetourCells = 12f;
 
         // ---- Movement ----------------------------------------------------------------------------------------
         // Cells a tick: open ground (the tank walks one) and burrowing through soil (the tank digs about half a cell).

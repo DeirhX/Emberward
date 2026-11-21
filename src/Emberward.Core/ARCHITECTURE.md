@@ -582,7 +582,9 @@ A creature out is a small state machine (`EmberiteState`): `Hunting` with a char
 `TryFindHotspot` found near where it bit (one fixed scan per bite, `Emberite.Hotspot`, straight steering, given up after
 `HotspotSeekTicks`), `Recharging` there for `HotspotRechargeTicks` (`Emberite.Timer`) before it takes a full charge with
 `ExtractEnergyInRadiusArea` and hunts again, and `Returning` home when it has lost its tank or found no hot ground
-(`EmberiteSwarm.Hotspots.cs`). A tank on ground at `HotZoneHeat` is kept whatever its heat (one heat read per hunting creature).
+(`EmberiteSwarm.Hotspots.cs`). A creature going home short of a full charge looks for hot ground on its way
+(`TryFindHotspotOnWayHome`: a fixed scan of `HomeScanCells` around it, at once and then once in `HomeScanTicks`, within
+`HomeDetourCells` of detour and away from the `Emberite.Hotspot` it last drained) and seeks it as above. A tank on ground at `HotZoneHeat` is kept whatever its heat (one heat read per hunting creature).
 A woken nest lets its creatures out in pulses (`Nest.Phase`, `AdvancePulse`): a stir of `StirTicks` (`StepEventKind.NestStirred`,
 the warning), a group sized by the hunted tank's heat (`EmberiteSwarm.PulseSize`), then a lull. A resting creature leaves
 only with a full charge, and while the nest cannot fill one for `StarveTicks` its hungry creatures die one by one

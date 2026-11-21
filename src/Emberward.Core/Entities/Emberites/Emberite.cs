@@ -4,15 +4,15 @@ using Emberward.Core.Types;
 
 /// <summary>
 /// What a creature out of its nest is doing. It hunts with a charge, bites, runs to the nearest hot ground
-/// (<see cref="Seeking"/>), drinks a new charge there for a second (<see cref="Recharging"/>) and hunts again; it goes
-/// home only when it has lost its tank or finds no hot ground near.
+/// (<see cref="Seeking"/>), drinks a new charge there for a second (<see cref="Recharging"/>) and hunts again. One that
+/// has lost its tank goes home; one short of a charge looks for hot ground on its way home and drinks there first.
 /// </summary>
 public enum EmberiteState : byte
 {
     /// <summary>Going for a tank, to bite it.</summary>
     Hunting,
 
-    /// <summary>Going home to its nest, to rest and recharge.</summary>
+    /// <summary>Going home to its nest, to rest and recharge; short of a charge, watching for hot ground on the way.</summary>
     Returning,
 
     /// <summary>Spent by a bite, running to the hot ground it found (<see cref="Emberite.Hotspot"/>).</summary>
@@ -55,10 +55,10 @@ public struct Emberite
     /// <summary>Whether that look found a line clear of rock (kept until the next look).</summary>
     public bool Sees { get; set; }
 
-    /// <summary>The hot cell a spent creature runs to and drinks from (<see cref="EmberiteState.Seeking"/>, <see cref="EmberiteState.Recharging"/>).</summary>
+    /// <summary>The hot cell a spent creature runs to and drinks from (<see cref="EmberiteState.Seeking"/>, <see cref="EmberiteState.Recharging"/>); kept after, so that it does not go back to ground it has drained.</summary>
     public Position Hotspot { get; set; }
 
-    /// <summary>Ticks left: of the run to <see cref="Hotspot"/> before it gives up, or of the drink there.</summary>
+    /// <summary>Ticks left: of the run to <see cref="Hotspot"/> before it gives up, of the drink there, or (going home) to its next look for hot ground on the way.</summary>
     public int Timer { get; set; }
 
     /// <summary>Killed or back in its nest this step; removed before the next one.</summary>

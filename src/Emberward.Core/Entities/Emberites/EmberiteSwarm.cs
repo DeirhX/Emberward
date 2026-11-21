@@ -235,7 +235,7 @@ public sealed partial class EmberiteSwarm
             if (emberite.Pyrite != 0)
                 hash = Fnv1a.Mix(hash, emberite.Pyrite);
             hash = Fnv1a.Mix(Fnv1a.Mix(hash, emberite.SightTick), emberite.Sees);
-            if (emberite.State is EmberiteState.Seeking or EmberiteState.Recharging)
+            if (emberite.State is not EmberiteState.Hunting)
                 hash = Fnv1a.Mix(Fnv1a.Mix(Fnv1a.Mix(hash, emberite.Hotspot.X), emberite.Hotspot.Y), emberite.Timer);
         }
         return _trails.Mix(hash);
