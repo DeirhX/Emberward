@@ -200,10 +200,13 @@ The tank lives in a band around 0. Both ends hurt, and the world has places at b
   burning tank warms its surroundings more than itself (the energy is booked as injected in the ledger). The fire
   does no damage of its own; it hurts through the heat (overheating, being seen by emberites). Only the base puts it
   out, by repairing the hull (a dark base repairs nothing, so a fire there stays, held down by the base's cooling).
-  The fire is drawn on the tank: soot on the hull, ragged flame tongues that multiply as the hull falls and lean away
-  from the way it drives, a flickering light on the ground around it, heat shimmer over it, and smoke and embers that
-  rise from where it has been, so a burning tank leaves a trail (none of it shown out of sight). It crackles, higher as
-  it grows; the HUD's
+  The fire is drawn on the tank: the exposed core glowing at the hull's centre in a ring of soot (1.5 cells across at
+  75% hull to 3.5 at none, dark red through orange and yellow to white-hot on the hull-heat ramp; below 25% it sags and
+  drips slag, below 5% it pulses white; a regenerated shield hides it), ragged flame tongues that multiply as the hull
+  falls and lean away from the way it drives, a flickering light in the core's colour on the ground around it, heat
+  shimmer over it, and smoke and embers that rise from where it has been, so a burning tank leaves a trail (none of it
+  shown out of sight). A tank that dies flashes white and leaves a slag disc that cools for about 3 seconds. It
+  crackles, higher as it grows and sizzling higher still once the core sags; the HUD's
   crystal shows the shield, the number under it the hull, and the plate reads FIRE ABOARD while it burns.
   **A hit on a shield** is seen and heard: its own zap (and a shatter when it breaks), a pulse that lights the veins of
   the whole shield, and a red patch where the shot landed; a base's gate shield does the same.

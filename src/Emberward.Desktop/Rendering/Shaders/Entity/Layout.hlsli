@@ -44,14 +44,18 @@
 //                   the tank's centre ((0, 0) = no spot); color.rgb = team colour. Drawn only while a hit is fresh.
 //  23 tank fire   — .x = fire level (0..1), .y = seconds into a 4 s animation cycle, .z = a per-tank seed (0..1), .w = the hull
 //                   heading relative to the quad (radians). The quad's local -y points the way the flames go. Drawn only
-//                   while the hull burns.
-//  24 tank fire light — .x = fire level (0..1), .y = seconds into a 4 s cycle, .z = a per-tank seed (0..1). Additive.
+//                   while the hull burns, and for a few seconds where a tank died.
+//                   color.r = hull fill (0..1: the exposed core's size and colour), color.g = shield fill (0..1: the core
+//                   hides behind it), color.b = 0 alive, or 1 + the age of a dead tank's flash and slag disc (1 at the
+//                   death, 2 at the end of its window; fire level 0, no flames).
+//  24 tank fire light — .x = fire level (0..1), .y = seconds into a 4 s cycle, .z = a per-tank seed (0..1), .w = hull fill
+//                   (0..1: the light takes the core's colour). Additive.
 //  25 fire particle — .x = age (0 born, 1 gone), .y = 0 ember, 1 smoke, .z = fire level (0..1), .w = a per-particle seed (0..1)
 //  16 power label — .xy = packed 5x7 glyph bitmap (low 20 bits, then high 15), .z = dots per cell
 //                   (0 for a solid bar), .w = opacity
 //
 // color.rgb is the team colour (tank hull, turret), the body colour (hot shot),
-// the tint (reach area, coverage, power label) or data (radar blip). Every other kind owns its colours
+// the tint (reach area, coverage, power label) or data (radar blip, tank fire). Every other kind owns its colours
 // here in the shader; the C# side sends black for them.
 // ============================================================================
 

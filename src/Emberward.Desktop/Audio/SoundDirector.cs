@@ -235,8 +235,10 @@ public sealed class SoundDirector
             (1f - 0.05f * index) * approachRate, muffle);
         float fire = dead ? 0f : tank.FireLevel;
         bool fireOn = fire > 0f && audible;
+        // The fire rises in pitch with its level, and sizzles higher still once the exposed core sags (below 25% hull).
+        float sizzle = Math.Clamp((0.25f - tank.HullFraction) * 4f, 0f, 1f);
         _sink.SetLoop(track.FireLoop, fireOn ? gain * AudioTweaks.HullFireGain * (0.35f + 0.65f * fire) : 0f, pan,
-            0.9f + (0.2f * fire), muffle);
+            0.9f + (0.2f * fire) + (0.25f * sizzle), muffle);
         LogLoop(SoundEffect.FireLoop, index, ref track.FireOn, fireOn);
         LogLoop(SoundEffect.EngineLoop, index, ref track.EngineOn, engineOn);
         LogLoop(SoundEffect.DigLoop, index, ref track.DigOn, digOn);

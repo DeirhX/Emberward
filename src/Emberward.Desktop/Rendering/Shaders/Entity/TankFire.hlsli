@@ -3,12 +3,13 @@
 // ============================================================================
 //
 // Three kinds (params in Layout.hlsli):
-//   23 TankFire      soot on the hull and flame tongues, in the "flame frame": local -y points the way the flames go
-//                    (up the screen, leaning away from the drift), and params.w turns the hull box into that frame.
+//   23 TankFire      the exposed core in its soot ring at the hull's centre and flame tongues, in the "flame frame":
+//                    local -y points the way the flames go (up the screen, leaning away from the drift), and params.w
+//                    turns the hull box into that frame. A dead tank's flash and cooling slag disc are this kind too.
 //   24 TankFireLight the flickering light the fire throws on the ground around the tank (additive).
 //   25 FireParticle  one puff of smoke or one ember, placed by the C# side where the tank was when it was born.
 // Every animation loops on a 4 s cycle: each frequency is a multiple of 1/4 Hz, and the flame noise scrolls a whole
-// number of lattice periods per cycle.
+// number of lattice periods per cycle. The death's cooling runs on its age, which the C# side counts in steps.
 // ============================================================================
 
 #ifndef EMBERWARD_ENTITY_TANKFIRE_HLSLI
@@ -19,6 +20,26 @@ static const float3 kFireOrange = float3(1.00, 0.45, 0.08);
 static const float3 kFireRed = float3(0.70, 0.10, 0.03);
 static const float2 kFireHullCenter = float2(-0.5, 0.0);   // the hull box of Tank.hlsli
 static const float2 kFireHullHalf = float2(2.45, 1.55);
+
+// The hull-heat ramp: the exposed core's colour by how full the hull is. HudPalette.HullHeat has the same stops
+// (TankFireCoreTests checks them).
+static const float3 kHullHeat0 = float3(1.0000, 0.9647, 0.8471);    // #FFF6D8 at an empty hull
+static const float3 kHullHeat5 = float3(1.0000, 0.8157, 0.2510);    // #FFD040 at 5%
+static const float3 kHullHeat25 = float3(1.0000, 0.4157, 0.0627);   // #FF6A10 at 25%
+static const float3 kHullHeat50 = float3(0.7020, 0.1490, 0.0471);   // #B3260C at 50%
+static const float3 kHullHeat75 = float3(0.3529, 0.0784, 0.0314);   // #5A1408 at 75%
+static const float3 kCoreSoot = float3(0.0784, 0.0392, 0.0314);     // #140A08
+static const float3 kSlag = float3(0.1647, 0.1020, 0.0784);         // #2A1A14
+static const float3 kSlagCrack = float3(1.0000, 0.3529, 0.1020);    // #FF5A1A
+
+// The hull-heat ramp at hull fill h (0..1), interpolated between the stops; above 75% it stays at the 75% stop.
+float3 HullHeatColour(float h)
+{
+    float3 c = lerp(kHullHeat0, kHullHeat5, saturate(h * 20.0));
+    c = lerp(c, kHullHeat25, saturate((h - 0.05) * 5.0));
+    c = lerp(c, kHullHeat50, saturate((h - 0.25) * 4.0));
+    return lerp(c, kHullHeat75, saturate((h - 0.5) * 4.0));
+}
 
 // A hash of a lattice point built on frac (no sin), which stays exact enough at reduced precision for the small
 // lattice coordinates FireNoise hands it.
@@ -64,7 +85,9 @@ float FlameMask(float2 p, float2 base, float height, float sway)
     return across * foot * (1.0 - vc * vc);
 }
 
-float4 TankFire(float2 p, float4 params, float aa)
+// core: .x = hull fill (0..1), .y = shield fill (0..1: the core hides behind it), .z = 0 alive, or 1 + the age of a
+// dead tank's slag disc (0 at the death, 1 at the end of its window).
+float4 TankFire(float2 p, float4 params, float3 core, float aa)
 {
     float level = saturate(params.x);
     float t = params.y;                          // seconds into the 4 s cycle
@@ -72,18 +95,52 @@ float4 TankFire(float2 p, float4 params, float aa)
     float s = seed * 6.283185;
     float c = cos(params.w);
     float sn = sin(params.w);
+    float hullFill = saturate(core.x);
+    float dead = step(0.5, core.z);
+    float deathAge = saturate(core.z - 1.0);
 
-    // The noise both the soot and the flames read, scrolling up the screen 8 lattice rows per cycle.
-    float2 q = p * float2(0.9, 0.6) + float2(seed * 8.0, 2.0 * t);
+    // The noise the soot, the crust and the flames read, scrolling up the screen 8 lattice rows per cycle (a dead
+    // tank's slag stands still).
+    float2 q = p * float2(0.9, 0.6) + float2(seed * 8.0, 2.0 * t * (1.0 - dead));
     float n = 0.65 * FireNoise(q) + 0.35 * FireNoise(q * 2.0 + float2(5.0, 3.0));
 
     float4 result = float4(0.0, 0.0, 0.0, 0.0);
 
-    // Soot: the hull (turned from its own frame into the flame frame) goes dark and blotchy, with embers in the cracks.
-    float2 hullP = float2(c * p.x + sn * p.y, -sn * p.x + c * p.y);
-    float hull = FillAlpha(sdRoundBox(hullP, kFireHullCenter, kFireHullHalf, 0.5), aa);
-    Over(result, float3(0.03, 0.02, 0.02), hull * 0.5 * level * (0.6 + 0.4 * n));
-    result.rgb += kFireOrange * hull * level * 0.35 * smoothstep(0.62, 0.8, n);
+    // The core sits at the hull box's centre (turned into the flame frame); it grows from 1.5 to 3.5 cells as the hull
+    // falls from 75% to empty, and shrinks away behind a regenerated shield.
+    float2 cp = p - kFireHullCenter.x * float2(c, sn);
+    float d = length(cp);
+    float exposed = saturate((0.75 - hullFill) * 40.0) * (1.0 - saturate(core.y));
+    float radius = (1.5 + 2.0 * saturate((0.75 - hullFill) * 1.333333)) * exposed;
+    float sag = saturate((0.25 - hullFill) * 4.0) * (1.0 - dead);
+    float glow = 1.0 - smoothstep(0.086, 0.943, deathAge);     // a dead tank's slag cools from 0.3 s to 3.3 s
+    float flash = dead * (1.0 - smoothstep(0.0, 0.086, deathAge));
+    float fade = 1.0 - smoothstep(0.9, 1.0, deathAge);
+
+    // Soot: a dark, ragged ring round the core keeps it readable on any hull colour, with embers in its cracks.
+    float soot = FillAlpha(d - (radius + 0.5 + 0.7 * max(level, dead)) + 0.8 * (n - 0.5), aa) * 0.85;
+    Over(result, kCoreSoot, soot);
+    result.rgb += kFireOrange * soot * level * 0.35 * smoothstep(0.62, 0.8, n);
+
+    // Molten drips down the screen (+y in the flame frame) from a sagging core: up to three lanes, one per 2 s.
+    float lane = clamp(floor(cp.x / 1.1 + 0.5), -1.0, 1.0);
+    float along = (cp.y - 0.6 * radius) / ((1.0 + 2.5 * frac(0.5 * t + FireHash(float2(lane + 4.0, seed * 8.0)))) * max(sag, 0.01));
+    float drip = (1.0 - smoothstep(0.18, 0.32, abs(cp.x - 1.1 * lane) + 0.1 * along)) * step(0.0, along)
+        * (1.0 - smoothstep(0.85, 1.0, along)) * sag * exposed;
+    Over(result, lerp(kSlag, kSlagCrack, smoothstep(0.5, 0.95, along)), drip);
+
+    // The core: the hull-heat ramp (a dead tank's slag runs it back up as it cools), brightest at its centre, pulsing
+    // white-hot at 2 Hz below 5%, crusted with slag and cracked as it sags or cools.
+    float3 heat = HullHeatColour(lerp(hullFill, 0.75 * (1.0 - glow), dead));
+    heat = lerp(heat, kHullHeat0, saturate((0.05 - hullFill) * 20.0) * (1.0 - dead) * (0.5 + 0.5 * sin(12.566371 * t + s)));
+    float inner = saturate(1.0 - d / max(radius, 0.001)) * exposed;
+    float3 body = heat * (0.75 + 0.5 * inner);
+    float crust = smoothstep(0.45, 0.6, n) * max(sag * smoothstep(0.4, 0.9, 1.0 - inner), dead * (1.0 - glow));
+    body = lerp(body, kSlag, crust);
+    body = lerp(body, kSlagCrack, (1.0 - smoothstep(0.02, 0.07, abs(n - 0.52))) * lerp(sag, glow, dead));
+    float disc = FillAlpha(d - radius, aa) * exposed;
+    Over(result, body, disc);
+    result.rgb += heat * inner * inner * 0.6 * (1.0 - dead * (1.0 - glow)) + kHullHeat0 * flash * 2.0 * saturate(1.0 - d * 0.2);
 
     // Flames: four tongues standing on the hull (positions in its frame), the later ones lighting as the hull falls.
     float flicker = FireFlicker(t, s);
@@ -109,17 +166,19 @@ float4 TankFire(float2 p, float4 params, float aa)
     float alpha = 0.25 * shown;
     result.rgb = flame * 1.5 * shown + result.rgb * (1.0 - alpha);
     result.a = alpha + result.a * (1.0 - alpha);
-    return result;
+    return result * fade;
 }
 
-// The light a burning tank throws on the ground around it: a soft pool that grows and warms with the fire.
+// The light a burning tank throws on the ground around it: a soft pool that grows with the fire, in the core's colour
+// on the hull-heat ramp (params.w = hull fill), brought up to full brightness.
 float4 TankFireLight(float2 p, float4 params)
 {
     float level = saturate(params.x);
     float radius = 5.0 + 7.0 * level;
     float fall = saturate(1.0 - dot(p, p) / (radius * radius));
     fall *= fall;
-    float3 colour = lerp(float3(0.85, 0.20, 0.04), float3(1.0, 0.55, 0.15), level);
+    float3 heat = HullHeatColour(saturate(params.w));
+    float3 colour = heat / max(max(heat.r, heat.g), 0.35);
     float intensity = (0.08 + 0.32 * level) * FireFlicker(params.y, params.z * 6.283185);
     return float4(colour * intensity * fall, 0.0);
 }
