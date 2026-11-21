@@ -85,7 +85,7 @@ public class TankShieldFeedbackTests
     }
 
     [Fact]
-    public void AShieldHit_DrawsThePulse_WithTheFillLeftAfterTheHit()
+    public void AShieldHit_DrawsThePulse_WithTheFillLeftAfterTheHit_AndWhereTheShellCameIn()
     {
         var (world, victim) = Shot(Tweaks.Weapon.BulletDamage);
         float fill = world.TankShieldOf(victim).ShieldFill;
@@ -97,17 +97,39 @@ public class TankShieldFeedbackTests
         // The shader keeps only this much of the bubble: a partly drained shield shows a partly eroded one.
         Assert.InRange(fill, 0.01f, 0.99f);
         Assert.All(vertices, v => Assert.Equal(fill, v.P0));
+        // A fresh pulse, and the shell came in from the west: the red patch goes on that side.
+        Assert.All(vertices, v => Assert.InRange(v.P1, 0f, 0.5f));
+        Assert.All(vertices, v => Assert.True(v.P2 < 0f && MathF.Abs(v.P3) < MathF.Abs(v.P2), $"hit at ({v.P2}, {v.P3})"));
     }
 
     [Fact]
-    public void AShieldThatBreaks_DrawsThePulse_WithNoFillLeft()
+    public void AHitThatLeavesTheLastSliver_StillSendsAPositiveFill()
     {
-        var (world, victim) = Shot(Tweaks.TankShield.Capacity + 50);
+        var (world, victim) = Shot(Tweaks.TankShield.Capacity - 1);
+        float fill = world.TankShieldOf(victim).ShieldFill;
 
         var vertices = EmitPulse(world, victim);
 
+        // Not the break: the shader draws a small core for any fill above 0.
+        Assert.InRange(fill, float.Epsilon, 0.05f);
         Assert.NotEmpty(vertices);
-        Assert.All(vertices, v => Assert.Equal(0f, v.P0));
+        Assert.All(vertices, v => Assert.Equal(fill, v.P0));
+    }
+
+    [Fact]
+    public void AShieldThatBreaks_DrawsTheCollapse_AtWhereTheShellCameIn()
+    {
+        var (world, victim) = Shot(Tweaks.TankShield.Capacity + 50);
+        Assert.Equal(0f, world.TankShieldOf(victim).ShieldFill);
+
+        var vertices = EmitPulse(world, victim);
+
+        // The break marker, not the empty shield's 0 (which would draw nothing), and the hit for the red patch.
+        Assert.NotEmpty(vertices);
+        Assert.All(vertices, v => Assert.Equal(EntityShape.KindTankShield, v.Kind));
+        Assert.All(vertices, v => Assert.Equal(TankShieldQuads.BrokenFill, v.P0));
+        Assert.All(vertices, v => Assert.InRange(v.P1, 0f, 0.5f));
+        Assert.All(vertices, v => Assert.True(v.P2 < 0f, $"hit at ({v.P2}, {v.P3})"));
     }
 
     [Fact]

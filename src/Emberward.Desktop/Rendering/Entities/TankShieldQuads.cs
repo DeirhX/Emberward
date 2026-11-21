@@ -10,7 +10,7 @@ using Emberward.Core.Types;
 /// What a tank shows when its shield takes a hit (DESIGN.md §4.7): for a moment the veins of the shield light up
 /// with a wavefront from the impact, and a red patch glows where the shot landed. The shield's fill after the hit
 /// goes with the pulse, and the shader shows only that much of the bubble: its outer edge goes first, a small core
-/// at the centre last. Hits are read from
+/// at the centre last. The hit that breaks it sends <see cref="BrokenFill"/> instead. Hits are read from
 /// <see cref="World.StepEvents"/> after each step. Nothing is drawn, and nothing costs anything, while no hit is
 /// fresh. Output only.
 /// </summary>
@@ -20,6 +20,12 @@ public sealed class TankShieldQuads
     private const int PulseSteps = 9;
 
     private const float Radius = 8.5f;
+
+    /// <summary>
+    /// The fill a pulse sends for the hit that broke the shield: the shader then shows the whole bubble flashing and
+    /// collapsing to the centre, rather than the nothing an empty shield has left.
+    /// </summary>
+    public const float BrokenFill = -1f;
 
     private struct Pulse
     {
@@ -63,7 +69,7 @@ public sealed class TankShieldQuads
                 Step = _step,
                 OffsetX = shell ? e.Position.X - from.X : 0f,
                 OffsetY = shell ? e.Position.Y - from.Y : 0f,
-                Fill = world.TankShieldOf(tank).ShieldFill,
+                Fill = e.Kind == StepEventKind.TankShieldBroken ? BrokenFill : world.TankShieldOf(tank).ShieldFill,
             };
             // A hit restarts the tank's pulse.
             _pulses.RemoveAll(p => p.Color == color);
