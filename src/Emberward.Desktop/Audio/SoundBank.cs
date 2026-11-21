@@ -431,6 +431,10 @@ public sealed class SoundBank
         return samples;
     }
 
+    // Where the fire's pops fall in its one second (uneven, and clear of the loop's end so none is cut by the wrap).
+    private static readonly float[] PopTimes = [0.05f, 0.14f, 0.29f, 0.37f, 0.52f, 0.60f, 0.71f, 0.83f, 0.93f];
+    private static readonly float[] PopWeights = [1.0f, 0.6f, 0.8f, 0.5f, 1.0f, 0.7f, 0.5f, 0.9f, 0.6f];
+
     /// <summary>A burning hull: a low roar under a crackle of small pops.</summary>
     private static float[] FireLoop(ref Noise noise)
     {
@@ -442,13 +446,13 @@ public sealed class SoundBank
             float t = i / (float)Rate;
             // Pops: fixed positions in the second (the loop is seamless), each a quick decaying click.
             float pops = 0f;
-            for (int k = 0; k < 9; k++)
+            for (int k = 0; k < PopTimes.Length; k++)
             {
-                float since = t - (0.07f + 0.11f * k + 0.013f * (k * k % 5));
+                float since = t - PopTimes[k];
                 if (since > 0f)
-                    pops += hiss[i] * Decay(since, 0.006f) * (0.6f + 0.4f * ((k * 7) % 5) / 4f);
+                    pops += hiss[i] * Decay(since, 0.006f) * PopWeights[k];
             }
-            samples[i] = roar[i] * (0.8f + 0.2f * MathF.Sin(Tau * 5f * t)) * 1.3f + hiss[i] * 0.18f + pops * 1.4f;
+            samples[i] = roar[i] * (0.8f + 0.2f * MathF.Sin(Tau * 5f * t)) * 1.3f + hiss[i] * 0.18f + pops * 0.9f;
         }
         return samples;
     }

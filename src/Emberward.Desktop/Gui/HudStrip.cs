@@ -91,7 +91,7 @@ public sealed class HudStrip
         _heat.DrawOrb(dl, player, time);
         // The crystal holds the shield when the match has one, else the hull; the number under it is always the hull.
         float crystal = shield.Active ? shield.ShieldFill : player.HullFraction;
-        bool crystalLow = shield.Active ? shield.ShieldFill < Tweaks.Tank.HullLowOnFraction : player.IsHullLow(latched: false);
+        bool crystalLow = shield.Active ? shield.Low : player.IsHullLow(latched: false);
         _liquids.Draw(dl, player, ShieldX, time, crystal, crystalLow);
 
         // TEMP: the tank's temperature in degrees above ambient. Digging and firing heat it; past the safe maximum

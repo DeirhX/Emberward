@@ -56,14 +56,14 @@ public sealed class PlayerWarnings
         if (player.SpeedFactor < 0.999f)
             return new(WarningKind.Chilled, $"CHILLED - {(int)MathF.Round(player.SpeedFactor * 100f)}% SPEED", null,
                 HintTone.Info, Blinks: false);
-        if (player.FireLevel > 0f)
-            return new(WarningKind.FireAboard, "FIRE ABOARD - HULL BURNING",
-                "The fire heats the tank and the ground around it - return to base to repair the hull", HintTone.Bad, Blinks: true);
         if (_hullLowLatched)
             return new(WarningKind.HullLow, "HULL LOW", "Your base repairs the hull", HintTone.Bad, Blinks: true);
         if (_runningHotLatched)
             return new(WarningKind.RunningHot, "RUNNING HOT",
                 "Digging and firing heat the tank - return to base to cool down", HintTone.Warn, Blinks: true);
+        if (player.FireLevel > 0f)
+            return new(WarningKind.FireAboard, "FIRE ABOARD - HULL BURNING",
+                "The fire heats the tank and the ground around it - return to base to repair the hull", HintTone.Bad, Blinks: true);
         if (player.SpawnProtectionTicks > 0)
             return new(WarningKind.RespawnShield, "Respawn shield active", null, HintTone.Info, Blinks: false);
         if (now < _thermalHintUntil)

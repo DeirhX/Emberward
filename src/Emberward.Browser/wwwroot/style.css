@@ -796,7 +796,8 @@ footer i {
     letter-spacing: 0.04em;
 }
 #warning[data-kind="Overheating"] strong,
-#warning[data-kind="Frostbite"] strong {
+#warning[data-kind="Frostbite"] strong,
+#warning[data-kind="FireAboard"] strong {
     font-size: 20px;
 }
 #warning span {

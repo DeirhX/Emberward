@@ -29,9 +29,6 @@ public sealed class TankFireQuads
         }
     }
 
-    /// <summary>How many tanks are burning, as of the last step.</summary>
-    public int BurningCount => _levels.Count;
-
     public void Emit(EntityQuads quads, EntityMotion motion, VisionMap? vision)
     {
         if (_levels.Count == 0)

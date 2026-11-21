@@ -121,4 +121,14 @@ public class TankFireTests
         Assert.NotEqual(Emberward.Desktop.Gui.Guidance.WarningKind.FireAboard, new Emberward.Desktop.Gui.Guidance.PlayerWarnings()
             .Update(calm, offerThermalView: false, 0f)?.Kind);
     }
+
+    [Fact]
+    public void AVeryDamagedHull_ShowsHullLow_NotJustTheFire()
+    {
+        var (_, tank) = Burning(200);
+
+        var kind = new Emberward.Desktop.Gui.Guidance.PlayerWarnings().Update(tank, offerThermalView: false, 0f)?.Kind;
+
+        Assert.Equal(Emberward.Desktop.Gui.Guidance.WarningKind.HullLow, kind);
+    }
 }

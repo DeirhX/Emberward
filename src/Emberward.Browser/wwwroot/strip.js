@@ -514,7 +514,7 @@ export class StripView {
         const pulse = Math.floor(time * 4) % 2 === 0;
         const [sTop, sBottom] = extent(SHIELD_OUTLINE);
         const sLevel = sBottom - (sBottom - sTop) * this.shown.crystal;
-        const crystalLow = p.shieldActive ? p.shieldFill < 0.25 : p.hullLow;
+        const crystalLow = p.shieldActive ? p.shieldLow : p.hullLow;
         const crystalFill = p.shieldActive ? p.shieldFill : p.hull;
         if (p.hitFresh) fillBand(ctx, SHIELD_OUTLINE, sLevel, sBottom, abgr(0x90ffffff));
         else if (crystalLow && crystalFill > 0 && pulse)

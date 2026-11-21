@@ -33,6 +33,7 @@ public class BrowserSessionTests
         Assert.Contains(new SoundPlay(nameof(SoundEffect.BuildRelay), AudioTweaks.BuildGain, 0f, 1f), sounds.Play);
         Assert.Equal(SoundDirector.MaxTrackedTanks * 5 + 1, sounds.Loops.Length);
         Assert.Equal(nameof(SoundEffect.EngineLoop), sounds.Loops[0].Effect);
+        Assert.Equal(nameof(SoundEffect.FireLoop), sounds.Loops[4].Effect);
         Assert.Equal(nameof(SoundEffect.RechargeLoop), sounds.Loops[^1].Effect);
         Assert.True(sounds.Loops[0].Gain > 0f, "The player's engine runs.");
         Assert.Equal(0f, sounds.Loops[3 * 5].Gain);   // a fourth tank that is not there

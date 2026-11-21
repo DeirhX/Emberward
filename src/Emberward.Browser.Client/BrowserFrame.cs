@@ -58,7 +58,7 @@ public sealed record HeatDial(string[] Bands, float Ambient, float Safe, float M
 /// <param name="OreLine">The line beneath the hold window (<c>BuildSlotView.OreLine</c>).</param>
 public sealed record PlayerStatus(
     Position Position, Position Home, float Heat, float HeatLimit, float HeatGauge, string HeatColor,
-    float HitFlash, float HitFromX, float HitFromY, float Hull, bool ShieldActive, float ShieldFill, float FireLevel,
+    float HitFlash, float HitFromX, float HitFromY, float Hull, bool ShieldActive, float ShieldFill, bool ShieldLow, float FireLevel,
     int Ore, int HoldCapacity, int Store, double Charge, double BaseHeat, double BaseArmor,
     bool Docked, bool OffNetwork, float SafeSeconds, bool Dead, double RespawnSeconds, bool CanRecall,
     string Outcome, string? Carrying, bool BaseDestroyed,
