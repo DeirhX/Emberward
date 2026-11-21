@@ -262,4 +262,36 @@ public class TankFireQuadsTests
         Assert.Equal(1, count);
         Assert.True(target[3] >= 0.55f + (0.4f * tank.FireLevel) - 1e-4f, $"haze {target[3]}");
     }
+
+    private static EntityQuads DrawAt(TankFireQuads fire, EntityMotion motion, float alpha)
+    {
+        var quads = new EntityQuads();
+        quads.Begin(new RenderView(new Size(1600, 1200), new Size(400, 300), new Position(0, 0), 4), 1.3f, alpha);
+        fire.Emit(quads, motion, null, 1f / 60f, snap: false);
+        return quads;
+    }
+
+    [Fact]
+    public void Particles_DoNotRunBackOrOn_WhenAlphaWrapsWithoutAStep()
+    {
+        var (fire, motion) = Burning(1f);
+        PositionF[] late = ParticleCorners(DrawAt(fire, motion, 0.9f));
+
+        // A stalled network match: the frames' alpha wraps to 0 and climbs again, but no step arrives.
+        Assert.Equal(late, ParticleCorners(DrawAt(fire, motion, 0f)));
+        Assert.Equal(late, ParticleCorners(DrawAt(fire, motion, 0.5f)));
+        PositionF[] capped = ParticleCorners(DrawAt(fire, motion, 1f));
+        Assert.Equal(capped, ParticleCorners(DrawAt(fire, motion, 0.3f)));
+        Assert.Equal(fire.ParticleClock(0.3f), fire.ParticleClock(1.7f));
+
+        // Held (the world takes no step): nothing moves at any alpha until the next capture.
+        fire.Hold();
+        Assert.Equal(capped, ParticleCorners(DrawAt(fire, motion, 0.2f)));
+        fire.BeginCapture(1);
+        fire.CaptureTank(0, new Position(100, 100), 1f);
+        // The next step carries on from where the capped clock stood, then runs on.
+        Assert.Equal(capped, ParticleCorners(DrawAt(fire, motion, 0f)));
+        double atStep = fire.ParticleClock(0f);
+        Assert.True(fire.ParticleClock(0.5f) > atStep);
+    }
 }

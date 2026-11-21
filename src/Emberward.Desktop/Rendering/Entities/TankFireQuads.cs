@@ -50,6 +50,11 @@ public sealed class TankFireQuads
     // stall) and keep pace with it when it catches up. Counted in a long and read in doubles, so it never wraps.
     private long _steps;
 
+    // The particle clock last drawn, and whether the world is held (no step is coming): the clock never runs back,
+    // never runs more than a step past the latest capture, and stands still while held.
+    private double _clock;
+    private bool _held;
+
     // The world the trails were recorded in: a new match (or a late join's copy) starts them again.
     private WeakReference<World>? _world;
 
@@ -101,6 +106,7 @@ public sealed class TankFireQuads
             _trailKnown[i] = false;
         _count = count;
         _steps++;
+        _held = false;
     }
 
     /// <summary>Records tank <paramref name="slot"/>'s position and fire level (0: not burning) after this step.</summary>
@@ -175,7 +181,7 @@ public sealed class TankFireQuads
         ReadOnlySpan<TankRenderState> tanks = motion.Tanks;
         float scale = quads.View.PixelScale;
         float t = quads.Phase % PhaseCycleSeconds;
-        double clock = _steps + quads.Alpha;
+        double clock = ParticleClock(quads.Alpha);
         float follow = snap ? 1f : 1f - MathF.Exp(-Math.Max(0f, frameSeconds) / FlameLeanSeconds);
         for (int i = 0; i < tanks.Length && i < _count; i++)
         {
@@ -199,6 +205,23 @@ public sealed class TankFireQuads
 
             EmitParticles(quads, vision, i, level, clock, smoke: false);
         }
+    }
+
+    /// <summary>
+    /// The world takes no step (a pause, or a network tick that carried none): smoke and embers stand where they are
+    /// drawn now until the next capture, whatever the frames' alpha does meanwhile.
+    /// </summary>
+    public void Hold() => _held = true;
+
+    /// <summary>
+    /// The particles' clock (steps) for a frame drawn at <paramref name="alpha"/> of the step after the latest capture:
+    /// never behind the last frame's, never past the next step, and fixed while held.
+    /// </summary>
+    public double ParticleClock(float alpha)
+    {
+        if (!_held)
+            _clock = Math.Min(Math.Max(_steps + Math.Clamp(alpha, 0f, 1f), _clock), _steps + 1.0);
+        return _clock;
     }
 
     private static bool IsDrawn(in TankRenderState tank, float level, VisionMap? vision) =>
@@ -238,7 +261,7 @@ public sealed class TankFireQuads
             float age = (float)(loop - cycleStart);
             int cycle = unchecked((int)(long)cycleStart);
             // The frame is drawn alpha of a step after the latest step, so that much less of the trail lies behind it.
-            int stepsAgo = (int)MathF.Round((age * (float)lifeSteps) - quads.Alpha);
+            int stepsAgo = (int)Math.Round((age * lifeSteps) - (clock - _steps));
             Position birth = TrailPosition(slot, stepsAgo);
             float h1 = Hash(slot, k, cycle, smoke ? 17 : 29);
             float h2 = Hash(slot, k, cycle, smoke ? 43 : 61);
