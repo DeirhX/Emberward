@@ -1,3 +1,5 @@
+using Emberward.Core.Config;
+using Emberward.Core.Entities;
 using Emberward.Core.Rendering;
 using Emberward.Core.Sensing;
 using Emberward.Core.Types;
@@ -174,5 +176,90 @@ public class TankFireQuadsTests
         int[] player = Kinds(0);
         Assert.Equal(player, Kinds(1));
         Assert.True(player[2] > 0);
+    }
+    private static PositionF[] ParticleCorners(EntityQuads quads)
+    {
+        var corners = new List<PositionF>();
+        for (int v = 0; v < quads.VertexCount; v++)
+        {
+            if (quads.Vertices[v].Kind == EntityShape.KindFireParticle)
+                corners.Add(new PositionF(quads.Vertices[v].CellX, quads.Vertices[v].CellY));
+        }
+        return [.. corners];
+    }
+
+    [Fact]
+    public void Particles_HoldStill_WhileTheWorldTakesNoStep()
+    {
+        var (fire, motion) = Burning(1f);
+        PositionF[] before = ParticleCorners(Draw(fire, motion, phase: 1.3f));
+
+        // The visual clock runs on (a pause, a network stall), the world does not.
+        Assert.Equal(before, ParticleCorners(Draw(fire, motion, phase: 7.9f)));
+        Assert.Equal(before, ParticleCorners(Draw(fire, motion, phase: 999.9f)));
+
+        fire.BeginCapture(1);
+        fire.CaptureTank(0, new Position(100, 100), 1f);
+        Assert.NotEqual(before, ParticleCorners(Draw(fire, motion, phase: 1.3f)));
+    }
+
+    [Fact]
+    public void TheTrail_KeepsTheLatestSteps_AsItWrapsAround()
+    {
+        var fire = new TankFireQuads();
+        const int Steps = TankFireQuads.TrailSteps + 54;
+        for (int x = 0; x < Steps; x++)
+        {
+            fire.BeginCapture(1);
+            fire.CaptureTank(0, new Position(100 + x, 100), 1f);
+        }
+
+        for (int k = 0; k < TankFireQuads.TrailSteps; k++)
+        {
+            Assert.Equal(new Position(100 + Steps - 1 - k, 100), fire.TrailPosition(0, k));
+        }
+        // Further back than the trail goes is the oldest it keeps.
+        Assert.Equal(fire.TrailPosition(0, TankFireQuads.TrailSteps - 1), fire.TrailPosition(0, 500));
+    }
+
+    [Fact]
+    public void ANewMatch_StartsTheTrailsAgain()
+    {
+        var first = TestHelpers.CreateSeededWorld();
+        var fire = new TankFireQuads();
+        var tank = first.TankList.Tanks[0];
+        Position start = tank.Position;
+        for (int x = 0; x < 10; x++)
+        {
+            tank.Position = start + new Offset(x, 0);
+            fire.CaptureStep(first);
+        }
+        Assert.NotEqual(fire.TrailPosition(0, 0), fire.TrailPosition(0, 5));
+
+        var second = TestHelpers.CreateSeededWorld();
+        Position there = start + new Offset(4, 3);
+        second.TankList.Tanks[0].Position = there;
+        fire.CaptureStep(second);
+
+        for (int k = 0; k < TankFireQuads.TrailSteps; k++)
+            Assert.Equal(there, fire.TrailPosition(0, k));
+    }
+
+    [Fact]
+    public void ABurningTank_ShimmersTheAirAboveIt()
+    {
+        var world = TestHelpers.CreateSeededWorld(enableTerrainRegrowth: false, tankShield: true);
+        var tank = world.TankList.Tanks[0];
+        tank.TakeDamage(Tweaks.TankShield.Capacity + tank.Reactor.Health - 1, DamageCause.EnemyFire);
+        Assert.True(tank.FireLevel > 0.9f);
+        var view = new RenderView(new Size(1600, 1200), world.Terrain.Size, new Position(
+            (int)((tank.Position.X * 4) - 800), (int)((tank.Position.Y * 4) - 600)), 4);
+        var target = new float[Tweaks.World.MaxPlayers * 4];
+
+        int count = new TerrainAuxBuilder().BuildGpuTankHeatGlowData(
+            world.TankList.Tanks, [new PositionF(tank.Position.X, tank.Position.Y)], view, target);
+
+        Assert.Equal(1, count);
+        Assert.True(target[3] >= 0.55f + (0.4f * tank.FireLevel) - 1e-4f, $"haze {target[3]}");
     }
 }

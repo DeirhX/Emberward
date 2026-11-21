@@ -46,6 +46,13 @@ public sealed class TankFireQuads
     private PositionF[] _lean = [];
     private int _count;
 
+    // Steps captured: the particles' clock, so smoke and embers stand still while the world does (a pause, a network
+    // stall) and keep pace with it when it catches up. Counted in a long and read in doubles, so it never wraps.
+    private long _steps;
+
+    // The world the trails were recorded in: a new match (or a late join's copy) starts them again.
+    private WeakReference<World>? _world;
+
     /// <summary>Smoke particles a tank burning at <paramref name="level"/> keeps in the air.</summary>
     public static int SmokeCount(float level) => level > 0f ? (int)(6f + 14f * Math.Min(level, 1f)) : 0;
 
@@ -55,10 +62,25 @@ public sealed class TankFireQuads
     /// <summary>Records each tank's fire and position after a simulation step.</summary>
     public void CaptureStep(World world)
     {
+        if (_world == null)
+            _world = new WeakReference<World>(world);
+        else if (!_world.TryGetTarget(out World? last) || !ReferenceEquals(last, world))
+        {
+            Reset();
+            _world.SetTarget(world);
+        }
         var tanks = world.TankList.Tanks;
         BeginCapture(tanks.Count);
         for (int i = 0; i < tanks.Count; i++)
             CaptureTank(i, tanks[i].Position, tanks[i].IsDead ? 0f : tanks[i].FireLevel);
+    }
+
+    /// <summary>Forgets every trail and lean: the next capture starts each tank afresh where it is.</summary>
+    public void Reset()
+    {
+        Array.Clear(_trailKnown);
+        Array.Clear(_levels);
+        _count = 0;
     }
 
     /// <summary>Starts a step's capture of <paramref name="count"/> tanks (then <see cref="CaptureTank"/> for each).</summary>
@@ -78,6 +100,7 @@ public sealed class TankFireQuads
         for (int i = count; i < _count; i++)
             _trailKnown[i] = false;
         _count = count;
+        _steps++;
     }
 
     /// <summary>Records tank <paramref name="slot"/>'s position and fire level (0: not burning) after this step.</summary>
@@ -151,8 +174,8 @@ public sealed class TankFireQuads
     {
         ReadOnlySpan<TankRenderState> tanks = motion.Tanks;
         float scale = quads.View.PixelScale;
-        float phase = quads.Phase;
-        float t = phase % PhaseCycleSeconds;
+        float t = quads.Phase % PhaseCycleSeconds;
+        double clock = _steps + quads.Alpha;
         float follow = snap ? 1f : 1f - MathF.Exp(-Math.Max(0f, frameSeconds) / FlameLeanSeconds);
         for (int i = 0; i < tanks.Length && i < _count; i++)
         {
@@ -162,7 +185,7 @@ public sealed class TankFireQuads
             if (!IsDrawn(tanks[i], level, vision))
                 continue;
 
-            EmitParticles(quads, vision, i, level, phase, smoke: true);
+            EmitParticles(quads, vision, i, level, clock, smoke: true);
 
             if (!quads.IsOffScreen(quads.ScreenX(start.X), quads.ScreenY(start.Y), 16f * scale))
             {
@@ -174,7 +197,7 @@ public sealed class TankFireQuads
                     EntityShape.KindTankFire, level, t, Seed(i), heading, drift);
             }
 
-            EmitParticles(quads, vision, i, level, phase, smoke: false);
+            EmitParticles(quads, vision, i, level, clock, smoke: false);
         }
     }
 
@@ -196,26 +219,29 @@ public sealed class TankFireQuads
 
     /// <summary>
     /// One kind of particle for tank <paramref name="slot"/>. Particle k of n is on a loop of its life L, at age
-    /// <c>frac(phase / L + k / n)</c>; it was born where the tank was <c>age * L</c> ago and has risen since.
+    /// <c>frac(clock / L + k / n)</c>, the clock being the steps captured plus the frame's progress through the next;
+    /// it was born where the tank was <c>age * L</c> ago and has risen since.
     /// </summary>
-    private void EmitParticles(EntityQuads quads, VisionMap? vision, int slot, float level, float phase, bool smoke)
+    private void EmitParticles(EntityQuads quads, VisionMap? vision, int slot, float level, double clock, bool smoke)
     {
         float kind = smoke ? ParticleSmoke : ParticleEmber;
         int count = smoke ? SmokeCount(level) : EmberCount(level);
         float life = smoke ? SmokeLifeSeconds : EmberLifeSeconds;
         float rise = smoke ? SmokeRiseCellsPerSecond : EmberRiseCellsPerSecond;
         float stepsPerSecond = Tweaks.Perf.TargetFps;
+        double lifeSteps = life * stepsPerSecond;
         float scale = quads.View.PixelScale;
         for (int k = 0; k < count; k++)
         {
-            float loop = (phase / life) + ((float)k / count);
-            float cycle = MathF.Floor(loop);
-            float age = loop - cycle;
+            double loop = (clock / lifeSteps) + ((double)k / count);
+            double cycleStart = Math.Floor(loop);
+            float age = (float)(loop - cycleStart);
+            int cycle = unchecked((int)(long)cycleStart);
             // The frame is drawn alpha of a step after the latest step, so that much less of the trail lies behind it.
-            int stepsAgo = (int)MathF.Round((age * life * stepsPerSecond) - quads.Alpha);
+            int stepsAgo = (int)MathF.Round((age * (float)lifeSteps) - quads.Alpha);
             Position birth = TrailPosition(slot, stepsAgo);
-            float h1 = Hash(slot, k, (int)cycle, smoke ? 17 : 29);
-            float h2 = Hash(slot, k, (int)cycle, smoke ? 43 : 61);
+            float h1 = Hash(slot, k, cycle, smoke ? 17 : 29);
+            float h2 = Hash(slot, k, cycle, smoke ? 43 : 61);
             float risen = rise * age * life;
             float x, y, half;
             if (smoke)

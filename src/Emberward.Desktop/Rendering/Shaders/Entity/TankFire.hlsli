@@ -99,7 +99,7 @@ float4 TankFire(float2 p, float4 params, float aa)
     float m2 = FlameMask(p, float2(c * b2.x - sn * b2.y, sn * b2.x + c * b2.y), height * (0.8 + 0.08 * sin(21.991149 * t + s + 2.3)),
         0.4 * sin(7.853982 * t + s + 3.1)) * smoothstep(0.35, 0.5, level);
     float m3 = FlameMask(p, float2(c * b3.x - sn * b3.y, sn * b3.x + c * b3.y), height * 0.75,
-        0.4 * sin(5.497787 * t + s + 4.4)) * smoothstep(0.7, 0.85, level);
+        0.4 * sin(3.141593 * t + s + 4.4)) * smoothstep(0.7, 0.85, level);
     float mask = max(max(m0, m1), max(m2, m3));
     float field = mask - 0.55 * n;
 
