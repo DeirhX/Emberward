@@ -7,8 +7,10 @@ using Emberward.Core.Sensing;
 using Emberward.Core.Types;
 
 /// <summary>
-/// What a tank shows when its shield takes a hit (DESIGN.md §4.7): for a moment the veins of the whole shield light up
-/// with a wavefront from the impact, and a red patch glows where the shot landed. Hits are read from
+/// What a tank shows when its shield takes a hit (DESIGN.md §4.7): for a moment the veins of the shield light up
+/// with a wavefront from the impact, and a red patch glows where the shot landed. The shield's fill after the hit
+/// goes with the pulse, and the shader shows only that much of the bubble: its outer edge goes first, a small core
+/// at the centre last. Hits are read from
 /// <see cref="World.StepEvents"/> after each step. Nothing is drawn, and nothing costs anything, while no hit is
 /// fresh. Output only.
 /// </summary>

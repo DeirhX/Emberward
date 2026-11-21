@@ -2,6 +2,7 @@ using Emberward.Core;
 using Emberward.Core.Config;
 using Emberward.Core.Entities;
 using Emberward.Core.Entities.Projectiles;
+using Emberward.Core.Rendering;
 using Emberward.Core.Terrain;
 using Emberward.Core.Types;
 using Emberward.Desktop.Rendering;
@@ -66,6 +67,47 @@ public class TankShieldFeedbackTests
             quads.CaptureStep(world);
         }
         Assert.Equal(0, quads.PulseCount);
+    }
+
+    /// <summary>The tank shield quads the pulse from <paramref name="world"/>'s last step draws for <paramref name="victim"/>.</summary>
+    private static EntityVertex[] EmitPulse(World world, Emberward.Core.Entities.Tanks.Tank victim)
+    {
+        var shield = new TankShieldQuads();
+        shield.CaptureStep(world);
+        var motion = new EntityMotion();
+        motion.CaptureTanks([new TankRenderState(victim.Position, victim.Color, Direction: 4, IsDead: false,
+            TurretDirection: default)]);
+        motion.SetAlpha(0f);
+        var quads = new EntityQuads();
+        quads.Begin(new RenderView(new Size(1000, 1000), world.Terrain.Size, default, 2), phase: 0f, alpha: 0f);
+        shield.Emit(quads, motion, vision: null);
+        return quads.Vertices.AsSpan(0, quads.VertexCount).ToArray();
+    }
+
+    [Fact]
+    public void AShieldHit_DrawsThePulse_WithTheFillLeftAfterTheHit()
+    {
+        var (world, victim) = Shot(Tweaks.Weapon.BulletDamage);
+        float fill = world.TankShieldOf(victim).ShieldFill;
+
+        var vertices = EmitPulse(world, victim);
+
+        Assert.NotEmpty(vertices);
+        Assert.All(vertices, v => Assert.Equal(EntityShape.KindTankShield, v.Kind));
+        // The shader keeps only this much of the bubble: a partly drained shield shows a partly eroded one.
+        Assert.InRange(fill, 0.01f, 0.99f);
+        Assert.All(vertices, v => Assert.Equal(fill, v.P0));
+    }
+
+    [Fact]
+    public void AShieldThatBreaks_DrawsThePulse_WithNoFillLeft()
+    {
+        var (world, victim) = Shot(Tweaks.TankShield.Capacity + 50);
+
+        var vertices = EmitPulse(world, victim);
+
+        Assert.NotEmpty(vertices);
+        Assert.All(vertices, v => Assert.Equal(0f, v.P0));
     }
 
     [Fact]

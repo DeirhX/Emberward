@@ -19,11 +19,6 @@ static const float kShellMargin = 2.5;
 static const float3 kShieldCool = float3(0.45, 0.85, 1.00);
 static const float3 kShieldHot = float3(1.00, 0.35, 0.18);
 
-float ShieldHash(float2 c)
-{
-    return frac(sin(dot(c, float2(12.9898, 78.233))) * 43758.5453);
-}
-
 // A flat bar `halfWidth` cells either side of `center`, filled from the left to `fill`, over a dark back.
 float4 ShieldBar(float2 p, float2 center, float halfWidth, float fill, float3 color, float aa)
 {

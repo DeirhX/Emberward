@@ -40,8 +40,9 @@
 //                   color.rgb = team colour
 //  21 shield hit  — .x = age (0 just hit, 1 gone), .y = shield strength when hit (0..1), .z = 1 for the killing hit;
 //                   color.rgb = team colour
-//  22 tank shield — .x = shield fill (0..1), .y = pulse age (0 just hit, 1 gone), .zw = where the shot landed, in cells from
-//                   the tank's centre ((0, 0) = no spot); color.rgb = team colour. Drawn only while a hit is fresh.
+//  22 tank shield — .x = shield fill (0..1; the bubble erodes from its edge inward as it falls, none left at 0),
+//                   .y = pulse age (0 just hit, 1 gone), .zw = where the shot landed, in cells from the tank's centre
+//                   ((0, 0) = no spot); color.rgb = team colour. Drawn only while a hit is fresh.
 //  23 tank fire   — .x = fire level (0..1), .y = seconds into a 4 s animation cycle, .z = how far the smoke leans (cells per cell
 //                   of rise), .w unused; color.rgb = team colour. Drawn only while the hull burns.
 //  16 power label — .xy = packed 5x7 glyph bitmap (low 20 bits, then high 15), .z = dots per cell
