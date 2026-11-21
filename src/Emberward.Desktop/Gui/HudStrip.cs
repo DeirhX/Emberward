@@ -90,11 +90,11 @@ public sealed class HudStrip
         DrawPanelArt(dl, _shieldIconTex, ShieldX, ShieldPanelW);
         DrawPanelArt(dl, _panelFrameTex, MaterialsX, MaterialsPanelW);
         DrawPanelArt(dl, _buildPanelTex, BuildX, BuildPanelW);
-        DrawPanelLabels(dl, burning: !player.IsDead && player.FireLevel > 0f, shielded: shield.Active && !player.IsDead);
+        DrawPanelLabels(dl, burning: !player.IsDead && player.FireLevel > 0f, shielded: shield.Active);
 
         _heat.DrawOrb(dl, player, time);
         // The crystal holds the shield when the match has one, else the hull; the numbers under it are the shield's and the hull's (the hull alone with no shield).
-        float crystal = shield.Active ? shield.ShieldFill : player.HullFraction;
+        float crystal = shield.Active ? (player.IsDead ? 0f : shield.ShieldFill) : player.HullFraction;
         bool crystalLow = shield.Active ? shield.Low : player.IsHullLow(latched: false);
         _liquids.Draw(dl, player, ShieldX, time, crystal, crystalLow);
 
@@ -109,9 +109,10 @@ public sealed class HudStrip
         // when the match has no shield.
         int health = Math.Max(0, player.Reactor.Health);
         string hull = health.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        if (shield.Active && !player.IsDead)
+        if (shield.Active)
         {
-            string points = shield.Shield.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            // A dead tank's shield is spent too (death resets it to full for the respawn).
+            string points = (player.IsDead ? 0 : shield.Shield).ToString(System.Globalization.CultureInfo.InvariantCulture);
             DrawStripText(dl, points, ShieldPlate.ReadoutLeft + HalfCell, ShieldPlate.ReadoutY, SplitReadoutSize, ShieldReadoutColor, glow: 0x28FFE060u);
             DrawStripText(dl, hull, ShieldPlate.ReadoutRight - HalfCell, ShieldPlate.ReadoutY, SplitReadoutSize, HullReadoutColor, glow: 0x283090FFu);
         }
