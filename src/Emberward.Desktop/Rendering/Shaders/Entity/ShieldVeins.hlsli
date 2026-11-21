@@ -42,6 +42,18 @@ float HexVeinDistance(float2 p)
     return 0.5 - max(dot(ag, float2(0.5, 0.8660254)), ag.x);
 }
 
+// The centre, in lattice units, of the hexagon `p` falls in: the same for every point of a cell, so a cell can be
+// given its own value (ShieldHash of it).
+float2 HexCellCentre(float2 p)
+{
+    const float2 r = float2(1.0, 1.7320508);
+    const float2 h = float2(0.5, 0.8660254);
+    float2 a = p - r * floor(p / r) - h;
+    float2 q = p - h;
+    float2 b = q - r * floor(q / r) - h;
+    return p - ((dot(a, a) < dot(b, b)) ? a : b);
+}
+
 // 1 on a vein, falling to 0 within `width` lattice units of it.
 float VeinLines(float2 p, float width)
 {

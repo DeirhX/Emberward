@@ -69,19 +69,77 @@ public class TankShieldFeedbackTests
         Assert.Equal(0, quads.PulseCount);
     }
 
-    /// <summary>The tank shield quads the pulse from <paramref name="world"/>'s last step draws for <paramref name="victim"/>.</summary>
-    private static EntityVertex[] EmitPulse(World world, Emberward.Core.Entities.Tanks.Tank victim)
+    /// <summary>The tank shield quads drawn for <paramref name="victim"/> after <paramref name="world"/>'s last step.</summary>
+    private static EntityVertex[] EmitPulse(World world, Emberward.Core.Entities.Tanks.Tank victim, float phase = 0f)
     {
         var shield = new TankShieldQuads();
         shield.CaptureStep(world);
+        return Draw(shield, world, victim, phase);
+    }
+
+    private static EntityVertex[] Draw(TankShieldQuads shield, World world, Emberward.Core.Entities.Tanks.Tank victim,
+        float phase)
+    {
         var motion = new EntityMotion();
         motion.CaptureTanks([new TankRenderState(victim.Position, victim.Color, Direction: 4, IsDead: false,
             TurretDirection: default)]);
         motion.SetAlpha(0f);
         var quads = new EntityQuads();
-        quads.Begin(new RenderView(new Size(1000, 1000), world.Terrain.Size, default, 2), phase: 0f, alpha: 0f);
+        quads.Begin(new RenderView(new Size(1000, 1000), world.Terrain.Size, default, 2), phase, alpha: 0f);
         shield.Emit(quads, motion, vision: null);
         return quads.Vertices.AsSpan(0, quads.VertexCount).ToArray();
+    }
+
+    [Fact]
+    public void AShieldedTankAtRest_ShowsTheBubble_WithItsFillAndNoPulse()
+    {
+        var world = TestHelpers.CreateSeededWorld(enableTerrainRegrowth: false, tankShield: true);
+        world.Advance(_ => default);
+        var tank = world.TankList.Tanks[1];
+        var shield = new TankShieldQuads();
+        shield.CaptureStep(world);
+        float fill = world.TankShieldOf(tank).ShieldFill;
+
+        var vertices = Draw(shield, world, tank, phase: 10f);
+
+        Assert.True(fill > 0f);
+        Assert.Equal(world.TankList.Tanks.Count, shield.ShieldedCount);
+        Assert.Equal(6, vertices.Length);
+        Assert.All(vertices, v => Assert.Equal(EntityShape.KindTankShield, v.Kind));
+        Assert.All(vertices, v => Assert.Equal(fill, v.P0));
+        Assert.All(vertices, v => Assert.True(v.P1 >= 1f, $"age {v.P1}"));
+        Assert.All(vertices, v => Assert.Equal(TankShieldQuads.NoHitAngle, v.P2));
+        Assert.All(vertices, v => Assert.Equal(10f / TankShieldQuads.LoopSeconds, v.P3, precision: 5));
+    }
+
+    [Fact]
+    public void WithoutTheShieldRule_NoBubbleIsDrawn()
+    {
+        var world = TestHelpers.CreateSeededWorld(enableTerrainRegrowth: false, tankShield: false);
+        world.Advance(_ => default);
+        var shield = new TankShieldQuads();
+        shield.CaptureStep(world);
+
+        Assert.Equal(0, shield.ShieldedCount);
+        Assert.Empty(Draw(shield, world, world.TankList.Tanks[1], phase: 0f));
+    }
+
+    [Fact]
+    public void TheAnimationLoop_DividesThePhaseWrap_SoItIsSeamless()
+    {
+        // The entity layer wraps its phase at 1000 s; a loop that divides it runs on unbroken through the wrap.
+        Assert.Equal(0f, 1000f % TankShieldQuads.LoopSeconds);
+        var world = TestHelpers.CreateSeededWorld(enableTerrainRegrowth: false, tankShield: true);
+        world.Advance(_ => default);
+        var tank = world.TankList.Tanks[1];
+        var shield = new TankShieldQuads();
+        shield.CaptureStep(world);
+
+        float justBefore = Draw(shield, world, tank, phase: 999.99f)[0].P3;
+        float justAfter = Draw(shield, world, tank, phase: 0.01f)[0].P3;
+
+        Assert.InRange(justBefore, 0.999f, 1f);
+        Assert.InRange(justAfter, 0f, 0.001f);
     }
 
     [Fact]
@@ -99,7 +157,7 @@ public class TankShieldFeedbackTests
         Assert.All(vertices, v => Assert.Equal(fill, v.P0));
         // A fresh pulse, and the shell came in from the west: the red patch goes on that side.
         Assert.All(vertices, v => Assert.InRange(v.P1, 0f, 0.5f));
-        Assert.All(vertices, v => Assert.True(v.P2 < 0f && MathF.Abs(v.P3) < MathF.Abs(v.P2), $"hit at ({v.P2}, {v.P3})"));
+        Assert.All(vertices, v => Assert.True(MathF.Abs(v.P2) > 2.5f && MathF.Abs(v.P2) <= MathF.PI, $"hit angle {v.P2}"));
     }
 
     [Fact]
@@ -129,7 +187,7 @@ public class TankShieldFeedbackTests
         Assert.All(vertices, v => Assert.Equal(EntityShape.KindTankShield, v.Kind));
         Assert.All(vertices, v => Assert.Equal(TankShieldQuads.BrokenFill, v.P0));
         Assert.All(vertices, v => Assert.InRange(v.P1, 0f, 0.5f));
-        Assert.All(vertices, v => Assert.True(v.P2 < 0f, $"hit at ({v.P2}, {v.P3})"));
+        Assert.All(vertices, v => Assert.True(MathF.Abs(v.P2) > 2.5f && MathF.Abs(v.P2) <= MathF.PI, $"hit angle {v.P2}"));
     }
 
     [Fact]
