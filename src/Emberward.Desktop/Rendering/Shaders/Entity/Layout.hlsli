@@ -42,8 +42,11 @@
 //                   color.rgb = team colour
 //  22 tank shield — .x = shield fill (0..1), .y = pulse age (0 just hit, 1 gone), .zw = where the shot landed, in cells from
 //                   the tank's centre ((0, 0) = no spot); color.rgb = team colour. Drawn only while a hit is fresh.
-//  23 tank fire   — .x = fire level (0..1), .y = seconds into a 4 s animation cycle, .z = how far the smoke leans (cells per cell
-//                   of rise), .w unused; color.rgb = team colour. Drawn only while the hull burns.
+//  23 tank fire   — .x = fire level (0..1), .y = seconds into a 4 s animation cycle, .z = a per-tank seed (0..1), .w = the hull
+//                   heading relative to the quad (radians). The quad's local -y points the way the flames go. Drawn only
+//                   while the hull burns.
+//  24 tank fire light — .x = fire level (0..1), .y = seconds into a 4 s cycle, .z = a per-tank seed (0..1). Additive.
+//  25 fire particle — .x = age (0 born, 1 gone), .y = 0 ember, 1 smoke, .z = fire level (0..1), .w = a per-particle seed (0..1)
 //  16 power label — .xy = packed 5x7 glyph bitmap (low 20 bits, then high 15), .z = dots per cell
 //                   (0 for a solid bar), .w = opacity
 //
@@ -80,6 +83,8 @@ static const float kKindBaseShield = 20.0;
 static const float kKindShieldHit = 21.0;
 static const float kKindTankShield = 22.0;
 static const float kKindTankFire = 23.0;
+static const float kKindTankFireLight = 24.0;
+static const float kKindFireParticle = 25.0;
 
 // Machine flags (params.w); EntityShape's MachineFlag* constants must match.
 static const float kMachineFlagStalled = 1.0;
