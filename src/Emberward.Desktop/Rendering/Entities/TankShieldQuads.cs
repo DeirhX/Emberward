@@ -1,6 +1,7 @@
 namespace Emberward.Desktop.Rendering.Entities;
 
 using Emberward.Core;
+using Emberward.Core.Entities;
 using Emberward.Core.Rendering;
 using Emberward.Core.Sensing;
 using Emberward.Core.Types;
@@ -27,6 +28,7 @@ public sealed class TankShieldQuads
     }
 
     private readonly List<Pulse> _pulses = new();
+    private readonly Dictionary<int, Position> _before = new();
     private long _step;
 
     /// <summary>Call after each simulation step, while <see cref="World.StepEvents"/> still holds that step's events.</summary>
@@ -46,17 +48,27 @@ public sealed class TankShieldQuads
             var tank = FindTank(world, color);
             if (tank == null)
                 continue;
-            // A hit restarts the tank's pulse. Offset from the tank's centre; a hit at the centre (a bite) shows no spot.
-            _pulses.RemoveAll(p => p.Color == color);
-            _pulses.Add(new Pulse
+            // A bite has no direction: it never replaces the pulse of a shell that landed in the same step.
+            bool shell = e.Cause == DamageCause.EnemyFire;
+            int existing = _pulses.FindIndex(p => p.Color == color && p.Step == _step);
+            if (!shell && existing >= 0)
+                continue;
+            // Projectiles run before tanks move, so the impact is measured from where the tank stood at the step's start.
+            var from = _before.TryGetValue(color, out Position before) ? before : tank.Position;
+            var pulse = new Pulse
             {
                 Color = color,
                 Step = _step,
-                OffsetX = e.Position.X - tank.Position.X,
-                OffsetY = e.Position.Y - tank.Position.Y,
+                OffsetX = shell ? e.Position.X - from.X : 0f,
+                OffsetY = shell ? e.Position.Y - from.Y : 0f,
                 Fill = world.TankShieldOf(tank).ShieldFill,
-            });
+            };
+            // A hit restarts the tank's pulse.
+            _pulses.RemoveAll(p => p.Color == color);
+            _pulses.Add(pulse);
         }
+        foreach (var tank in world.TankList.Tanks)
+            _before[tank.Color] = tank.Position;
     }
 
     private static Emberward.Core.Entities.Tanks.Tank? FindTank(World world, int color)
