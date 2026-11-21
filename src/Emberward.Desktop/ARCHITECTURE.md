@@ -211,6 +211,11 @@ display's own resolution instead of being stretched by the OS.
   carries no text: `HudStrip` draws titles and numbers with the UI font, placed from each panel's plates as
   measured on the art (`HudStrip.Plate`), and centres text on the height of the '0' glyph, not on the font's line
   box.
+- **SHIELD/HULL plate.** The title is one status word (`HullStatuses`: SHIELDED, SHIELD DOWN, HULL BREACH,
+  MELTING, SLAG); the readout stacks SHIELD over HULL, each with a hairline bar. The hull's number and bar, and the
+  hot centre the crystal shows through an empty shield, follow the hull heat ramp `HudPalette.HullHeat` (and
+  `HullEmber` for glows), the one the tank's hotspot shares. The browser's strip gets the same word and colours
+  through `HullPlate` in its frame.
 - **Charge labels** (`PowerLabelQuads`, only while the match runs `MatchRules.EnergyNetwork`, as every standard
   match does). Each standing machine in sight within `DesktopScreenTweaks.PowerLabelGoneCells` of the player's tank
   gets a label with charge over capacity, flow in and out a second (and `>` what a node passed on) and a fill bar,

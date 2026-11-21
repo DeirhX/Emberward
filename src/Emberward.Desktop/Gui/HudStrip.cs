@@ -20,10 +20,12 @@ public sealed class HudStrip
     // The readout numbers' green and size (art pixels).
     private const uint ReadoutColor = 0xFFAAFACDu;
     private const float ReadoutSize = 22f;
-    private const float SplitReadoutSize = 19f;
-    private const float HalfCell = 34f;
-    private const uint ShieldReadoutColor = 0xFFFFE0A0u;
-    private const uint HullReadoutColor = 0xFF70B8FFu;
+
+    // The SHIELD/HULL readout plate holds two stacked rows, SHIELD above HULL, each a label on the left, its number on
+    // the right and a hairline bar under both (art pixels, measured on the plate: 168.5 to 192.5 high).
+    private const float LedgerLeft = ShieldX + 19f, LedgerRight = ShieldX + 140f;
+    private const float ShieldRowY = 174f, HullRowY = 185.5f, BarDrop = 5.6f;
+    private const float LedgerLabelSize = 10.5f, LedgerNumberSize = 13f, StatusWordSize = 17f;
 
     // The ore line, drawn on the narrow plate beneath the hold window (art pixels): the pale gold of the Pyrite in
     // the hold (tools/hud/make_hold_pyrite.py), deep orange once the hold is full, bright green while it unloads.
@@ -90,10 +92,14 @@ public sealed class HudStrip
         DrawPanelArt(dl, _shieldIconTex, ShieldX, ShieldPanelW);
         DrawPanelArt(dl, _panelFrameTex, MaterialsX, MaterialsPanelW);
         DrawPanelArt(dl, _buildPanelTex, BuildX, BuildPanelW);
-        DrawPanelLabels(dl, burning: !player.IsDead && player.FireLevel > 0f, shielded: shield.Active);
+        DrawPanelLabels(dl);
+        var status = HullStatuses.Of(player, shield);
+        DrawStripText(dl, status.Text, ShieldPlate.CenterX, ShieldPlate.TitleY, StatusWordSize, status.ColorAt(time),
+            glow: HudTheme.WithAlphaByte(status.Color, 0x30));
 
         _heat.DrawOrb(dl, player, time);
-        // The crystal holds the shield when the match has one, else the hull; the numbers under it are the shield's and the hull's (the hull alone with no shield).
+        // The crystal holds the shield when the match has one, else the hull; the tank's hot centre shows through
+        // what has emptied.
         float crystal = shield.Active ? (player.IsDead ? 0f : shield.ShieldFill) : player.HullFraction;
         bool crystalLow = shield.Active ? shield.Low : player.IsHullLow(latched: false);
         _liquids.Draw(dl, player, ShieldX, time, crystal, crystalLow);
@@ -105,21 +111,8 @@ public sealed class HudStrip
         _heat.DrawTrend(dl, player, TempPlate.ReadoutRight - 12f, TempPlate.ReadoutY);
         _heat.DrawOffNetworkTag(dl, player, HeatX + HeatPanelW * 0.5f, time, reserve);
 
-        // SHIELD and HULL: two numbers side by side, the shield's points (cyan) and the hull's (warm); the hull alone
-        // when the match has no shield.
-        int health = Math.Max(0, player.Reactor.Health);
-        string hull = health.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        if (shield.Active)
-        {
-            // A dead tank's shield is spent too (death resets it to full for the respawn).
-            string points = (player.IsDead ? 0 : shield.Shield).ToString(System.Globalization.CultureInfo.InvariantCulture);
-            DrawStripText(dl, points, ShieldPlate.ReadoutLeft + HalfCell, ShieldPlate.ReadoutY, SplitReadoutSize, ShieldReadoutColor, glow: 0x28FFE060u);
-            DrawStripText(dl, hull, ShieldPlate.ReadoutRight - HalfCell, ShieldPlate.ReadoutY, SplitReadoutSize, HullReadoutColor, glow: 0x283090FFu);
-        }
-        else
-        {
-            DrawReadout(dl, ShieldPlate, hull);
-        }
+        // SHIELD and HULL: two stacked rows, each with its number and a hairline bar.
+        DrawLedger(dl, player, shield);
 
         // MATERIALS: the ore in the tank's hold against what it takes, the currency structures are built from. The
         // pile is a sheet of 8 x 5 frames drawn by tools/hud/make_hold_pyrite.py; each stone carries its own corona.
@@ -171,27 +164,59 @@ public sealed class HudStrip
     /// The panel titles, drawn on the plates of the art (which carries no text of its own). Positions are the plate
     /// centres in art pixels.
     /// </summary>
-    private void DrawPanelLabels(ImDrawListPtr dl, bool burning, bool shielded)
+    private void DrawPanelLabels(ImDrawListPtr dl)
     {
         DrawStripText(dl, "TEMP", TempPlate.CenterX, TempPlate.TitleY, 19f, 0xFF78C8FFu, glow: 0x181880FFu);
-        // A burning hull says so, in fire colours; otherwise the plate names the crystal and the number under it.
-        if (burning)
-            DrawStripText(dl, "FIRE ABOARD", ShieldPlate.CenterX, ShieldPlate.TitleY, 18f, 0xFF50A0FFu, glow: 0x402060FFu);
-        else
-        {
-            if (shielded)
-            {
-                DrawStripText(dl, "SHIELD", ShieldPlate.ReadoutLeft + HalfCell, ShieldPlate.TitleY, 15f, ShieldReadoutColor, glow: 0x20FFA030u);
-                DrawStripText(dl, "HULL", ShieldPlate.ReadoutRight - HalfCell, ShieldPlate.TitleY, 15f, HullReadoutColor, glow: 0x20FFA030u);
-            }
-            else
-            {
-                DrawStripText(dl, "HULL", ShieldPlate.CenterX, ShieldPlate.TitleY, 20f, 0xFFF8E890u, glow: 0x20FFA030u);
-            }
-        }
         DrawStripText(dl, "MATERIALS", MaterialsPlate.CenterX, MaterialsPlate.TitleY, 21f, 0xFF68E0FFu, glow: 0x282090FFu);
         DrawStripText(dl, "BUILD STRUCTURES", BuildX + 162f, 23.5f, 17f, 0xFFB0E4F8u, glow: 0x181880FFu);
         DrawStripText(dl, "COMMAND", BuildX + 171f, 191.5f, 21f, 0xFF98E8FFu, glow: 0x202080FFu);
+    }
+
+    /// <summary>
+    /// The SHIELD/HULL readout: SHIELD above HULL, a label and a number on each row and a hairline bar under it. The
+    /// shield is cyan, slate once empty; the hull's number and bar take the hotspot ramp's colour
+    /// (<see cref="HudPalette.HullHeat"/>). A match with no shield shows the hull row alone, in the middle of the plate.
+    /// A dead tank's shield is spent too (death resets it to full for the respawn).
+    /// </summary>
+    private void DrawLedger(ImDrawListPtr dl, Tank player, in TankShieldView shield)
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        float hullRow = HullRowY;
+        if (shield.Active)
+        {
+            int points = player.IsDead ? 0 : Math.Max(0, shield.Shield);
+            float fill = player.IsDead ? 0f : shield.ShieldFill;
+            uint color = points > 0 ? HudPalette.Shield : HudPalette.ShieldEmpty;
+            DrawLedgerRow(dl, ShieldRowY, "SHIELD", color, points.ToString(inv), color, fill, color,
+                HudTheme.WithAlphaByte(HudPalette.ShieldEmpty, 0x70));
+        }
+        else
+        {
+            hullRow = ShieldPlate.ReadoutY;
+        }
+
+        int health = Math.Max(0, player.Reactor.Health);
+        float hull = player.IsDead ? 0f : player.HullFraction;
+        // A dead hull has cooled to slag; a living one glows on the ramp as it falls.
+        uint hullColor = player.IsDead ? HudPalette.TextDim : HudPalette.HullHeat(hull);
+        DrawLedgerRow(dl, hullRow, "HULL", HudPalette.HullNeutral, health.ToString(inv), hullColor, hull, hullColor,
+            HudTheme.WithAlphaByte(HudPalette.HullEmber(HudPalette.HullHeatStart), 0x90), numberGlow: 0x30106AFFu);
+    }
+
+    /// <summary>One ledger row centred on art y <paramref name="y"/>: label left, number right, bar beneath.</summary>
+    private void DrawLedgerRow(ImDrawListPtr dl, float y, string label, uint labelColor, string number, uint numberColor,
+        float fill, uint barColor, uint trackColor, uint numberGlow = 0)
+    {
+        DrawStripText(dl, label, LedgerLeft, y + 0.5f, LedgerLabelSize, labelColor, align: 0f);
+        DrawStripText(dl, number, LedgerRight, y, LedgerNumberSize, numberColor, numberGlow, align: 1f);
+
+        // A hairline bar: a dark outline, the track, and the filled part from the left.
+        float barY = y + BarDrop, half = 0.75f;
+        dl.AddRectFilled(At(LedgerLeft - 1f, barY - half - 1f), At(LedgerRight + 1f, barY + half + 1f), 0xC0000000u);
+        dl.AddRectFilled(At(LedgerLeft, barY - half), At(LedgerRight, barY + half), trackColor);
+        float f = Math.Clamp(fill, 0f, 1f);
+        if (f > 0f)
+            dl.AddRectFilled(At(LedgerLeft, barY - half), At(LedgerLeft + (LedgerRight - LedgerLeft) * f, barY + half), barColor);
     }
 
     /// <summary>A plate's number, centred in its readout plate above the bar.</summary>
@@ -202,8 +227,10 @@ public sealed class HudStrip
     /// Text in the strip, centred on art pixel (<paramref name="cx"/>, <paramref name="cy"/>) and sized in art pixels,
     /// so it scales with the art; drawn from the large font bake when big on screen, so it stays sharp at 4K. A dark
     /// outline keeps it legible on the plates, and an optional soft <paramref name="glow"/> lights it like the art.
+    /// <paramref name="align"/> places the text's width about <paramref name="cx"/>: 0.5 centred, 0 starting there,
+    /// 1 ending there.
     /// </summary>
-    private void DrawStripText(ImDrawListPtr dl, string text, float cx, float cy, float size, uint color, uint glow = 0)
+    private void DrawStripText(ImDrawListPtr dl, string text, float cx, float cy, float size, uint color, uint glow = 0, float align = 0.5f)
     {
         float px = S(size);
         float deviceScale = ImGuiPlatform.DeviceScale;
@@ -215,7 +242,7 @@ public sealed class HudStrip
         // not the middle of the line (that includes room for descenders).
         float inkMidY = InkMiddle(font) * px;
         // Snap to whole device pixels so the glyphs are not resampled between texels.
-        var pos = At(cx, cy) - new Vector2(extent.X * 0.5f + bold * 0.5f, inkMidY);
+        var pos = At(cx, cy) - new Vector2(extent.X * align + bold * 0.5f, inkMidY);
         pos = new Vector2(MathF.Round(pos.X * deviceScale) / deviceScale, MathF.Round(pos.Y * deviceScale) / deviceScale);
 
         if (glow != 0)

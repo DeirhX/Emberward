@@ -56,6 +56,7 @@ public sealed record HeatDial(string[] Bands, float Ambient, float Safe, float M
 /// <param name="HitFresh">The first frames after a hit, when the shield crystal flashes white.</param>
 /// <param name="OrePileFrame">The hold's sprite frame, or -1 when empty (<c>BuildSlotView.OrePileFrame</c>).</param>
 /// <param name="OreLine">The line beneath the hold window (<c>BuildSlotView.OreLine</c>).</param>
+/// <param name="Plate">What the SHIELD/HULL plate shows.</param>
 public sealed record PlayerStatus(
     Position Position, Position Home, float Heat, float HeatLimit, float HeatGauge, string HeatColor,
     float HitFlash, float HitFromX, float HitFromY, float Hull, bool ShieldActive, float ShieldFill, bool ShieldLow, float FireLevel,
@@ -63,7 +64,17 @@ public sealed record PlayerStatus(
     bool Docked, bool OffNetwork, float SafeSeconds, bool Dead, double RespawnSeconds, bool CanRecall,
     string Outcome, string? Carrying, bool BaseDestroyed,
     int Health, float Frozen, float Boil, bool Burning, bool HullLow, bool HitFresh, int OrePileFrame,
-    bool Unloading, bool HoldFull, bool OffNetworkUrgent, string OreLine);
+    bool Unloading, bool HoldFull, bool OffNetworkUrgent, string OreLine, HullPlate Plate);
+
+/// <summary>What the desktop's SHIELD/HULL plate shows (<c>HudStrip</c>, <c>LiquidGauges</c>); colours as #rrggbb.</summary>
+/// <param name="Word">The status word (<c>HullStatuses</c>), in <paramref name="WordColor"/>, alternating four times a
+/// second with <paramref name="WordFlashColor"/> when the two differ.</param>
+/// <param name="Shield">The shield's points (0 once dead).</param>
+/// <param name="HullColor">The hull number's and bar's colour (<c>HudPalette.HullHeat</c>; dim once dead).</param>
+/// <param name="GlowCentre">The crystal's hot centre, from <paramref name="GlowCentre"/> in the middle to
+/// <paramref name="GlowRim"/> at the outline, at strength <paramref name="Glow"/> (0 to 1; 0 once dead).</param>
+public sealed record HullPlate(string Word, string WordColor, string WordFlashColor, int Shield, string HullColor,
+    string GlowCentre, string GlowRim, float Glow);
 
 /// <param name="KeyLabel">The key that builds it, as the desktop writes it (<c>MachinePresentation.KeyLabel</c>).</param>
 /// <param name="Slot">The machine's column in the desktop's BUILD STRUCTURES panel.</param>
