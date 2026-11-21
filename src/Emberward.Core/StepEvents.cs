@@ -175,7 +175,7 @@ public enum StepEventKind
     /// </summary>
     TankShieldHit,
 
-    /// <summary>A hit emptied a tank's shield. Same fields as <see cref="TankShieldHit"/>.</summary>
+    /// <summary>A hit emptied a tank's shield (recorded instead of <see cref="TankShieldHit"/> for that hit). Same fields.</summary>
     TankShieldBroken,
 }
 
@@ -193,7 +193,8 @@ public readonly record struct StepEvent(
     MachineType Machine = default,
     ImpactTarget Target = default,
     int Count = 0,
-    bool Torch = false);
+    bool Torch = false,
+    Entities.DamageCause Cause = default);
 
 /// <summary>
 /// The events of the current step, cleared when the next one begins. It is output only: nothing in the simulation
