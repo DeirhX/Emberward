@@ -687,15 +687,15 @@ within 2 cells of its own base's core banks it into the base's ore store quickly
 2 cells of one of its own powered relays unloads there, slower (4 a second, §6.4). Being inside the base's walls or
 the network's coverage is not enough. The hold grows with the cargo hold upgrade (§4.8).
 
-**Pyrite in the hold is hot** (`Tweaks.Cargo`, `TankHeatModel.ComputeCargoHeat`). Each unit warms the tank by 0.1
-degrees a second before cooling, mild: 1.9 a second at 19 units, about what the off-network clock adds. At 20 the load
-starts to cook the tank: 3 degrees a second more, plus a surge growing with the square of the way from 20 to 40,
-64 degrees a second at 40, and rising on past it in a straight line. So 20 units heat at 5 degrees a second, 30 at
-22 and 40 at 71, against a full link's 6. Ground soaks up a hot tank's heat fast, so in play 20 shows as a slow climb
-(a tank idle off the network is about 10 degrees warmer after 12 seconds), 30 as a steady one (out of the network
-in open ground it reaches 100 in about 12 seconds), and 40 is an emergency: past 100 in two seconds in the open and in
-four or five in a tunnel, on the network or off it. The heat is the ore's own energy, booked as injected in the
-ledger. Hot with 20 or more aboard, the heat warnings say to unload, and the line under the hold says CARGO HOT.
+**Pyrite in the hold is hot** (`Tweaks.Cargo`, `TankHeatModel.ComputeCargoHeat`), linearly in the load, with no
+step or spike. Each unit warms the tank by 0.1 degrees a second before cooling, mild: 1.9 a second at 19 units, about
+what the off-network clock adds. From 20 every further unit adds 3.5 degrees a second more, so the rate is continuous at
+20 and climbs evenly past it: 20 units heat at 2 degrees a second, 30 at 38, 40 at 74, against a full link's 6; an
+upgraded hold goes on along the same line (70 at 182, 100 at 290, 130 at 398, so a big hold is only safe part full).
+Ground soaks up a hot tank's heat fast, so in play 20 barely shows, 30 is a serious climb (in a tunnel about 50 degrees
+after 5 seconds; in the open past 100 in about 5), and 40 is an emergency: past 100 in about 2 seconds in the open and
+4 in a tunnel, on the network or off it. The heat is the ore's own energy, booked as injected in the ledger. Hot with
+20 or more aboard, the heat warnings say to unload, and the line under the hold says CARGO HOT.
 When the tank dies its hold spills back into the ground as plain ore in the nearest open or dirt cells around the wreck,
 never under another tank or a machine (ore blocks links, so it would cut a relay); what does not fit within a few cells
 is lost. Torching rock no longer yields anything. The MATERIALS panel shows a pile of Pyrite growing inside the
@@ -1026,7 +1026,7 @@ upgrades, throughput, turrets, removing the pylon and the tank's reserve are in)
 | Sensors upgrade: relays and generators see 10 cells past coverage, and 8 more per level (the base 8 more per level) | Prototype |
 | Every heat body is finite: no pinned temperatures or permanent sources; the outside is a loss, not a cell | Decided |
 | Stored heat is the match's supply; what keeps it up over a long match is open (§4.10) | Proposed |
-| Carried pyrite heats the tank hard from 20 units and dangerously at 40; the hold unloads only by touching the own core or a powered relay, and the core has no baffles round it (§6.3, §4.9) | Prototype |
+| Carried pyrite heats the tank linearly, steeply from 20 units and dangerously at 40, with no step or spike; the hold unloads only by touching the own core or a powered relay, and the core has no baffles round it (§6.3, §4.9) | Prototype |
 
 ## 14. Open questions
 

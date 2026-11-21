@@ -14,22 +14,15 @@ public static class TankHeatModel
 
     /// <summary>
     /// Degrees a tick a load of <paramref name="ore"/> pyrite adds to the tank before cooling (DESIGN.md §6.3,
-    /// <see cref="Tweaks.Cargo"/>): a mild share per unit, and from <c>TankCargoHeatStartOre</c> a step and a surge
-    /// that grows with the square of the way to <c>TankCargoHeatDangerOre</c> and past it along the line the curve
-    /// leaves it on, so the heat rises smoothly from the start and never levels off.
+    /// <see cref="Tweaks.Cargo"/>): linear in the ore held, a mild share for every unit and a larger one for every unit
+    /// past <c>TankCargoHeatStartOre</c>. Continuous at the start, with no step or spike anywhere.
     /// </summary>
     public static float ComputeCargoHeat(in SimulationSettings s, int ore)
     {
         if (ore <= 0)
             return 0f;
-        float heat = ore * s.TankHeatPerOrePerTick;
-        int span = s.TankCargoHeatDangerOre - s.TankCargoHeatStartOre;
-        if (ore >= s.TankCargoHeatStartOre && span > 0)
-        {
-            float t = (ore - s.TankCargoHeatStartOre) / (float)span;
-            heat += s.TankCargoStartHeatPerTick + s.TankCargoSurgeHeatPerTick * (t <= 1f ? t * t : 2f * t - 1f);
-        }
-        return heat;
+        return ore * s.TankHeatPerOrePerTick +
+            Math.Max(0, ore - s.TankCargoHeatStartOre) * s.TankCargoHeatPerOreAboveStartPerTick;
     }
 
     /// <summary>

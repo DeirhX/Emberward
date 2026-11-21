@@ -5,8 +5,9 @@ using Emberward.Core.Types;
 namespace Emberward.Tests;
 
 /// <summary>
-/// Carried pyrite heats the tank (DESIGN.md §6.3, <see cref="Tweaks.Cargo"/>): mild below 20 units, a clear climb from
-/// 20, and at 40 an emergency that takes a tank past its safe maximum in a few seconds unless it unloads.
+/// Carried pyrite heats the tank (DESIGN.md §6.3, <see cref="Tweaks.Cargo"/>), linearly in the ore held: mild below 20
+/// units, steeper from 20, and at 40 an emergency that takes a tank past its safe maximum in a few seconds unless it
+/// unloads.
 /// </summary>
 public class CargoHeatTests
 {
@@ -17,33 +18,39 @@ public class CargoHeatTests
     [Theory]
     [InlineData(0, 0f)]
     [InlineData(19, 1.9f)]
-    [InlineData(20, 5f)]
-    [InlineData(30, 22f)]
-    [InlineData(40, 71f)]
-    public void TheCurve_GivesTheDocumentedRates(int ore, float degreesPerSecond) =>
-        Assert.Equal(degreesPerSecond, PerSecond(ore), precision: 3);
+    [InlineData(20, 2f)]
+    [InlineData(30, 38f)]
+    [InlineData(40, 74f)]
+    [InlineData(70, 182f)]
+    [InlineData(130, 398f)]
+    public void TheRamp_GivesTheDocumentedRates(int ore, float degreesPerSecond) =>
+        Assert.Equal(degreesPerSecond, PerSecond(ore), precision: 2);
 
+    /// <summary>Linear: below the start and above it, every unit adds the same as the one before; no step, no spike.</summary>
     [Fact]
-    public void TheCurve_RisesWithEveryUnit_AndKeepsRisingPastForty()
+    public void TheRamp_IsLinear_OnEachSideOfTheStart_AndContinuousAtIt()
     {
-        for (int ore = 1; ore <= 130; ore++)
-            Assert.True(PerSecond(ore) > PerSecond(ore - 1), $"{ore} units heat no faster than {ore - 1}");
-        // Smooth past the danger mark: the step from 40 to 41 is the step from 39 to 40, near enough.
-        float before = PerSecond(40) - PerSecond(39), after = PerSecond(41) - PerSecond(40);
-        Assert.InRange(after, before, before * 1.1f);
+        int start = Tweaks.Cargo.HeatStartOre;
+        float below = PerSecond(1) - PerSecond(0), above = PerSecond(start + 1) - PerSecond(start);
+        for (int ore = 1; ore <= start; ore++)
+            Assert.Equal(below, PerSecond(ore) - PerSecond(ore - 1), precision: 4);
+        for (int ore = start + 1; ore <= 130; ore++)
+            Assert.Equal(above, PerSecond(ore) - PerSecond(ore - 1), precision: 3);
+        // Continuous at the start: the unit that reaches it adds only the mild share.
+        Assert.Equal(PerSecond(start - 1) + below, PerSecond(start), precision: 4);
+        Assert.True(above > below, "past the start each unit should heat more");
     }
 
     [Fact]
-    public void BelowTwenty_ItIsMild_AndFromTwentyItOutrunsTheOffNetworkClock()
+    public void BelowTwenty_ItIsMild_AndFortySwampsAFullLink()
     {
         Assert.True(PerSecond(19) <= 2f * Tweaks.Tank.OffNetworkHeatPerSecond, "19 units should be mild");
-        Assert.True(PerSecond(20) > 4f * Tweaks.Tank.OffNetworkHeatPerSecond, "20 units should start to heat the tank");
         Assert.True(PerSecond(40) > 10f * Tweaks.Tank.NetworkCoolingPerSecond, "40 units should swamp a full link");
     }
 
     /// <summary>
     /// In a world: a cool tank idle in a tunnel with a load aboard. 40 units take it past the safe maximum within
-    /// five seconds even inside its base's coverage; 19 leave it barely warm and 30 well short of it.
+    /// five seconds even inside its base's coverage; 19 leave it barely warm and 30 short of it.
     /// </summary>
     [Theory]
     [InlineData(19, false)]
@@ -65,7 +72,7 @@ public class CargoHeatTests
         Assert.Equal(ore, s.Tank.OreHeld);
         Assert.Equal(overheats, hottest > Tweaks.Tank.HeatSafeMax);
         if (!overheats)
-            Assert.True(hottest < Tweaks.Tank.HeatSafeMax * 0.5f, $"{ore} units reached {hottest:0}");
+            Assert.True(hottest < Tweaks.Tank.HeatSafeMax * 0.75f, $"{ore} units reached {hottest:0}");
         if (ore < Tweaks.Cargo.HeatStartOre)
             Assert.True(hottest < 10f, $"{ore} units should be mild; reached {hottest:0}");
     }
