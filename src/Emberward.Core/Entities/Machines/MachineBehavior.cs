@@ -96,6 +96,12 @@ public record MachineBehavior(
     /// </summary>
     public bool IsLinkNode { get; init; }
 
+    /// <summary>
+    /// A drop-off point for the tank's ore: a tank of its side that touches it while it is powered unloads its hold
+    /// into the base store, the units travelling home along the links (DESIGN.md §6.3).
+    /// </summary>
+    public bool TakesOre { get; init; }
+
     /// <summary>It works through the link network, so the tank refuses to plant it where it would not link.</summary>
     public bool RequiresLinkToPlant { get; init; }
 
@@ -192,6 +198,7 @@ public static class MachineBehaviors
         IsLinkNode = true,
         RequiresLinkToPlant = true,
         IsHeatPump = true,
+        TakesOre = true,
         UpgradePaths = [MachineUpgradePath.Tap, MachineUpgradePath.Sensor, MachineUpgradePath.Conduit],
     };
 

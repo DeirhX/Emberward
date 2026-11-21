@@ -39,14 +39,14 @@ public class BasePowerTests
     }
 
     /// <summary>
-    /// A shell from a corner of the courtyard along the diagonal, the one line that reaches the core. Returns the
+    /// A shell from a corner of the courtyard along the diagonal, where an attacker inside the walls fires. Returns the
     /// ticks it took to land, or -1 if it never damaged the base.
     /// </summary>
     private static int FireAtCore(World world, TankBase target, int owner)
     {
         world.Projectiles.Add(Projectile.CreateBullet(
             target.Position + BaseLayout.NearestCorner(-1, -1), new VectorF(1, 1), owner));
-        // The shell crosses the gap between the baffles and the floor round the core before it lands.
+        // The shell crosses the floor of the courtyard before it lands.
         for (int tick = 1; tick <= BaseLayout.Lane; tick++)
         {
             world.Advance(_ => default);
@@ -153,7 +153,7 @@ public class BasePowerTests
         Assert.False(world.AreGatesShut(target));
         Assert.Contains(world.StepEvents.ToArray(), e => e.Kind == StepEventKind.BaseShieldBroken);
 
-        // Open, a gate stops no shell: the next one flies in and lands on the baffle behind the gate.
+        // Open, a gate stops no shell: the next one flies in, nothing stands behind the gate, and it lands on the core.
         FireAtWestSide(world, target, owner: 0);
         Assert.DoesNotContain(world.StepEvents.ToArray(), e => e.Kind is StepEventKind.BaseShieldHit or StepEventKind.BaseShieldBroken);
 
@@ -288,7 +288,7 @@ public class BasePowerTests
     }
 
     [Fact]
-    public void Docking_BurnsCarriedOreAndRecordsTheCharge()
+    public void TouchingTheCore_BurnsCarriedOreAndRecordsTheCharge()
     {
         var world = CreateWorld();
         var tank = world.TankList.Tanks[0];
@@ -296,6 +296,11 @@ public class BasePowerTests
         int banked = home.Store.Ore;
         home.DrawCharge(home.Charge);
         tank.Hold.Add(19);
+        // Only touching the core burns it: anywhere else in the courtyard the hold stays as it is.
+        world.Advance(_ => default);
+        Assert.Equal(19, tank.OreHeld);
+        Assert.True(world.IsBaseDark(home));
+        tank.Position = TestHelpers.AgainstCore(home);
 
         world.Advance(_ => default);
 

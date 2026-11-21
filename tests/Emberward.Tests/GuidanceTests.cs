@@ -140,9 +140,9 @@ public class GuidanceTests
         s.World.Machines.Add(harvester);
         s.World.PlantMachine(harvester, s.Base);
         Advance(s, 12);
-        // The tank stands in the same coverage, unloading its hold through the network while the harvester works.
-        s.Tank.Position = s.RelayPos + new Offset(0, s.DirY * -8);
-        s.Tank.Hold.Ore = Tweaks.Ore.TankHold;
+        // The tank stands on the relay, unloading its hold through it while the harvester works.
+        s.Tank.Position = s.RelayPos + new Offset(0, s.DirY * -15);
+        s.Tank.Hold.Ore = Tweaks.Cargo.HeatStartOre - 1;
         var feed = new NotificationFeed();
         var events = new GameEventWatcher();
         float now = 0f;

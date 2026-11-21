@@ -175,16 +175,18 @@ is a new entry, in the place its order needs; the profile picks up its label. Th
    regrowth is spread over the ticks between passes.
 4. **proj**: `ProjectileList.Advance`.
 5. **tanks**: `LinkMap.AgeOreFlow`, then `TankList.Advance` with the world's `SimulationContext` (built once). Per tank (`Tank.Advance`):
-   idle heat, base interaction (recharge, heat sink, docking: the hold banks into the store), network coverage (with
+   idle heat, base interaction (recharge, heat sink anywhere inside the walls; touching the core, `Tank.TouchesCore`,
+   the hold banks into the store), network coverage (with
    `MatchRules.TankReserve` on, a generator nearby holds the off-network floor), the reserve (only with that rule:
    `TankReserveSystem.Advance` burns a unit on the recall key, recorded as `StepEventKind.ReserveBurned`, settles the
    stage, recorded as `ReserveStageChanged` when it changes, and returns the stage's effects, which mask the gun and
-   build keys and slow the move, dig and gun below), the network unload (inside linked coverage the hold moves `Ore.NetworkUnloadPerSecond` into the base store, booked on
-   the links with `LinkMap.CarryOre` and recorded as `StepEventKind.OreUnloaded`), turret aim and fire,
+   build keys and slow the move, dig and gun below), the relay unload (touching an own powered relay, `MachineBehavior.TakesOre`, `Tank.TouchedRelay`, the hold
+   moves `Ore.RelayUnloadPerSecond` into the base store, booked on the links with `LinkMap.CarryOre` and recorded as
+   `StepEventKind.OreUnloaded`; being in coverage is not enough), turret aim and fire,
    `TankDigger.Move`, spawn shield, shooting, `TankBuildController.Advance`, the upgrade keys, the machine upgrade
    key (only when `MatchRules.MachineUpgrades` is on: `MachineUpgradeSystem` buys a level for the nearest own machine
    in reach on a press of `ControllerOutput.UpgradeMachine` with a key, recorded as `StepEventKind.MachineUpgraded`
-   or `MachineUpgradeRefused`), then `TankThermals.Advance` (heat from ore still in the hold and from tank actions,
+   or `MachineUpgradeRefused`), then `TankThermals.Advance` (heat from ore still in the hold, `TankHeatModel.ComputeCargoHeat`, and from tank actions,
    then exchange with the grid). Machine upgrades take effect where the rest of the game reads them: a relay asks its
    pump rate (`MachineContext.Upgrades`), the energy network holds a resized capacitor and idle draw
    (`EnergyNetwork.Resize`) and a Conduit's throughput (`EnergyNetwork.SetThroughputScale`), and vision asks a
@@ -256,7 +258,7 @@ is off by default and never runs per tick.
 
 Queries Desktop asks instead of computing itself: `World.MatchOutcomeFor` / `IsMatchOver`,
 `World.CoreTapOf` (a base's progress on the sector goal),
-`Tank.IsDockedAtOwnBase`, `Tank.IsInOwnNetwork`, `Tank.IsUnloadingOre`, `Tank.QuoteBuild` (cost, payer, stock and
+`Tank.IsDockedAtOwnBase`, `Tank.IsInOwnNetwork`, `Tank.IsUnloadingOre`, `Tank.IsCargoHot`, `Tank.TouchesCore`, `Tank.QuoteBuild` (cost, payer, stock and
 refusal for a machine), `Tank.LastBuildRefusal`, `World.GetNetworkStatus`, `World.PreviewPlacement`, `World.CoverageFor`,
 `World.CollectCoverageNodes`, `World.TrackVision`, `World.TrackRadar`, `World.RadarOf`, and the `CopyRenderStates` snapshot of each entity list.
 
@@ -505,7 +507,7 @@ Core:
    `BuildTable(...)` call that fills `MachineBehaviors.All`: its type, action interval, action, colour, ore cost
    and `BuildKey`, its `Capacitor` (capacity, transfer rate, `PowerTier`, idle draw; DESIGN.md §4.9), plus the traits
    Core reads instead of the type: `RunsOnCharge` (its action pays in charge and stops when it cannot), `IsLinkNode`,
-   `RequiresLinkToPlant`, `IsMiner`, `IsHeatPump`, `IsGenerator`, `IsTurret`, `HuntsCreatures`, and `NeedsEnergyNetwork` (only
+   `RequiresLinkToPlant`, `TakesOre` (a tank touching it unloads there), `IsMiner`, `IsHeatPump`, `IsGenerator`, `IsTurret`, `HuntsCreatures`, and `NeedsEnergyNetwork` (only
    energy matches can build it), and its `UpgradePaths`. The action is a static method taking `(Machine,
    MachineContext)`, in `MachineBehaviors` or, when it is long, a class of its own (`TurretAction`).
 3. Constants (interval, capacitor) in `Tweaks.Machine`, its ore cost in `Tweaks.Ore`, colour in `Tweaks.Colors`.

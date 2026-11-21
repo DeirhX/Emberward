@@ -170,14 +170,14 @@ public static partial class Tweaks
         public const int TankHold = 40;
 
         // The economy (DESIGN.md §6.4): ore is the only currency. A base starts with BaseStartingStore and holds up to
-        // BaseStoreCapacity. Docked, the hold empties into the store at Base.HomeAbsorbOre a tick; inside the coverage
-        // of its own linked network (Coverage) it unloads at NetworkUnloadPerSecond, slower, so relays are also drop-off
-        // points.
+        // BaseStoreCapacity. Touching its own base's core, the hold empties into the store at Base.HomeAbsorbOre a tick;
+        // touching one of its own powered relays it unloads at RelayUnloadPerSecond, slower, so relays are also drop-off
+        // points (Cargo.ContactReach says what touching is).
         public const int BaseStartingStore = 30;
         public const int BaseStoreCapacity = 20000;
-        public const int NetworkUnloadPerSecond = 4;
+        public const int RelayUnloadPerSecond = 4;
         // How long a link shows ore passing (Link.OreFlowTicks): a little over the gap between two units.
-        public const int LinkFlowShowTicks = Perf.TargetFps / NetworkUnloadPerSecond + 6;
+        public const int LinkFlowShowTicks = Perf.TargetFps / RelayUnloadPerSecond + 6;
 
         // Build costs, paid in ore (Entities/Tanks/TankBuildController: the base store inside the own network, else
         // the hold).
@@ -265,7 +265,7 @@ public static partial class Tweaks
         public const int AreaCoolingOuterAirTotal = 40;
         public const int HomeCooldownHeat = 6;
         public const int HomeRechargeHealth = 3;
-        // Ore banked per tick while docked: a full hold empties in a few ticks.
+        // Ore banked per tick while the tank touches the core: a full hold empties in a few ticks.
         public const int HomeAbsorbOre = 10;
 
         // Power (DESIGN.md §4.5). Heat relays deliver passes through the base engine on its way to the dimensional-link
@@ -341,8 +341,6 @@ public static partial class Tweaks
         public const float HeatMax = 100f;
         public const float HeatDigPerPixel = 0.008f;
         public const float HeatShootPerShot = 0.25f;
-        // A full 40-unit hold adds 4 degrees per second before cooling.
-        public const float HeatPerOrePerSecond = 0.1f;
         public const float HeatBaseCoolBonus = 0.20f;
         public const int TorchTerrainHeatAmount = 8;
         public const int TorchRockHeatAmount = 14;

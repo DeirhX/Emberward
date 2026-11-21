@@ -81,7 +81,7 @@ public sealed class TutorialDirector
                 Progress: static (_, p) => Ratio("Ore", p.OreHeld, Cost(MachineType.Relay))),
 
             new("Mind your temperature",
-                "Digging heats the tank (TEMP). Above 100° it burns your shield. Drive back into your base: it cools you down and banks your ore.",
+                "Digging heats the tank (TEMP), and so does pyrite in the hold, hard from 20. Above 100° it burns your shield. Drive back into your base to cool down, and touch the core at its centre to bank your ore.",
                 static (t, w, p) => t._unloadedHaul || OwnsAny(w, p, MachineType.Relay),
                 Target: static (_, p) => p.Base?.Position),
 
@@ -92,7 +92,7 @@ public sealed class TutorialDirector
                     : Ratio("Ore you can spend", p.QuoteBuild(MachineType.Relay).Stock, Cost(MachineType.Relay))),
 
             new(NetworkStepTitle,
-                "The pale circles are your network. Inside them the links pull heat out of your tank and your hold unloads into the base. Outside, the OFF NETWORK clock runs: get back before it reaches 0, or plant another relay to reach further.",
+                "The pale circles are your network. Inside them the links pull heat out of your tank, and touching a relay unloads your hold into the base. Outside, the OFF NETWORK clock runs: get back before it reaches 0, or plant another relay to reach further.",
                 static (t, _, _) => t._cameBackCovered,
                 ReadSeconds: 14f),
 
@@ -216,10 +216,10 @@ public sealed class TutorialDirector
         bool docked = player.IsDockedAtOwnBase;
         if (!docked)
             _hasLeftBase = true;
-        // A real haul: the tank came home with at least a relay's worth of ore and docked.
+        // A real haul: the tank came home with at least a relay's worth of ore and unloaded it at the core or a relay.
         if (!docked && player.OreHeld >= Cost(MachineType.Relay))
             _carriedHaul = true;
-        if (docked && _carriedHaul)
+        if (player.IsUnloadingOre && _carriedHaul)
             _unloadedHaul = true;
         if (player.IsOffNetwork)
             _wasOffNetwork = true;

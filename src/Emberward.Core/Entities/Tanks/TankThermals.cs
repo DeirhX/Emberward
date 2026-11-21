@@ -168,7 +168,7 @@ internal sealed class TankThermals
         var position = _tank.Position;
         int radius = _settings.TankDigRadius;
         var contact = heat.SampleTankContact(position, radius);
-        float cargoHeat = _tank.OreHeld * _settings.TankHeatPerOrePerTick;
+        float cargoHeat = TankHeatModel.ComputeCargoHeat(in _settings, _tank.OreHeld);
         // A burning hull (TankShieldSystem.FireLevelOf) heats the tank and, more, the air around it. External sources.
         float fire = _tank.FireLevel;
         float fireHeat = fire > 0f ? fire * _settings.TankFireHeatPerTickMax : 0f;

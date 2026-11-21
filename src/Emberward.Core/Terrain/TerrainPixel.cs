@@ -187,7 +187,7 @@ public static class Pixel
     /// <summary>Soil and plain rock: the ground level generation may turn into pockets and deposits.</summary>
     public static bool IsSolidGround(TerrainPixel p) => IsSoil(p) || IsRock(p);
 
-    /// <summary>Any cell of a base: walls and baffles, floor, gates and the core.</summary>
+    /// <summary>Any cell of a base: walls, floor, gates and the core.</summary>
     public static bool IsAnyBaseCell(TerrainPixel p) =>
         IsBase(p) || p is TerrainPixel.BaseBarrier or TerrainPixel.BaseGateOpen or TerrainPixel.BaseFloor or TerrainPixel.BaseCore;
 

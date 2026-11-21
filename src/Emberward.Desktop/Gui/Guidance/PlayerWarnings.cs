@@ -12,12 +12,14 @@ public sealed record PlayerWarning(WarningKind Kind, string Title, string? Detai
 
 /// <summary>
 /// Picks the one warning to show, most urgent first: overheating, frostbite, chilled, low shield, running hot, the
-/// respawn shield, and once after the first hit a tip about the thermal view. When each is on is decided by Core
+/// respawn shield, and once after the first hit a tip about the thermal view. Hot with a big load aboard
+/// (<see cref="Tank.IsCargoHot"/>), the heat warnings say to unload it. When each is on is decided by Core
 /// (<see cref="Tank.IsRunningHot"/>, <see cref="Tank.IsHullLow"/>), which the warning sounds also ask.
 /// </summary>
 public sealed class PlayerWarnings
 {
     private const float ThermalHintSeconds = 8f;
+    private const string CargoDetail = "Your pyrite load heats the tank - touch your core or a relay to unload it";
 
     private bool _runningHotLatched;
     private bool _hullLowLatched;
@@ -49,7 +51,7 @@ public sealed class PlayerWarnings
 
         if (player.IsOverheating)
             return new(WarningKind.Overheating, "OVERHEATING - SHIELD BURNING",
-                "Stop digging and firing, or return to base to cool down", HintTone.Bad, Blinks: true);
+                player.IsCargoHot ? CargoDetail : "Stop digging and firing, or return to base to cool down", HintTone.Bad, Blinks: true);
         if (player.IsFreezing)
             return new(WarningKind.Frostbite, "FROSTBITE - SHIELD CRACKING",
                 "Get away from the frost, or return to base to warm up", HintTone.Info, Blinks: true);
@@ -63,7 +65,8 @@ public sealed class PlayerWarnings
                 "Return to base to repair the hull: the fire heats the tank and the ground around it", HintTone.Bad, Blinks: true);
         if (_runningHotLatched)
             return new(WarningKind.RunningHot, "RUNNING HOT",
-                "Digging and firing heat the tank - return to base to cool down", HintTone.Warn, Blinks: true);
+                player.IsCargoHot ? CargoDetail : "Digging and firing heat the tank - return to base to cool down",
+                HintTone.Warn, Blinks: true);
         if (player.SpawnProtectionTicks > 0)
             return new(WarningKind.RespawnShield, "Respawn shield active", null, HintTone.Info, Blinks: false);
         if (now < _thermalHintUntil)

@@ -285,7 +285,7 @@ public class BotTankAI
 
     /// <summary>
     /// The step that takes a tank in its own courtyard out through the gate in direction <paramref name="exitY"/>.
-    /// The core and its baffles fill the middle, so from another side it drives out to a side lane, along it, and
+    /// The core fills the middle, so from another side it drives out to a side lane, along it, and
     /// then to the middle of the gate.
     /// </summary>
     private static Offset CourtyardMove(int exitY, int relX, int relY)

@@ -83,12 +83,16 @@ public sealed record BuildSlotView(
     }
 
     /// <summary>
-    /// The line beneath the hold window: the hold emptying into the base, else a plain label. The base's ore store is
-    /// not here: it only changes at the base and at its machines, and shows on the upgrade panels there.
+    /// The line beneath the hold window: the hold emptying into the base; in the base with ore aboard, where it unloads
+    /// (touching the core); a load big enough to heat the tank; else a plain label. The base's ore store is not here:
+    /// it only changes at the base and at its machines, and shows on the upgrade panels there.
     /// </summary>
     public static string OreLine(Tank player)
     {
         ArgumentNullException.ThrowIfNull(player);
-        return player.IsUnloadingOre ? "UNLOADING" : "ORE";
+        return player.IsUnloadingOre ? "UNLOADING"
+            : player.OreHeld > 0 && player.IsDockedAtOwnBase ? "TO CORE"
+            : player.IsCargoHot ? "CARGO HOT"
+            : "ORE";
     }
 }

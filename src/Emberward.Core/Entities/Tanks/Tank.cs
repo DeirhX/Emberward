@@ -169,6 +169,12 @@ public class Tank
     /// <summary>How much pyrite the hold takes (<see cref="Tweaks.Ore.TankHold"/> plus the base's cargo hold upgrades).</summary>
     public int OreHoldCapacity => Hold.Capacity;
 
+    /// <summary>
+    /// True when the load is big enough to heat the tank hard (<see cref="Tweaks.Cargo.HeatStartOre"/> or more): from
+    /// here each unit more heats it faster (DESIGN.md §6.3).
+    /// </summary>
+    public bool IsCargoHot => OreHeld >= Tweaks.Cargo.HeatStartOre;
+
     /// <summary>True when the hold has no room for another unit: the tank's dig leaves ore in the ground.</summary>
     public bool IsOreHoldFull => Hold.IsFull;
 
@@ -178,7 +184,10 @@ public class Tank
     /// </summary>
     public bool IsInOwnNetwork => IsDockedAtOwnBase || (!IsDead && Coverage.Covered);
 
-    /// <summary>True on ticks the hold is emptying into the base store: docked, or through the network.</summary>
+    /// <summary>
+    /// True on ticks the hold is emptying into the base store: the tank touches its own base's core, or one of its own
+    /// powered relays (DESIGN.md §6.3).
+    /// </summary>
     public bool IsUnloadingOre { get; private set; }
 
     /// <summary>
@@ -280,7 +289,7 @@ public class Tank
         var reserve = ctx.Reserve?.Advance(this, input.Recall, ctx.Events) ?? TankReserveEffects.Normal;
         if (!reserve.CanShoot)
             input.ShootPrimary = false;
-        AdvanceNetworkUnload(in ctx);
+        AdvanceRelayUnload(in ctx);
         AdvanceTurretAim(input);
         Turret.Update(input.ShootPrimary);
         _digger.Move(in ctx, input.MoveSpeed, Turret.Direction, input.ShootPrimary, reserve.MoveFactor);
@@ -378,8 +387,9 @@ public class Tank
     private const float BaseServicedHeatDrop = 0.05f;
 
     /// <summary>
-    /// Its own base repairs the tank, stores heat from the docking area, banks the ore and pumps heat directly from
-    /// the tank into its reservoir. Another side's base does nothing for a tank: a raider inside the walls gets no
+    /// Its own base repairs the tank, stores heat from the docking area and pumps heat directly from the tank into its
+    /// reservoir anywhere inside the walls; the ore is banked (or, while the base is dark, burned to restart it) only
+    /// while the tank touches the core. Another side's base does nothing for a tank: a raider inside the walls gets no
     /// service from the base it is attacking.
     /// </summary>
     private void AdvanceBaseInteraction(in SimulationContext ctx)
@@ -393,40 +403,75 @@ public class Tank
             baseColl.RechargeTank(Reactor);
         _thermals.CoolDockingArea(ctx.Heat, baseColl);
 
-        int burned = ctx.BasePower?.BurnHold(baseColl, Hold, ctx.Heat.Ledger) ?? 0;
-        if (burned > 0)
-            ctx.Events?.Record(new StepEvent(StepEventKind.RestartOreBurned, Position, Color, Count: burned));
-        int banked = dark ? 0 : Hold.MoveTo(baseColl.Store, Tweaks.Base.HomeAbsorbOre);
-        IsUnloadingOre = banked > 0;
+        int banked = 0;
+        if (TouchesCore(baseColl))
+        {
+            int burned = ctx.BasePower?.BurnHold(baseColl, Hold, ctx.Heat.Ledger) ?? 0;
+            if (burned > 0)
+                ctx.Events?.Record(new StepEvent(StepEventKind.RestartOreBurned, Position, Color, Count: burned));
+            banked = dark ? 0 : Hold.MoveTo(baseColl.Store, Tweaks.Base.HomeAbsorbOre);
+            IsUnloadingOre = banked > 0;
+        }
         _thermals.PumpHeatAtBase(baseColl);
         // A tank that is only shedding the last fraction of a degree near 0 is not being serviced any more.
         if (Reactor.Health > health || Heat < heat - BaseServicedHeatDrop || banked > 0)
             ctx.Events?.Record(new StepEvent(StepEventKind.BaseServiced, Position, Color));
     }
 
+    /// <summary>
+    /// Whether the tank touches the core of <paramref name="tankBase"/>: a cell of its shape lies within
+    /// <see cref="Tweaks.Cargo.ContactReach"/> cells of the core's disc.
+    /// </summary>
+    public bool TouchesCore(TankBase tankBase) => TankSpriteShape.ReachesDisc(Direction, Position, tankBase.Position,
+        Tweaks.Keep.CoreSize + 2 * Tweaks.Cargo.ContactReach);
+
+    [NotSaved("scratch: TouchedRelay fills it before it reads it")]
+    private readonly List<Machine> _nearMachines = new();
+
+    /// <summary>
+    /// The first of its own base's standing, powered drop-off points (<see cref="MachineBehavior.TakesOre"/>, the relay)
+    /// that the tank touches: a cell of its shape lies within <see cref="Tweaks.Cargo.ContactReach"/> cells of the
+    /// machine's square. Null when it touches none.
+    /// </summary>
+    internal Machine? TouchedRelay(MachineList? machines)
+    {
+        if (machines == null || Base == null)
+            return null;
+        int reach = TankSpriteShape.Radius + Tweaks.Machine.BoundingBoxHalfSize + Tweaks.Cargo.ContactReach;
+        machines.CollectNear(Position, reach, _nearMachines);
+        foreach (var machine in _nearMachines)
+            if (machine.StandsFor(Base) && machine.Behavior.TakesOre &&
+                machine.LinkPoint is { IsPowered: true, Hops: >= 0 } &&
+                TankSpriteShape.OverlapsSquare(Direction, Position, machine.Position,
+                    machine.BoundingBox.HalfWidth + Tweaks.Cargo.ContactReach))
+                return machine;
+        return null;
+    }
+
     // Unload rate credit, in units times ticks per second: a unit moves each time it reaches TargetFps.
     private int _unloadCredit;
 
     /// <summary>
-    /// Inside the coverage of its own linked network (not in a base, where docking banks faster) the hold unloads
-    /// into the base store at <see cref="Tweaks.Ore.NetworkUnloadPerSecond"/>, one unit at a time, as long as the
-    /// store has room. Each unit travels home along the links from the covering node.
+    /// Touching one of its own powered relays (<see cref="TouchedRelay"/>) the hold unloads into the base store at
+    /// <see cref="Tweaks.Ore.RelayUnloadPerSecond"/>, one unit at a time, as long as the store has room. Each unit
+    /// travels home along the links from that relay. Nowhere else does the hold unload but at the core.
     /// </summary>
-    private void AdvanceNetworkUnload(in SimulationContext ctx)
+    private void AdvanceRelayUnload(in SimulationContext ctx)
     {
         var store = Base?.Store;
-        if (store == null || ctx.BasePower?.IsDark(Base!) == true || !Coverage.Covered || Hold.Ore == 0 || store.IsFull)
+        if (store == null || IsUnloadingOre || Hold.Ore == 0 || store.IsFull || ctx.BasePower?.IsDark(Base!) == true ||
+            TouchedRelay(ctx.Machines) is not { } relay)
         {
             _unloadCredit = 0;
             return;
         }
         IsUnloadingOre = true;
-        _unloadCredit += Tweaks.Ore.NetworkUnloadPerSecond;
+        _unloadCredit += Tweaks.Ore.RelayUnloadPerSecond;
         if (_unloadCredit < Tweaks.Perf.TargetFps)
             return;
         _unloadCredit -= Tweaks.Perf.TargetFps;
         int moved = Hold.MoveTo(store, 1);
-        LinkMap.CarryOre(Coverage.Point);
+        LinkMap.CarryOre(relay.LinkPoint);
         ctx.Events?.Record(new StepEvent(StepEventKind.OreUnloaded, Position, Color, Count: moved));
     }
 

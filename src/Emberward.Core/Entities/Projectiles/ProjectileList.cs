@@ -146,7 +146,7 @@ public class ProjectileList
                         p.PiercedCell = ipos;
                         return false;
                     }
-                    // Walls and baffles take no damage; only a shell that reaches the core wears a base down.
+                    // Walls take no damage; only a shell that reaches the core wears a base down.
                     if (Pixel.IsBaseCore(pix) && solver.EnemyBaseAt(ipos, p.OwnerColor) is { } target)
                     {
                         int raw = p.Damage;
