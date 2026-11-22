@@ -96,11 +96,11 @@ public partial class BotTankAI
     /// <summary>Ticks left in which the bot does not wait at a post (see <see cref="LoiterBreakFrames"/>).</summary>
     private int _loiterBreakFrames;
 
-    /// <summary>Notes a hit (health lower than last tick), which keeps the bot from waiting at a post for a while.</summary>
+    /// <summary>Notes a hit (health lower than last tick, or enemy fire the shield took: the hit flash just lit), which keeps the bot from waiting at a post for a while.</summary>
     private void TrackHits(Tank tank)
     {
         int health = (int)tank.Reactor.Health;
-        if (health < _lastHealth)
+        if (health < _lastHealth || tank.HitFlashTicks >= Tank.HitFlashDuration - 1)
             _loiterBreakFrames = LoiterBreakFrames;
         else if (_loiterBreakFrames > 0)
             _loiterBreakFrames--;
