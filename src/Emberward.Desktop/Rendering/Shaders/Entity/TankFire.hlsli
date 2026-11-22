@@ -122,7 +122,7 @@ float4 TankFire(float2 p, float4 params, float3 core, float aa)
     float sag = saturate((0.25 - hullFill) * 4.0) * crust;
 
     // A second, finer noise roughens the core's edge so it reads as molten metal, not a disc.
-    float fine = FireNoise(p * 1.7 + float2(seed * 11.0, 3.0 * t));
+    float fine = FireNoise(p * 1.7 + float2(seed * 11.0, 4.0 * t));
 
     // Soot: a dark smudge round the core keeps it readable on any hull colour, with embers in its cracks. It thins out
     // over a couple of cells and the noise moves its reach, so it has no ring edge.
