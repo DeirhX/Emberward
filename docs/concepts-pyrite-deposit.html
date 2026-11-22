@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Concepts: pyrite deposit feedback</title>
+<style>
+  body { background:#14110f; color:#e8dccb; font:14px/1.4 system-ui, sans-serif; margin:24px; max-width:1280px; }
+  h1 { font-size:20px; } h2 { font-size:16px; margin-top:28px; color:#ffb870; }
+  .grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:18px; }
+  .grid4 { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; }
+  .grid2 { display:grid; grid-template-columns:repeat(2, 1fr); gap:18px; }
+  figure { margin:0; background:#1d1915; border:1px solid #3a3029; border-radius:6px; padding:10px; }
+  figure.pick { border-color:#5fae5f; box-shadow:0 0 0 1px #5fae5f inset; }
+  svg { width:100%; height:auto; display:block; background:#0d0b0a; border-radius:4px; }
+  figcaption { margin-top:8px; font-size:13px; } figcaption b { color:#ffd080; }
+  .rec { color:#8fe08f; font-weight:600; }
+  code { color:#ffd9a0; }
+  table { border-collapse:collapse; font-size:13px; margin-top:8px; }
+  td, th { border:1px solid #3a3029; padding:4px 8px; text-align:left; vertical-align:top; }
+  th { color:#ffb870; }
+</style>
+</head>
+<body>
+<h1>Pyrite deposit feedback: three variants</h1>
+<p>Concept sketches for <code>docs/pyrite-deposit-feedback-design.md</code>. Each in-world panel is a top view of a
+tank (pale yellow, the hardest colour for a gold effect) touching its own base's core, 0.3 s into banking a full hold of
+40 units. Today the hold empties in 4 ticks (0.17 s) with a short beam and no sound, and the store shows only in the
+base overlay. <span class="rec">Recommended: A, Pour and glow.</span></p>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffcf70"/><stop offset="0.55" stop-color="#d9861c"/><stop offset="1" stop-color="#4a2a10"/>
+    </radialGradient>
+    <radialGradient id="coreHot" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#fff6d8"/><stop offset="0.35" stop-color="#ffd040"/><stop offset="0.75" stop-color="#ff6a10"/><stop offset="1" stop-color="#5a1408"/>
+    </radialGradient>
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffb030" stop-opacity="0.55"/><stop offset="1" stop-color="#ff6a10" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="haloCyan" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#bff4ff" stop-opacity="0.6"/><stop offset="1" stop-color="#30c0ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="crysGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffe7a0" stop-opacity="0.8"/><stop offset="1" stop-color="#ffc040" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="floor" width="20" height="20" patternUnits="userSpaceOnUse">
+      <rect width="20" height="20" fill="#1c1d22"/><path d="M0 0H20V20" fill="none" stroke="#26282f" stroke-width="1"/>
+    </pattern>
+    <g id="tank">
+      <rect x="-17" y="-17" width="34" height="34" rx="4" fill="#e9dc8a" stroke="#7a6d2a" stroke-width="2"/>
+      <rect x="-21" y="-17" width="5" height="34" fill="#6b6440"/><rect x="16" y="-17" width="5" height="34" fill="#6b6440"/>
+      <circle r="7" fill="#c9b960" stroke="#7a6d2a"/><rect x="-2.5" y="-30" width="5" height="18" fill="#9a8c40"/>
+    </g>
+    <g id="crys"><circle r="7" fill="url(#crysGlow)"/><polygon points="0,-5 4,0 0,5 -4,0" fill="#ffc23f" stroke="#fff1c0" stroke-width="0.8"/></g>
+    <g id="base">
+      <rect x="10" y="10" width="300" height="200" fill="url(#floor)"/>
+      <rect x="10" y="10" width="300" height="200" fill="none" stroke="#6e7584" stroke-width="5"/>
+      <rect x="10" y="10" width="300" height="200" fill="none" stroke="#e9dc8a" stroke-width="1.2" opacity="0.6"/>
+    </g>
+  </defs>
+</svg>
+
+<h2>In the world (viewBox 0 0 320 220; core at the centre, tank touching it from below-left)</h2>
+<div class="grid">
+
+<!-- A: Pour and glow -->
+<figure class="pick">
+<svg viewBox="0 0 320 220" xmlns="http://www.w3.org/2000/svg">
+  <use href="#base"/>
+  <circle cx="170" cy="95" r="70" fill="url(#halo)"/>
+  <circle cx="170" cy="95" r="44" fill="none" stroke="#ffe08a" stroke-width="2" opacity="0.55"/>
+  <circle cx="170" cy="95" r="58" fill="none" stroke="#ffb050" stroke-width="1" opacity="0.25"/>
+  <circle cx="170" cy="95" r="22" fill="url(#coreHot)" stroke="#3a3a40" stroke-width="3"/>
+  <g transform="translate(110,160) rotate(-50)"><use href="#tank"/></g>
+  <!-- arcs -->
+  <path d="M122 146 Q128 100 160 100" fill="none" stroke="#ffc040" stroke-width="0.8" stroke-dasharray="2 4" opacity="0.6"/>
+  <path d="M124 148 Q160 140 164 108" fill="none" stroke="#ffc040" stroke-width="0.8" stroke-dasharray="2 4" opacity="0.6"/>
+  <use href="#crys" x="125" y="132"/><use href="#crys" x="133" y="112"/><use href="#crys" x="150" y="102"/>
+  <use href="#crys" x="142" y="141"/><use href="#crys" x="158" y="124"/>
+  <use href="#crys" x="128" y="142" transform="scale(1)"/>
+  <!-- floater -->
+  <text x="200" y="52" font-family="monospace" font-size="18" font-weight="bold" fill="#ffd05a">+40</text>
+  <text x="200" y="66" font-family="monospace" font-size="10" fill="#d8b860">BASE 1234</text>
+</svg>
+<figcaption><b>A. Pour and glow</b> <span class="rec">(recommended)</span>. A 4-tick bank becomes a 0.9 s pour:
+up to 12 gold crystals arc from the hold into the core (new kind 27). Each landing pulses the core: it brightens along
+the heat ramp, a ring expands from its rim, and its halo follows the reactor's real heat store (new kind 28), which
+deposit heat really raises. A gold <code>+40</code> rises with the store under it. HUD row, sound and a first-time
+toast as below.</figcaption>
+</figure>
+
+<!-- B: Beam hold, HUD-first -->
+<figure>
+<svg viewBox="0 0 320 220" xmlns="http://www.w3.org/2000/svg">
+  <use href="#base"/>
+  <circle cx="170" cy="95" r="40" fill="url(#halo)" opacity="0.6"/>
+  <circle cx="170" cy="95" r="22" fill="url(#core)" stroke="#3a3a40" stroke-width="3"/>
+  <g transform="translate(110,160) rotate(-50)"><use href="#tank"/></g>
+  <line x1="124" y1="146" x2="158" y2="106" stroke="#ffc040" stroke-width="1.2" opacity="0.5"/>
+  <polygon points="134,134 138,129 142,134 138,139" fill="#ffc23f"/>
+  <polygon points="146,120 150,115 154,120 150,125" fill="#ffc23f"/>
+  <rect x="200" y="160" width="100" height="40" rx="5" fill="#2a2420" stroke="#5a4a3c"/>
+  <text x="208" y="176" font-family="monospace" font-size="10" fill="#aafacd">HOLD  0/40</text>
+  <text x="208" y="192" font-family="monospace" font-size="10" fill="#ffd05a">BASE  1234 +40</text>
+</svg>
+<figcaption><b>B. Beam hold, HUD first.</b> No new entity kinds: the existing ore beam is held for 0.9 s after the last
+<code>OreUnloaded</code> (the BeamFader already fades it), the core is unchanged except for a mild halo from the
+event, and the work is done in the MATERIALS panel (BASE row, count-up, <code>+40</code>). Cheapest, but at the core
+the beam is only about 5 cells long and the eye is on the tank, not the strip. Deposit heat 0: no gameplay change.</figcaption>
+</figure>
+
+<!-- C: Slow pour -->
+<figure>
+<svg viewBox="0 0 320 220" xmlns="http://www.w3.org/2000/svg">
+  <use href="#base"/>
+  <circle cx="170" cy="95" r="56" fill="url(#halo)" opacity="0.8"/>
+  <circle cx="170" cy="95" r="22" fill="url(#coreHot)" stroke="#3a3a40" stroke-width="3"/>
+  <g transform="translate(110,160) rotate(-50)"><use href="#tank"/></g>
+  <line x1="124" y1="146" x2="158" y2="106" stroke="#ffc040" stroke-width="2" opacity="0.7"/>
+  <polygon points="130,138 134,133 138,138 134,143" fill="#ffc23f"/>
+  <polygon points="140,127 144,122 148,127 144,132" fill="#ffc23f"/>
+  <polygon points="150,115 154,110 158,115 154,120" fill="#ffc23f"/>
+  <text x="80" y="200" font-family="monospace" font-size="11" fill="#ff9a50">HomeAbsorbOre 10 → 2 a tick</text>
+  <text x="200" y="52" font-family="monospace" font-size="14" fill="#ffd05a">+12…</text>
+</svg>
+<figcaption><b>C. Slow pour.</b> Change the simulation instead: bank 2 units a tick (48 a second), so a full hold takes
+0.8 s and the existing beam, a ticking counter and the core glow are all driven by real per-tick state with no
+stretching. Most honest, but every trip home gets slower and a tank that touches the core for a moment no longer
+banks everything; bots and the tutorial would need retuning. Rejected for now.</figcaption>
+</figure>
+</div>
+
+<h2>Variant A over time (one full hold at the core)</h2>
+<div class="grid4">
+<figure><svg viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="140" fill="url(#floor)"/>
+  <circle cx="120" cy="60" r="16" fill="url(#core)" stroke="#3a3a40" stroke-width="3"/>
+  <g transform="translate(70,100) rotate(-50) scale(0.8)"><use href="#tank"/></g>
+  <use href="#crys" x="82" y="88"/>
+</svg><figcaption><b>0.00 s</b> tick 1: <code>OreUnloaded</code> (10). First crystal leaves the hold. HOLD starts to drain on the HUD.</figcaption></figure>
+<figure><svg viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="140" fill="url(#floor)"/>
+  <circle cx="120" cy="60" r="34" fill="url(#halo)" opacity="0.6"/>
+  <circle cx="120" cy="60" r="16" fill="url(#core)" stroke="#3a3a40" stroke-width="3"/>
+  <g transform="translate(70,100) rotate(-50) scale(0.8)"><use href="#tank"/></g>
+  <use href="#crys" x="84" y="74"/><use href="#crys" x="96" y="64"/><use href="#crys" x="110" y="62"/><use href="#crys" x="92" y="88"/>
+</svg><figcaption><b>0.17 s</b> Core simulation is done: hold 0, store +40, reactor +10,000. Presentation: crystals in flight, the first lands.</figcaption></figure>
+<figure><svg viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="140" fill="url(#floor)"/>
+  <circle cx="120" cy="60" r="50" fill="url(#halo)"/>
+  <circle cx="120" cy="60" r="32" fill="none" stroke="#ffe08a" stroke-width="2" opacity="0.6"/>
+  <circle cx="120" cy="60" r="16" fill="url(#coreHot)" stroke="#3a3a40" stroke-width="3"/>
+  <g transform="translate(70,100) rotate(-50) scale(0.8)"><use href="#tank"/></g>
+  <use href="#crys" x="104" y="72"/><use href="#crys" x="110" y="66"/>
+  <text x="140" y="30" font-family="monospace" font-size="14" font-weight="bold" fill="#ffd05a">+40</text>
+</svg><figcaption><b>0.5 s</b> Pulse rings, core white-gold, <code>+40</code> rising. Deposit sound: clinks then a thump. BASE counts up.</figcaption></figure>
+<figure><svg viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="140" fill="url(#floor)"/>
+  <circle cx="120" cy="60" r="30" fill="url(#halo)" opacity="0.5"/>
+  <circle cx="120" cy="60" r="16" fill="url(#core)" stroke="#3a3a40" stroke-width="3"/>
+  <g transform="translate(70,100) rotate(-50) scale(0.8)"><use href="#tank"/></g>
+  <text x="140" y="20" font-family="monospace" font-size="14" font-weight="bold" fill="#ffd05a" opacity="0.4">+40</text>
+</svg><figcaption><b>1.5 s</b> Pulse gone; the halo fades with the reactor as the radiator vents the deposit heat (real <code>HeatStoreFill</code>).</figcaption></figure>
+</div>
+
+<h2>Other receivers and refusals (variant A)</h2>
+<div class="grid">
+<figure><svg viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="140" fill="url(#floor)"/>
+  <line x1="130" y1="50" x2="200" y2="10" stroke="#5ad8ff" stroke-width="1.2" opacity="0.6"/>
+  <circle cx="130" cy="50" r="18" fill="url(#halo)" opacity="0.7"/>
+  <rect x="120" y="40" width="20" height="20" rx="3" fill="#2a3540" stroke="#5ad8ff"/><circle cx="130" cy="50" r="5" fill="#ffd060"/>
+  <g transform="translate(80,100) rotate(-40) scale(0.8)"><use href="#tank"/></g>
+  <use href="#crys" x="106" y="72"/>
+  <text x="146" y="40" font-family="monospace" font-size="12" font-weight="bold" fill="#ffd05a">+7</text>
+</svg><figcaption><b>Relay.</b> One crystal per unit (4 a second) on top of today's beam, a small gold flash on the relay, and a running total for the visit (<code>+7</code>), not a cloud of <code>+1</code>s. Pickup streak sound as today.</figcaption></figure>
+<figure><svg viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="140" fill="url(#floor)"/>
+  <circle cx="120" cy="60" r="44" fill="url(#haloCyan)"/>
+  <circle cx="120" cy="60" r="16" fill="#203040" stroke="#3a3a40" stroke-width="3"/>
+  <circle cx="120" cy="60" r="7" fill="#dff8ff"/>
+  <g transform="translate(70,100) rotate(-50) scale(0.8)"><use href="#tank"/></g>
+  <polygon points="96,70 100,65 104,70 100,75" fill="#bff4ff"/><polygon points="106,64 110,59 114,64 110,69" fill="#bff4ff"/>
+  <text x="138" y="28" font-family="monospace" font-size="12" font-weight="bold" fill="#9fe8ff">+15 CHARGE</text>
+</svg><figcaption><b>Dark base.</b> The hold burns to restart it (<code>RestartOreBurned</code>, now at the core): the pour turns cyan-white, no gold warmth, <code>+15 CHARGE</code>.</figcaption></figure>
+<figure><svg viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="140" fill="url(#floor)"/>
+  <circle cx="120" cy="60" r="28" fill="none" stroke="#b03020" stroke-width="2.5" opacity="0.8"/>
+  <circle cx="120" cy="60" r="16" fill="url(#core)" stroke="#3a3a40" stroke-width="3"/>
+  <g transform="translate(70,100) rotate(-50) scale(0.8)"><use href="#tank"/></g>
+  <text x="128" y="24" font-family="monospace" font-size="12" font-weight="bold" fill="#ff6a50">BASE FULL</text>
+</svg><figcaption><b>Store full (dropped when built: no capacity handling; see the design's §0).</b> No pour; one dull red ring and a <code>BASE FULL</code> floater per touch, the refused sound, the ore line says BASE FULL (new <code>CoreDropOff.StoreFull</code>), and a toast with a 30 s cooldown.</figcaption></figure>
+</div>
+
+<h2>MATERIALS panel (art pixels; plate 186 x 20)</h2>
+<div class="grid2">
+<figure><svg viewBox="0 0 230 223" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="2" width="226" height="219" rx="8" fill="#2a2420" stroke="#5a4a3c"/>
+  <rect x="45" y="44" width="150" height="68" rx="4" fill="#120f0c" stroke="#4a3e34"/>
+  <rect x="60" y="122" width="124" height="20" rx="3" fill="#1c1916" stroke="#4a3e34"/>
+  <text x="122" y="137" font-family="monospace" font-size="13" fill="#ffe678" text-anchor="middle">ORE</text>
+  <text x="120" y="158" font-family="monospace" font-size="16" fill="#ffe068" text-anchor="middle">MATERIALS</text>
+  <rect x="27" y="174" width="186" height="20" rx="3" fill="#1c1916" stroke="#4a3e34"/>
+  <text x="120" y="189" font-family="monospace" font-size="15" fill="#cdfaaa" text-anchor="middle">0 / 40</text>
+</svg><figcaption><b>Today</b>, just after a bank: an empty hold window, ORE, <code>0 / 40</code>. Nothing says the base gained 40 or holds 1,234.</figcaption></figure>
+<figure class="pick"><svg viewBox="0 0 230 223" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="2" width="226" height="219" rx="8" fill="#2a2420" stroke="#5a4a3c"/>
+  <rect x="45" y="44" width="150" height="68" rx="4" fill="#120f0c" stroke="#4a3e34"/>
+  <polygon points="104,104 112,92 120,104" fill="#ffc23f" opacity="0.7"/><polygon points="118,104 124,96 130,104" fill="#ffc23f" opacity="0.5"/>
+  <rect x="60" y="122" width="124" height="20" rx="3" fill="#1c1916" stroke="#4a3e34"/>
+  <text x="122" y="137" font-family="monospace" font-size="13" fill="#90ff60" text-anchor="middle">UNLOADING</text>
+  <polygon points="63,128 71,128 67,133" fill="#90ff60"/><polygon points="173,128 181,128 177,133" fill="#90ff60"/>
+  <text x="120" y="158" font-family="monospace" font-size="16" fill="#ffe068" text-anchor="middle">MATERIALS</text>
+  <rect x="27" y="168" width="186" height="30" rx="3" fill="#1c1916" stroke="#ffd05a" stroke-opacity="0.8"/>
+  <text x="36" y="180" font-family="monospace" font-size="10" fill="#cdfaaa">HOLD</text>
+  <text x="204" y="180" font-family="monospace" font-size="11" fill="#cdfaaa" text-anchor="end">3 / 40</text>
+  <rect x="36" y="183" width="168" height="1" fill="#3a5a3a"/><rect x="36" y="183" width="13" height="1" fill="#cdfaaa"/>
+  <text x="36" y="194" font-family="monospace" font-size="10" fill="#cdfaaa">BASE</text>
+  <text x="72" y="194" font-family="monospace" font-size="9" fill="#8a9a7a">+18/m</text>
+  <text x="204" y="194" font-family="monospace" font-size="11" fill="#ffd05a" text-anchor="end">1,221</text>
+  <rect x="36" y="196" width="168" height="1" fill="#3a5a3a"/><rect x="36" y="196" width="10" height="1" fill="#cdfaaa"/>
+  <text x="196" y="166" font-family="monospace" font-size="11" font-weight="bold" fill="#ffd05a" text-anchor="end">+40</text>
+</svg><figcaption><b>Proposed</b>, mid-pour: the pile drains over 0.9 s, UNLOADING is held for the pour, and the plate
+becomes a HOLD/BASE ledger. BASE counts up to 1,234 with a gold flash and a <code>+40</code> rising out of the row; the
+dim <code>+18/m</code> is the 30 s rate (deposits and harvesters). (As built: BASE is one colour, no bar, no <code>FULL</code>; the
+<code>+N</code> rises in the plate's middle.) Same coordinates in <code>strip.js</code>.</figcaption></figure>
+</div>
+
+<h2>Variants compared</h2>
+<table>
+<tr><th></th><th>A. Pour and glow (recommended)</th><th>B. Beam hold, HUD first</th><th>C. Slow pour</th></tr>
+<tr><td>Simulation change</td><td>Deposit heat 250 a unit into the reactor (fingerprints change); no rate change</td><td>None</td><td>HomeAbsorbOre 10 → 2 (fingerprints, bots, tutorial)</td></tr>
+<tr><td>Core signal</td><td><code>OreUnloaded</code> at the core with receiver position and <code>Target</code> (core or relay)</td><td>Same event</td><td>Same event</td></tr>
+<tr><td>Entity kinds</td><td>27 OreCrystal, 28 CoreHeat; GlyphText floater</td><td>None (beam held longer)</td><td>28 CoreHeat</td></tr>
+<tr><td>Where the eye is</td><td>At the tank and core</td><td>On the HUD strip</td><td>At the tank and core</td></tr>
+<tr><td>Honesty of the glow</td><td>Real reactor heat plus a landing pulse</td><td>Event pulse only</td><td>Real reactor heat</td></tr>
+<tr><td>Cost to play</td><td>None while nobody unloads</td><td>None</td><td>Slower trips home</td></tr>
+</table>
+</body>
+</html>
