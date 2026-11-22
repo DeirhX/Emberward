@@ -17,11 +17,13 @@ using Emberward.Core.Types;
 /// that runs hot. Present only in worlds whose rules ask for it (<see cref="Match.MatchRules.Emberites"/>), and costing
 /// nothing while no nest is awake and none is out: a dormant nest holds counters and is looked at once in
 /// <see cref="Tweaks.Emberites.WakeCheckTicks"/> ticks, a creature in its nest has no state of its own. A woken nest sends
-/// them in pulses sized by the hunted tank's heat, each after a stir that warns of it.
+/// them in pulses sized by the hunted tank's heat, each after a stir that warns of it. A creature that bites runs to the
+/// nearest hot ground, drinks a new charge there and bites again (<c>EmberiteSwarm.Hotspots.cs</c>).
 /// </summary>
 /// <remarks>
 /// Heat is conserved. A creature's charge is made, and booked as injected, when it first leaves its nest; a bite
-/// moves it into the tank; a kill spills it into the ground where it dies; a resting creature recharges by taking heat
+/// moves it into the tank; a kill spills it into the ground where it dies; a spent creature drinks a new one out of hot
+/// ground near the fight (<see cref="TerrainGrid.ExtractEnergyInRadiusArea"/>); a resting creature recharges by taking heat
 /// out of the deposit, leaves again only with a full charge, and starves where the deposit has none to give. <see cref="TotalCharge"/> is what the swarm holds, so the balance of
 /// <see cref="World.SumSystemThermalEnergy"/> closes. Burrowing writes no pixels.
 /// </remarks>
@@ -187,6 +189,25 @@ public sealed partial class EmberiteSwarm
         return Tweaks.Emberites.HuntLeashMinCells + t * (Tweaks.Emberites.HuntLeashCells - Tweaks.Emberites.HuntLeashMinCells);
     }
 
+    /// <summary>
+    /// The radius of a nest's danger ring for a tank at <paramref name="heat"/>: how far the nest senses it from
+    /// (<see cref="SenseRange"/>), and never less than <see cref="Tweaks.Emberites.WakeRange"/>, the nearest it senses
+    /// a tank at all, so that a tank too cool to be sensed still sees where warming up would wake it.
+    /// </summary>
+    public static float DangerRadius(float heat) => Math.Max(Tweaks.Emberites.WakeRange, SenseRange(heat));
+
+    /// <summary>How dangerous nest <paramref name="index"/> is now; false for a cleared nest, which is no danger.</summary>
+    public bool TryGetDangerLevel(int index, out NestDangerLevel level)
+    {
+        level = default;
+        if (index < 0 || index >= _nests.Count || _nests[index].IsCleared)
+            return false;
+        Nest nest = _nests[index];
+        level = nest.Out > 0 ? NestDangerLevel.Swarming
+            : nest.Awake ? NestDangerLevel.Awake : NestDangerLevel.Dormant;
+        return true;
+    }
+
     /// <summary>What a creature finds in a cell: the ground a nest's own creatures burrow through is soil to them.</summary>
     public static EmberiteGround Classify(TerrainPixel pixel, Position cell, Position zoneCentre, int zoneRadius)
     {
@@ -233,6 +254,8 @@ public sealed partial class EmberiteSwarm
             if (emberite.Pyrite != 0)
                 hash = Fnv1a.Mix(hash, emberite.Pyrite);
             hash = Fnv1a.Mix(Fnv1a.Mix(hash, emberite.SightTick), emberite.Sees);
+            if (emberite.State is not EmberiteState.Hunting)
+                hash = Fnv1a.Mix(Fnv1a.Mix(Fnv1a.Mix(Fnv1a.Mix(hash, emberite.Hotspot.X), emberite.Hotspot.Y), emberite.Timer), emberite.FailedSeeks);
         }
         return _trails.Mix(hash);
     }
@@ -276,12 +299,18 @@ public sealed partial class EmberiteSwarm
         return count;
     }
 
-    /// <summary>Adds the occupied nests as radar targets: a nest at rest gives a life echo.</summary>
+    /// <summary>
+    /// Adds the occupied nests and the creatures out as radar targets: each gives a life echo at its centre. A
+    /// creature costs this only while it is out.
+    /// </summary>
     internal void CollectRadarTargets(List<RadarTarget> targets)
     {
         foreach (Nest nest in _nests)
             if (nest.Inside > 0)
                 targets.Add(new RadarTarget(nest.Centre, Math.Max(2, nest.Radius / 2), Alive: true));
+        foreach (Emberite emberite in _emberites)
+            if (!emberite.Gone)
+                targets.Add(new RadarTarget((Position)emberite.Position, Tweaks.Radar.CreatureHalfSize, Alive: true));
     }
 
     /// <summary>The nests as the renderer draws them.</summary>

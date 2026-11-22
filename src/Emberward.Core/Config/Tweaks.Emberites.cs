@@ -75,6 +75,38 @@ public static partial class Tweaks
         // 5 units, a lump's 32 to 60 give up 8 to 15; a deposit with no plain ore left gives none.
         public const int DropEveryKills = 4;
 
+        // ---- After a bite ------------------------------------------------------------------------------------
+        // A creature that has bitten does not go home: it looks for the nearest hot ground, a cell at HotspotHeat or
+        // hotter that it can stand in, within HotspotSearchCells of where it bit (sampled every HotspotSearchStep
+        // cells, once per bite), runs to it, and once within HotspotArriveCells drinks a full charge out of the
+        // ground within HotspotDrinkRadius of it for HotspotRechargeTicks (1 s) before it charges the tank again. It
+        // goes home only when it finds no hot ground, cannot reach it in HotspotSeekTicks, or the ground gives less
+        // than a full charge. A tank standing on ground at HotZoneHeat or hotter is kept whatever its own heat (and
+        // whether a creature sees it): a fight in a hot zone does not let up, since the creatures drink beside it and
+        // bite again. HotZoneHeat is LoseScentHeat, so a tank that has cooled below the scent cannot keep ground that hot
+        // by itself: only ground heated by something else (hot rock, a fight, a relay's dump) holds them.
+        public const float HotspotHeat = 20f;
+        public const float HotZoneHeat = LoseScentHeat;
+        // The hot-ground rule holds a tank only within HotZoneKeepCells of the creature, and never one docked in its own
+        // base: it keeps a fight going, it does not send creatures across the map to a tank on hot ground.
+        public const int HotZoneKeepCells = 2 * HotspotSearchCells;
+        public const int HotspotSearchCells = 24;
+        public const int HotspotSearchStep = 2;
+        public const float HotspotArriveCells = 2f;
+        public const int HotspotDrinkRadius = 3;
+        public const int HotspotRechargeTicks = Perf.TargetFps;
+        public const int HotspotSeekTicks = 3 * Perf.TargetFps;
+        // A creature going home short of a full charge (no hot ground near the bite, a spot it could not reach, or one
+        // that gave too little) looks for hot ground on its way, at once and then once in HomeScanTicks: the nearest
+        // cell within HomeScanCells whose detour (there, then home, against straight home) is at most HomeDetourCells,
+        // skipping the ground it last drank from. It drinks there as above; only with none does it carry on home.
+        public const int HomeScanTicks = Perf.TargetFps / 2;
+        public const int HomeScanCells = 20;
+        public const float HomeDetourCells = 12f;
+        // A creature stops looking for hot ground once it has failed MaxFailedSeeks times since it last filled up (no
+        // hot ground found, a spot it could not reach, a drink too short), so a trip that finds no charge ends at home.
+        public const int MaxFailedSeeks = 2;
+
         // ---- Movement ----------------------------------------------------------------------------------------
         // Cells a tick: open ground (the tank walks one) and burrowing through soil (the tank digs about half a cell).
         public const float OpenSpeed = 1.5f;

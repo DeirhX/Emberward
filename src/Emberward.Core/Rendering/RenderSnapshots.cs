@@ -60,3 +60,22 @@ public readonly record struct EmberiteRenderState(int Id, PositionF Position, Ve
 /// <summary>A nest, as it is drawn: <paramref name="Occupied"/> creatures are in it, resting.</summary>
 /// <param name="IsStirring">A pulse of creatures is about to leave it: its embers flare.</param>
 public readonly record struct NestRenderState(Position Centre, int Radius, int Occupied, bool IsAwake, bool IsCleared, bool IsStirring = false);
+
+/// <summary>How dangerous a discovered nest is now (<see cref="NestDanger"/>).</summary>
+public enum NestDangerLevel : byte
+{
+    /// <summary>Asleep with creatures in it: it wakes to a tank that comes within its reach.</summary>
+    Dormant,
+
+    /// <summary>Awake, hunting a tank, with none of its creatures out.</summary>
+    Awake,
+
+    /// <summary>Its creatures are out.</summary>
+    Swarming,
+}
+
+/// <summary>
+/// A nest a side has discovered and that still has creatures, as its danger ring is drawn: centred on the nest, at the
+/// distance from which it senses that side's tank now (<see cref="Entities.Emberites.EmberiteSwarm.DangerRadius"/>).
+/// </summary>
+public readonly record struct NestDanger(Position Centre, float Radius, NestDangerLevel Level);

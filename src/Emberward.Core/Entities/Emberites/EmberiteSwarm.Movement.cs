@@ -21,10 +21,13 @@ public sealed partial class EmberiteSwarm
             ref Emberite emberite = ref span[i];
             CreatureSteps++;
             Move(ref emberite);
-            if (emberite.State == EmberiteState.Hunting)
-                Hunt(ref emberite);
-            else
-                GoHome(ref emberite);
+            switch (emberite.State)
+            {
+                case EmberiteState.Hunting: Hunt(ref emberite); break;
+                case EmberiteState.Seeking: Seek(ref emberite); break;
+                case EmberiteState.Recharging: Drink(ref emberite); break;
+                default: GoHome(ref emberite); break;
+            }
         }
         _emberites.RemoveAll(static m => m.Gone);
     }
@@ -80,7 +83,6 @@ public sealed partial class EmberiteSwarm
             }
             else
             {
-                emberite.State = EmberiteState.Returning;
                 emberite.Target = -1;
                 GoHome(ref emberite);
                 return;
@@ -94,7 +96,7 @@ public sealed partial class EmberiteSwarm
             if (emberite.Charge > 0.0 && !tank.IsDockedAtOwnBase && tank.SpawnProtectionTicks == 0)
             {
                 Bite(ref emberite, tank);
-                GoHome(ref emberite);
+                SeekHeat(ref emberite);
             }
             else
             {
@@ -113,13 +115,16 @@ public sealed partial class EmberiteSwarm
     }
 
     /// <summary>
-    /// A creature keeps its target while the tank is the nest's thief, or warm enough and within its heat leash of the
-    /// nest, or in sight: a line clear of rock from the creature, within <see cref="Tweaks.Emberites.HuntLeashCells"/>,
-    /// looked for once in <see cref="Tweaks.Emberites.SightCheckTicks"/> ticks.
+    /// A creature keeps its target while the tank is the nest's thief, or stands on hot ground
+    /// (<see cref="StandsInHeat"/>), or is warm enough and within its heat leash of the nest, or in sight: a line clear
+    /// of rock from the creature, within <see cref="Tweaks.Emberites.HuntLeashCells"/>, looked for once in
+    /// <see cref="Tweaks.Emberites.SightCheckTicks"/> ticks.
     /// </summary>
     private bool TargetStillWanted(ref Emberite emberite, Nest nest, Tank tank)
     {
         if (nest.Thief == emberite.Target && nest.ThiefTicks > 0)
+            return true;
+        if (StandsInHeat(tank, emberite))
             return true;
         float leash = HeatLeash(tank.Heat);
         if (leash > 0f && Position.DistanceSquared(tank.Position, nest.Centre) <= leash * leash)
@@ -140,9 +145,18 @@ public sealed partial class EmberiteSwarm
         return emberite.Sees;
     }
 
+    /// <summary>
+    /// Goes home to rest. A creature short of a full charge, with looks left (<see cref="Tweaks.Emberites.MaxFailedSeeks"/>),
+    /// looks once in <see cref="Tweaks.Emberites.HomeScanTicks"/> for hot ground on its way
+    /// (<see cref="TryFindHotspotOnWayHome"/>) and drinks there instead; only with none does it carry on home.
+    /// </summary>
     private void GoHome(ref Emberite emberite)
     {
-        emberite.State = EmberiteState.Returning;
+        if (emberite.State != EmberiteState.Returning)
+        {
+            emberite.State = EmberiteState.Returning;
+            emberite.Timer = 0;
+        }
         Nest nest = _nests[emberite.Nest];
         float dx = nest.Centre.X - emberite.Position.X, dy = nest.Centre.Y - emberite.Position.Y;
         float arrive = nest.Radius * 0.5f + 1f;
@@ -157,7 +171,29 @@ public sealed partial class EmberiteSwarm
             emberite.Velocity = default;
             return;
         }
+        if (!HasFullCharge(emberite) && emberite.FailedSeeks < Tweaks.Emberites.MaxFailedSeeks && --emberite.Timer <= 0)
+        {
+            emberite.Timer = Tweaks.Emberites.HomeScanTicks;
+            if (TryFindHotspotOnWayHome(emberite, nest, out Position spot))
+            {
+                StartSeeking(ref emberite, spot);
+                return;
+            }
+        }
         Steer(ref emberite, 1, emberite.Nest, nest.Centre, nest);
+    }
+
+    /// <summary>Heads straight for <paramref name="goal"/> (a cell), turning aside from what blocks it; no flow field.</summary>
+    private void SteerStraight(ref Emberite emberite, Position goal, Nest nest)
+    {
+        float dirX = goal.X + 0.5f - emberite.Position.X, dirY = goal.Y + 0.5f - emberite.Position.Y;
+        float length = MathF.Sqrt(dirX * dirX + dirY * dirY);
+        if (length < 1e-4f)
+        {
+            emberite.Velocity = default;
+            return;
+        }
+        Commit(ref emberite, dirX / length, dirY / length, nest);
     }
 
     /// <summary>

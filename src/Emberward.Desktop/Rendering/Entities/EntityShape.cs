@@ -33,6 +33,7 @@ public static class EntityShape
     public const float KindTankFire = 23f;
     public const float KindTankFireLight = 24f;
     public const float KindFireParticle = 25f;
+    public const float KindDangerRing = 26f;
 
     public const float MachineFlagStalled = 1f;
     public const float MachineFlagCarried = 2f;

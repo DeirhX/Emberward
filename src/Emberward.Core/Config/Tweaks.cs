@@ -462,8 +462,10 @@ public static partial class Tweaks
         public const int ContactLifetimeTicks = 10 * Perf.TargetFps;
         // Open ground behind dirt (a tunnel, a cave) gives a weak return and lets the ray on, this many times a ray.
         public const int WeakReturnsPerRay = 3;
-        // A tank reflects as a square this many cells either side of its centre.
+        // A tank reflects as a square this many cells either side of its centre, an emberite out of its nest as a
+        // smaller one. Something alive leaves its blip at its centre, not where the ray met the square.
         public const int TankHalfSize = 3;
+        public const int CreatureHalfSize = 1;
         // Heat uses the pulse up. A ray can cross HeatBudgetDegreeCells in all: every cell hotter than HeatThreshold
         // takes its degrees above the threshold, per cell of path, and the ray stops when the budget is gone. That
         // is about 3 cells of hot rock at 100, 6 cells of ground at 50, 25 cells at 20: the hotter the surroundings,

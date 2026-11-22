@@ -89,7 +89,9 @@ float4 main(PSIn input) : SV_Target
         result = TankFire(p, input.params, input.color.rgb, aa);
     else if (kind < kKindTankFireLight + 0.5)
         result = TankFireLight(p, input.params, input.color.r);
-    else // kKindFireParticle
+    else if (kind < kKindFireParticle + 0.5)
         result = FireParticle(p, input.params, aa);
+    else // kKindDangerRing
+        result = DangerRing(p, input.color.rgb, input.params, aa);
     return result;
 }
