@@ -44,6 +44,14 @@ public readonly record struct StepEventCue(SoundEffect Effect, float Gain, CueHe
 /// </summary>
 public static class StepEventSounds
 {
+    /// <summary>
+    /// The one-shot of <paramref name="e"/>: as <see cref="CueFor(StepEventKind, MachineType)"/>, except that ore banked
+    /// at the core (<see cref="ImpactTarget.Base"/>, ten units a tick) makes no pickup note of its own: base service
+    /// already sounds there. A unit unloaded at a relay keeps its note.
+    /// </summary>
+    public static StepEventCue? CueFor(in StepEvent e) =>
+        e.Kind == StepEventKind.OreUnloaded && e.Target == ImpactTarget.Base ? null : CueFor(e.Kind, e.Machine);
+
     public static StepEventCue? CueFor(StepEventKind kind, MachineType machine) => kind switch
     {
         StepEventKind.ShotFired => new(SoundEffect.Fire, AudioTweaks.FireGain, CueHeard.Anywhere, CueVoice.ShotCycle),

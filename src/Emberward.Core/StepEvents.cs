@@ -186,7 +186,10 @@ public enum StepEventKind
     TankShieldBroken,
 }
 
-/// <summary>What a <see cref="StepEventKind.BulletImpact"/> struck.</summary>
+/// <summary>
+/// What a <see cref="StepEventKind.BulletImpact"/> struck; for <see cref="StepEventKind.OreUnloaded"/> and
+/// <see cref="StepEventKind.RestartOreBurned"/>, what took the ore: <see cref="Base"/> the core, <see cref="Machine"/> a relay.
+/// </summary>
 public enum ImpactTarget { Terrain, Tank, Machine, Base }
 
 /// <summary>
