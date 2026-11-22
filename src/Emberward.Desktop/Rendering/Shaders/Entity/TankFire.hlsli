@@ -3,7 +3,7 @@
 // ============================================================================
 //
 // Three kinds (params in Layout.hlsli):
-//   23 TankFire      the exposed core in its soot ring at the hull's centre, upright on the screen (params.w, the hull
+//   23 TankFire      the exposed core in its soot smudge at the hull's centre, upright on the screen (params.w, the hull
 //                    heading, finds the hull box's centre). A dead tank's core glow, flaring and fading, is this kind
 //                    too (no soot: only the soft glow).
 //   24 TankFireLight the flickering light the fire throws on the ground around the tank (additive).
@@ -23,6 +23,7 @@ static const float3 kFireOrange = float3(1.00, 0.45, 0.08);
 static const float3 kFireYellow = float3(1.00, 0.72, 0.22);
 static const float3 kFireRed = float3(0.55, 0.07, 0.02);
 static const float3 kFireSmoke = float3(0.10, 0.085, 0.08);
+static const float3 kFireWhiteHot = float3(1.00, 0.97, 0.88);   // what the hottest glow tends to
 
 // What a fire particle is (params.y); FireParticleKind in FireParticles.cs has the same values.
 static const float kFireSparkKind = 0.0;
@@ -120,8 +121,13 @@ float4 TankFire(float2 p, float4 params, float3 core, float aa)
     float crust = solid * coreShown;
     float sag = saturate((0.25 - hullFill) * 4.0) * crust;
 
-    // Soot: a dark, ragged ring round the core keeps it readable on any hull colour, with embers in its cracks.
-    float soot = FillAlpha(d - (radius + 0.5 + 0.7 * level) + 0.8 * (n - 0.5), aa) * 0.85 * solid;
+    // A second, finer noise roughens the core's edge so it reads as molten metal, not a disc.
+    float fine = FireNoise(p * 1.7 + float2(seed * 11.0, 4.0 * t));
+
+    // Soot: a dark smudge round the core keeps it readable on any hull colour, with embers in its cracks. It thins out
+    // over a couple of cells and the noise moves its reach, so it has no ring edge.
+    float sootReach = radius + 0.6 + 0.8 * level;
+    float soot = (1.0 - smoothstep(-1.4, 0.6, d - sootReach + 1.2 * (n - 0.5))) * 0.7 * solid;
     Over(result, kCoreSoot, soot);
     result.rgb += kFireOrange * soot * level * 0.35 * smoothstep(0.62, 0.8, n);
 
@@ -140,12 +146,22 @@ float4 TankFire(float2 p, float4 params, float3 core, float aa)
     float3 body = heat * (0.75 + 0.5 * inner);
     body = lerp(body, kSlag, smoothstep(0.45, 0.6, n) * sag * smoothstep(0.4, 0.9, 1.0 - inner));
     body = lerp(body, kSlagCrack, (1.0 - smoothstep(0.02, 0.07, abs(n - 0.52))) * sag);
-    Over(result, body, FillAlpha(d - radius, aa) * crust);
+    // Its edge is ragged (both noises) and melts into the soot over most of a cell rather than ending on a line.
+    float edge = d - radius + (0.6 * (n - 0.5) + 0.9 * (fine - 0.5)) * coreShown;
+    Over(result, body, (1.0 - smoothstep(-0.9, 0.5, edge)) * crust);
 
-    // Its glow: a soft pool of the ramp's colour with no edge, the same falloff as the firelight on the ground.
-    float r2 = size * size * 2.56;
-    float fall = saturate(1.0 - d * d / r2);
-    result.rgb += heat * glow * 0.6 * fall * fall;
+    // Its glow: a pool whose reach the noise breaks into licks, brightest where the noise is, faded to nothing well
+    // inside the quad (half-width 6.5) so no quad edge shows, and brightened towards white with a soft knee
+    // (1 - exp) rather than clipping each channel to a flat plateau: a flaring core is a fireball, not a white disc.
+    float dg = d * (1.0 + 0.35 * (n - 0.5));
+    // A hot middle over a wide, dim tail, so even a flare's glow has no shoulder that reads as a rim.
+    float spread = dg * dg / (size * size);
+    float fall = (0.7 * exp(-1.6 * spread) + 0.3 * exp(-0.45 * spread)) * (1.0 - smoothstep(3.5, 6.3, d))
+        * (0.8 + 0.4 * fine);
+    float3 g = heat * (glow * 0.6 * fall);
+    float m = max(max(g.r, g.g), max(g.b, 1e-4));
+    float knee = 1.0 - exp(-1.25 * m);
+    result.rgb += lerp(g * (knee / m), kFireWhiteHot * knee, smoothstep(0.5, 1.4, m));
     return result;
 }
 
@@ -155,8 +171,9 @@ float4 TankFireLight(float2 p, float4 params, float strength)
 {
     float level = saturate(params.x);
     float radius = 5.0 + 7.0 * level;
-    float fall = saturate(1.0 - dot(p, p) / (radius * radius));
-    fall *= fall;
+    // A gaussian pool (no flat top to read as a disc), eased to nothing at the quad's edge (radius).
+    float x = dot(p, p) / (radius * radius);
+    float fall = exp(-3.2 * x) * (1.0 - smoothstep(0.55, 1.0, x));
     float3 heat = HullHeatColour(saturate(params.w));
     float3 colour = heat / max(max(heat.r, heat.g), 0.35);
     float intensity = (0.08 + 0.32 * level) * strength * FireFlicker(params.y, params.z * 6.283185);
@@ -172,15 +189,15 @@ float3 FireRamp(float heat)
     return lerp(c, kFireWhite, saturate((heat - 0.75) * 4.0));
 }
 
-// A puff of smoke of the given radius: a lumpy grey puff that swells and darkens as it rises, lit orange by the flames
-// while it is young.
+// A puff of smoke of the given radius: a lumpy, wispy grey puff (two soft lobes broken up by noise, gone well inside its
+// quad) that swells and darkens as it rises, lit orange by the flames while it is young.
 float4 FireSmokePuff(float2 p, float age, float strength, float seed, float radius)
 {
     float2 r = p / max(radius, 0.05);
     float2 lump = float2(cos(seed * 6.283185), sin(seed * 6.283185)) * 0.35;
     float d = min(dot(r, r), dot(r - lump, r - lump) * 1.8);
-    float body = saturate(1.0 - d);
-    body *= body;
+    float wisp = FireNoise(r * 1.7 + float2(seed * 13.0, age * 3.0));
+    float body = exp(-2.6 * d) * (1.0 - smoothstep(0.45, 1.0, d)) * (0.6 + 0.8 * wisp);
     float3 grey = lerp(float3(0.36, 0.34, 0.33), float3(0.17, 0.15, 0.14), age);
     float3 colour = lerp(float3(0.80, 0.42, 0.16), grey, smoothstep(0.0, 0.2, age));
     float alpha = 0.45 * (1.0 - age) * smoothstep(0.0, 0.15, age) * strength * body;
@@ -210,7 +227,7 @@ float4 FireFlame(float2 p, float age, float strength, float seed, float stretch,
 }
 
 // A spark or a cinder, local +x along its motion: a hot head `radius` cells across with a streak `trail` cells long
-// behind it and a halo, as a shot is drawn (HotShot). It starts at `heat0` on FireRamp and cools as it ages, twinkling;
+// behind it and a halo, as a shot is drawn (HotShot), but soft all through: a gaussian head, never a flat disc. It starts at `heat0` on FireRamp and cools as it ages, twinkling;
 // it only adds light.
 float4 FireStreak(float2 p, float age, float strength, float seed, float trail, float radius, float heat0, float aa)
 {
@@ -218,8 +235,10 @@ float4 FireStreak(float2 p, float age, float strength, float seed, float trail, 
     float dist = sdSegment(p, float2(-len, 0.0), float2(0.0, 0.0));
     float along = saturate(1.0 + p.x / len);                    // 0 at the tail, 1 at the head
     float heat = saturate(heat0 * (1.05 - age));
-    float core = FillAlpha(dist - radius * lerp(0.4, 1.0, along), aa) * lerp(0.2, 1.0, along);
-    float halo = exp(-max(dist - radius * 0.5, 0.0) * (2.4 / max(radius, 0.05))) * lerp(0.15, 1.0, along);
+    float width = max(radius * lerp(0.4, 1.0, along), aa);
+    float x = dist / width;
+    float core = exp(-1.6 * x * x) * lerp(0.2, 1.0, along);
+    float halo = exp(-dist * (2.4 / max(radius, 0.05))) * lerp(0.15, 1.0, along);
     float twinkle = 0.7 + 0.3 * sin(age * 53.0 + seed * 6.283185);
     float life = smoothstep(0.0, 0.06, age) * (1.0 - smoothstep(0.75, 1.0, age)) * strength;
     float3 colour = FireRamp(heat * lerp(0.8, 1.0, along));
