@@ -54,9 +54,9 @@ public class DepositQuadsTests
         }
     }
 
-    private static Run AtCore(int ore = 40, int localSlot = 0)
+    private static Run AtCore(int ore = 40, int localSlot = 0, bool energyNetwork = false)
     {
-        var s = RelayHeatTests.CreateScenario();
+        var s = RelayHeatTests.CreateScenario(energyNetwork: energyNetwork);
         s.Tank.Position = TestHelpers.AgainstCore(s.Base);
         s.Tank.Hold.Ore = ore;
         return new Run { S = s, LocalSlot = localSlot };
@@ -221,6 +221,110 @@ public class DepositQuadsTests
         s.Tank.Position = s.Base.SpawnPosition;
         run.Step();
         Assert.Null(run.Deposits.StoreLabel);
+    }
+
+    [Fact]
+    public void ABurnPour_IsCyan_AndSaysRestart()
+    {
+        var run = AtCore(ore: 19, energyNetwork: true);
+        var s = run.S;
+        s.Base.DrawCharge(s.Base.Charge);
+        s.Tank.Position = s.Base.SpawnPosition;
+        run.Step();
+        Assert.True(s.World.IsBaseDark(s.Base));
+        s.Tank.Position = TestHelpers.AgainstCore(s.Base);
+        run.Step(DepositQuads.FlightSteps / 2);
+
+        // The base restarts on what it burns, and banks the rest: a cyan pour and a gold one.
+        var pour = Assert.Single(run.Deposits.Pours(), p => p.Text?.EndsWith("RESTART", StringComparison.Ordinal) == true);
+        Assert.Equal($"+{pour.Units} RESTART", pour.Text);
+        var quads = run.Draw();
+        bool cyan = false;
+        for (int i = 0; i < quads.VertexCount; i += 6)
+            cyan |= quads.Vertices[i].Kind == EntityShape.KindOreCrystal && quads.Vertices[i].R == 1f;
+        Assert.True(cyan, "burned ore pours cyan");
+    }
+
+    [Fact]
+    public void ARivalsRelayPour_UnderFog_IsNotDrawn()
+    {
+        var s = RelayHeatTests.CreateScenario();
+        RelayHeatTests.PlantRelay(s);
+        var run = new Run { S = s, LocalSlot = -1 };
+        run.Step(12);
+        s.Tank.Position = s.RelayPos;
+        s.Tank.Hold.Ore = 10;
+        run.Step(Tweaks.Perf.TargetFps / 2);
+        var blind = new VisionMap(s.World.Terrain);
+
+        Assert.Null(Assert.Single(run.Deposits.Pours()).Text);
+        Assert.Equal(0, run.CountKind(EntityShape.KindOreCrystal, blind));
+        Assert.Equal(0, run.CountKind(EntityShape.KindPowerLabel, blind));
+    }
+
+    [Fact]
+    public void ThePour_GoesOn_WhenItsTankDrivesOff()
+    {
+        var run = AtCore();
+        run.Step(2);
+        run.S.Tank.Position = run.S.Base.SpawnPosition;
+        run.Step(DepositQuads.MaxCrystalsPerPour + DepositQuads.FlightSteps);
+
+        var pour = Assert.Single(run.Deposits.Pours());
+        Assert.True(pour.Units > 0);
+        Assert.True(run.Deposits.CorePulse(run.S.Base.Position) > 0.2f, "every crystal landed");
+    }
+
+    [Fact]
+    public void AtTheCore_TheOreBeamIsLeftOut_ForThePour()
+    {
+        var s = RelayHeatTests.CreateScenario();
+        s.Tank.Position = TestHelpers.AgainstCore(s.Base);
+        s.Tank.Hold.Ore = 40;
+        var layer = new Emberward.Desktop.Rendering.EntityLayerBuilder();
+        var size = s.World.Terrain.Size;
+        int beams = 0;
+        for (int i = 0; i < 4; i++)
+        {
+            s.World.Advance(_ => default);
+            layer.CaptureStep(s.World, 0);
+            Assert.True(s.Tank.IsUnloadingOre || i > 0);
+            layer.Build(new RenderView(size, size, default, 1), 0.5f, 0f, snapHeadings: true, visualSeconds: i * 0.1f);
+            for (int v = 0; v < layer.VertexCount; v += 6)
+                if (layer.Vertices[v].Kind == EntityShape.KindOreBeam)
+                    beams++;
+        }
+        Assert.Equal(0, beams);
+    }
+
+    [Fact]
+    public void TheStoreLabel_StopsAt24Cells_AndSkipsAnUnpoweredRelay_OrADarkBase()
+    {
+        var s = RelayHeatTests.CreateScenario(energyNetwork: true);
+        RelayHeatTests.PlantRelay(s);
+        var run = new Run { S = s, LocalSlot = 0 };
+        run.Step(12);
+
+        s.Tank.Position = s.RelayPos + new Offset(0, -s.DirY * DepositQuads.StoreLabelReach);
+        run.Step();
+        Assert.Equal(s.RelayPos, run.Deposits.StoreLabel);
+        s.Tank.Position = s.RelayPos + new Offset(0, -s.DirY * (DepositQuads.StoreLabelReach + 1));
+        run.Step();
+        Assert.Null(run.Deposits.StoreLabel);
+
+        s.Tank.Position = s.RelayPos + new Offset(0, -s.DirY * 10);
+        s.Base.DrawCharge(s.Base.Charge);
+        run.Step(2);
+        Assert.True(s.World.IsBaseDark(s.Base));
+        Assert.Null(run.Deposits.StoreLabel);
+
+        var blocked = RelayHeatTests.CreateScenario(blockLineOfSight: true);
+        RelayHeatTests.PlantRelay(blocked);
+        var unpowered = new Run { S = blocked, LocalSlot = 0 };
+        unpowered.Step(12);
+        blocked.Tank.Position = blocked.RelayPos + new Offset(0, -blocked.DirY * 5);
+        unpowered.Step();
+        Assert.Null(unpowered.Deposits.StoreLabel);
     }
 
     [Fact]

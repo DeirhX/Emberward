@@ -36,8 +36,10 @@ float4 OreCrystal(float2 p, float3 data, float4 params, float aa)
     float facet = step(0.0, -(r.x + r.y));
     float body = FillAlpha(d, aa);
     float heart = FillAlpha(d + size * 0.55, aa);
-    float halo = exp(-max(d, 0.0) * 3.2) * (0.30 + 0.55 * landing) * (1.0 - body);
-    float appear = smoothstep(0.0, 0.08, age);
+    // The halo fades out well inside the quad (half-size 0.7), so a spinning crystal never shows a square edge.
+    float halo = exp(-max(d, 0.0) * 3.2) * (0.30 + 0.55 * landing) * (1.0 - body) * smoothstep(0.7, 0.45, length(p));
+    // In over its first steps, and out as it sinks into the receiver, so it never vanishes at full strength.
+    float appear = smoothstep(0.0, 0.08, age) * smoothstep(1.0, 0.85, age);
 
     float4 result = float4(0.0, 0.0, 0.0, 0.0);
     Over(result, color * (0.78 + 0.22 * facet), body);
@@ -60,7 +62,8 @@ float4 CoreHeat(float2 p, float3 data, float4 params)
 
     float dist = length(p);
     float r = dist / radius;
-    float edge = smoothstep(1.0, 0.75, r);
+    // Everything is gone well before the quad's edge, so no glow at full heat reads as a disc.
+    float edge = smoothstep(1.0, 0.45, r);
     float coreRadius = radius * 0.28;
 
     float3 amber = float3(1.00, 0.45, 0.10);
@@ -71,11 +74,11 @@ float4 CoreHeat(float2 p, float3 data, float4 params)
     // A slow breath, so a warm core looks alive rather than painted.
     float breath = 0.9 + 0.1 * sin(phase * 6.2831853);
     float centre = exp(-(dist * dist) / (coreRadius * coreRadius)) * heat * 0.9 * breath;
-    float reach = coreRadius * (1.2 + 2.0 * heat);
+    float reach = coreRadius * (1.0 + 1.2 * heat);
     float halo = exp(-dist / max(reach, 0.5)) * heat * 0.35;
 
-    // The pulse ring: born at the rim, expanding to about 0.8 of the radius as the pulse falls.
-    float ringRadius = lerp(coreRadius, radius * 0.8, 1.0 - pulse);
+    // The pulse ring: born at the rim, expanding to about 0.65 of the radius as the pulse falls.
+    float ringRadius = lerp(coreRadius, radius * 0.65, 1.0 - pulse);
     float angle = atan2(p.y, p.x);
     float shimmer = 1.0 + 0.15 * sin(angle * 7.0 + phase * 12.566) * sin(dist * 3.0 - phase * 18.85);
     float ringWidth = 0.35 + 0.5 * (1.0 - pulse);

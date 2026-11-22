@@ -129,7 +129,10 @@ public sealed class DepositQuads
     /// <summary>The steps captured so far.</summary>
     public long Step => _step;
 
-    /// <summary>Where the store label stands (the player's nearest powered relay in reach, out of its base), or null.</summary>
+    /// <summary>
+    /// Where the store label stands (the player's nearest powered relay in reach, out of its base, while the base is
+    /// not dark), or null.
+    /// </summary>
     public Position? StoreLabel => _storeLabel;
 
     /// <summary>Call after each simulation step, while <see cref="World.StepEvents"/> still holds that step's events.</summary>
@@ -218,11 +221,15 @@ public sealed class DepositQuads
         ref Pour pour = ref _pours[index];
         pour.Units += e.Count;
         pour.LastEventStep = _step;
-        pour.Text = burn ? $"+{pour.Units} RESTART" : $"+{pour.Units}";
-        if (atCore && !burn)
-            foreach (var b in world.TankBases.Bases)
-                if (b.Color == e.Color)
-                    pour.Store = $"BASE {b.Store.Ore}";
+        // Only the player's side reads numbers, so only its pours build them.
+        if (pour.Own)
+        {
+            pour.Text = burn ? $"+{pour.Units} RESTART" : $"+{pour.Units}";
+            if (atCore && !burn)
+                foreach (var b in world.TankBases.Bases)
+                    if (b.Color == e.Color)
+                        pour.Store = $"BASE {b.Store.Ore}";
+        }
 
         int add = atCore ? Math.Min(e.Count, MaxCrystalsPerPour - pour.Crystals) : Math.Min(e.Count, MaxCrystalsPerPour);
         for (int k = 0; k < add; k++)
@@ -323,7 +330,10 @@ public sealed class DepositQuads
     private void CaptureStoreLabel(World world, Core.Entities.Tanks.Tank? player, OreLedgerView ledger)
     {
         // Inside its own base the tank has the core beside it; the label is for the field.
-        _storeLabel = player == null || player.IsDockedAtOwnBase ? null : world.NearestOreDropOff(player, StoreLabelReach);
+        // A dark base refuses ore at its relays, so none is labelled then.
+        _storeLabel = player is not { Base: { } home } || player.IsDockedAtOwnBase || world.IsBaseDark(home)
+            ? null
+            : world.NearestOreDropOff(player, StoreLabelReach);
         if (ledger.Store != _labelStore)
         {
             _labelStore = ledger.Store;
@@ -375,6 +385,8 @@ public sealed class DepositQuads
             float age = (stepNow - flash.Step) / RelayFlashSteps;
             if (flash.Step <= 0 || age < 0f || age >= 1f || !Sight.Sees(vision, flash.Position))
                 continue;
+            if (quads.IsOffScreen(quads.ScreenX(flash.Position.X), quads.ScreenY(flash.Position.Y), (RelayGlowRadius + 1f) * scale))
+                continue;
             AddGlow(quads, flash.Position, RelayGlowRadius, 0f, 1f - age, phase, 0f);
         }
     }
@@ -396,6 +408,11 @@ public sealed class DepositQuads
                 continue;
             float age = (stepNow - c.LaunchStep) / FlightSteps;
             if (age < 0f || age >= 1f)
+                continue;
+            // A pour spans its tank and its receiver: cull it by the box round both.
+            float midX = (c.From.X + pour.Receiver.X) * 0.5f, midY = (c.From.Y + pour.Receiver.Y) * 0.5f;
+            float span = MathF.Abs(c.From.X - pour.Receiver.X) + MathF.Abs(c.From.Y - pour.Receiver.Y);
+            if (quads.IsOffScreen(quads.ScreenX(midX), quads.ScreenY(midY), (span + ArcApex + 2f) * quads.View.PixelScale))
                 continue;
             var to = new PositionF(pour.Receiver.X, pour.Receiver.Y);
             // Anchored where the step left it and moving on through the step; held, anchored where it was drawn.
@@ -429,8 +446,10 @@ public sealed class DepositQuads
                 continue;
             float rise = FloaterRise * MathF.Min(1f, (stepNow - first) / FloaterSteps);
             float alpha = MathF.Min(1f, (end - stepNow) / FloaterFadeSteps);
-            float x = EntityQuads.Centre(pour.Receiver.X);
-            float y = EntityQuads.Centre(pour.Receiver.Y) - (pour.AtCore ? Tweaks.Keep.CoreSize * 0.5f + 2f : 3f) - rise;
+            // Above the core; beside a relay, clear of its charge label above it and the store label below it.
+            float x = EntityQuads.Centre(pour.Receiver.X)
+                + (pour.AtCore ? 0f : Tweaks.Machine.BoundingBoxHalfSize + 1.5f + GlyphText.Width(pour.Text, dot) * 0.5f);
+            float y = EntityQuads.Centre(pour.Receiver.Y) - (pour.AtCore ? Tweaks.Keep.CoreSize * 0.5f + 2f : 0f) - rise;
             if (quads.IsOffScreen(quads.ScreenX(x), quads.ScreenY(y), 12f * scale))
                 continue;
             GlyphText.AddLine(quads, x, y, -line, pour.Text, dot, pour.Burn ? Cyan : Gold, alpha);
