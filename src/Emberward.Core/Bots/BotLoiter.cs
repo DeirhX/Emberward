@@ -8,13 +8,17 @@ using Emberward.Core.Types;
 
 /// <summary>
 /// Where the bot waits while its enemy sits docked in a base it cannot break (<see cref="World.CanBreakBase"/>): a post
-/// <see cref="Tweaks.Bot.LoiterCellsOutsideWall"/> cells out from the wall, in front of the gate nearest the bot, so
-/// that the enemy meets it on the way out. It decides nothing by itself: <see cref="BotTankAI"/> asks it.
+/// <see cref="Tweaks.Bot.LoiterCellsOutsideWall"/> cells out from the wall, beside the gate nearest the bot, so that the
+/// enemy meets it on the way out. It stands to one side of the gate, out of the straight line of fire through it, so
+/// that the enemy inside has no free shot at it. It decides nothing by itself: <see cref="BotTankAI"/> asks it.
 /// </summary>
 public static class BotLoiter
 {
     /// <summary>Cells from the base's centre to a post, along the gate's axis.</summary>
     public const int PostDistance = BaseLayout.Half + Tweaks.Bot.LoiterCellsOutsideWall;
+
+    /// <summary>Cells from the gate's axis to a post: past the gate's edge by more than the tank's width.</summary>
+    public const int PostSideStep = BaseLayout.GateHalf + TankSpriteShape.Radius + 3;
 
     /// <summary>How far from its post (along either axis) the bot counts as standing at it.</summary>
     public const int PostSlack = 3;
@@ -23,9 +27,9 @@ public static class BotLoiter
     private const int EdgeMargin = TankSpriteShape.Radius + 2;
 
     /// <summary>
-    /// The post in front of the gate of <paramref name="target"/> nearest <paramref name="from"/>, among those inside
-    /// the map; the base's centre pulled in from the edge when no gate has room outside it (a map smaller than a
-    /// base and its posts).
+    /// The post beside the gate of <paramref name="target"/> nearest <paramref name="from"/>, among those inside
+    /// the map: each gate has one on either side of its axis. The base's centre when no gate has room outside it (a
+    /// map smaller than a base and its posts).
     /// </summary>
     public static Position Post(Position from, TankBase target, ITerrainPixelReadOnly terrain)
     {
@@ -33,19 +37,26 @@ public static class BotLoiter
         long bestDistance = long.MaxValue;
         foreach (var gate in BaseLayout.GateDirections)
         {
-            var post = target.Position + new Offset(gate.X * PostDistance, gate.Y * PostDistance);
-            if (post.X < EdgeMargin || post.Y < EdgeMargin ||
-                post.X >= terrain.Width - EdgeMargin || post.Y >= terrain.Height - EdgeMargin)
-                continue;
-            long distance = Position.DistanceSquared(from, post);
-            if (distance < bestDistance)
+            foreach (int side in Sides)
             {
-                best = post;
-                bestDistance = distance;
+                // The side step runs across the gate's axis.
+                var post = target.Position + new Offset(gate.X * PostDistance + gate.Y * side * PostSideStep,
+                    gate.Y * PostDistance + gate.X * side * PostSideStep);
+                if (post.X < EdgeMargin || post.Y < EdgeMargin ||
+                    post.X >= terrain.Width - EdgeMargin || post.Y >= terrain.Height - EdgeMargin)
+                    continue;
+                long distance = Position.DistanceSquared(from, post);
+                if (distance < bestDistance)
+                {
+                    best = post;
+                    bestDistance = distance;
+                }
             }
         }
         return best;
     }
+
+    private static readonly int[] Sides = [1, -1];
 
     /// <summary>Whether <paramref name="at"/> is within <see cref="PostSlack"/> of <paramref name="post"/>.</summary>
     public static bool IsAtPost(Position at, Position post) =>

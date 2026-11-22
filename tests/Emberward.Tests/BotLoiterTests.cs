@@ -138,11 +138,91 @@ public class BotLoiterTests
         var target = world.TankBases.Bases[0];
 
         var east = BotLoiter.Post(target.Position + new Offset(60, 3), target, world.Terrain);
-        Assert.Equal(target.Position + new Offset(BotLoiter.PostDistance, 0), east);
+        Assert.Equal(target.Position + new Offset(BotLoiter.PostDistance, BotLoiter.PostSideStep), east);
+        Assert.True(BotLoiter.PostSideStep - TankSpriteShape.Radius > BaseLayout.GateHalf,
+            "the tank at its post should stand clear of the straight line out of the gate");
+        var eastNorth = BotLoiter.Post(target.Position + new Offset(60, -3), target, world.Terrain);
+        Assert.Equal(target.Position + new Offset(BotLoiter.PostDistance, -BotLoiter.PostSideStep), eastNorth);
 
         // The base is 25 cells from the west edge: a post there would be off the map, so the next nearest is taken.
         var fromWest = BotLoiter.Post(target.Position + new Offset(-24, 4), target, world.Terrain);
         Assert.True(world.Terrain.IsInside(fromWest));
         Assert.NotEqual(target.Position + new Offset(-BotLoiter.PostDistance, 0), fromWest);
+    }
+
+    /// <summary>
+    /// Runs the bot (slot 1) against a still, cool enemy for <paramref name="ticks"/>: whether it fired while waiting at
+    /// a post, and whether it waited at all.
+    /// </summary>
+    private static (bool Fired, bool Waited) Run(World world, BotTankAI ai, int ticks)
+    {
+        var (enemy, bot) = (world.TankList.Tanks[0], world.TankList.Tanks[1]);
+        bool fired = false, waited = false;
+        for (int tick = 0; tick < ticks; tick++)
+        {
+            world.Advance(i =>
+            {
+                if (i != 1)
+                    return default;
+                var output = ai.GetInput(bot, enemy, world);
+                // Only fire from a post counts: out of it the bot fights an enemy it sees, as it should.
+                fired |= output.ShootPrimary && ai.IsWaiting;
+                waited |= ai.IsWaiting;
+                return output;
+            });
+            enemy.Heat = 0f;
+        }
+        return (fired, waited);
+    }
+
+    [Fact]
+    [Trait("Category", "Slow")]
+    public void PastTheSiegeGrace_TheBotStillWaitsOutsideASoundBase()
+    {
+        var world = CreateWorld(width: 160);
+        var (enemy, bot) = (world.TankList.Tanks[0], world.TankList.Tanks[1]);
+        var ai = new BotTankAI(9);
+
+        var (fired, _) = Run(world, ai, (Tweaks.Weapon.BotBaseSiegeGraceSeconds + 20) * Fps);
+
+        Assert.True(enemy.IsDockedAtOwnBase);
+        Assert.True(ai.IsWaiting, "past the grace a base it cannot break is still waited outside");
+        Assert.False(fired, "nor is it fired on from the post once the grace is over");
+        Assert.True(BotLoiter.IsAtPost(bot.Position, BotLoiter.Post(bot.Position, enemy.Base!, world.Terrain)),
+            $"the bot should stand at its post: {bot.Position - enemy.Base!.Position} from the base's centre");
+    }
+
+    [Fact]
+    public void DuringTheSiegeGrace_ABreakableBase_IsNotWaitedOutside()
+    {
+        var world = CreateWorld(energyNetwork: false, width: 160);
+        var (enemy, bot) = (world.TankList.Tanks[0], world.TankList.Tanks[1]);
+        Assert.True(world.CanBreakBase(bot, enemy.Base!));
+        var ai = new BotTankAI(9);
+
+        var (_, waited) = Run(world, ai, 40 * Fps);
+
+        Assert.True(enemy.IsDockedAtOwnBase);
+        Assert.False(waited, "a base it can break is only not yet allowed: the bot roams until the grace is over");
+    }
+
+    [Fact]
+    public void HitAtItsPost_TheBotStopsWaiting()
+    {
+        var world = CreateWorld(width: 160);
+        var (enemy, bot) = (world.TankList.Tanks[0], world.TankList.Tanks[1]);
+        var ai = new BotTankAI(9);
+        Run(world, ai, 40 * Fps);
+        Assert.True(ai.IsWaiting);
+
+        // A shot from inside the base lands on the waiting bot.
+        world.Projectiles.Add(Projectile.CreateBullet(bot.Position + new Offset(-6, 0), new VectorF(1, 0), ownerColor: 0, damage: 10));
+        bool stopped = false;
+        for (int tick = 0; tick < Fps && !stopped; tick++)
+        {
+            world.Advance(i => i == 1 ? ai.GetInput(bot, enemy, world) : default);
+            stopped = !ai.IsWaiting;
+        }
+        Assert.True(stopped, "a bot that is shot at its post should leave it or fight back");
     }
 }

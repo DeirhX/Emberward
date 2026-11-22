@@ -163,12 +163,14 @@ public partial class BotTankAI
             // It respawns in its base, whole and cold: it starts over from there.
             SetMode(TwitchMode.Start);
             _returnCooldownFrames = 0;
+            _waiting = false;
             return default;
         }
 
         if (tank.Base is { } home && world.IsBaseDark(home))
         {
-            if (tank.OreHeld > 0 && !tank.IsDockedAtOwnBase && _mode == TwitchMode.Twitch)
+            // Not while a return given up (a stall or the stuck watch) cools down, or it would wipe the detour.
+            if (tank.OreHeld > 0 && !tank.IsDockedAtOwnBase && _mode == TwitchMode.Twitch && _returnCooldownFrames <= 0)
                 SetMode(TwitchMode.Return);
             else if (_mode == TwitchMode.Recharge && tank.IsDockedAtOwnBase && tank.OreHeld == 0 && IsRecharged(tank))
                 SetMode(TwitchMode.Start);
@@ -183,10 +185,15 @@ public partial class BotTankAI
         // Roaming, headway is toward the enemy. Heading home it is just moving on: the trail may wind.
         _navigator.UpdateStuckState(tank.Position,
             _mode == TwitchMode.Twitch && enemy is { IsDead: false } ? enemy.Position : null);
-        // Its enemy docked in a base it cannot break, the bot waits outside (BotLoiter); one it can break it lays siege to.
-        bool canSiege = _gunner.BaseSiegeAllowed && enemy?.Base is { IsDestroyed: false } enemyBase &&
-            world.CanBreakBase(tank, enemyBase);
-        bool loiter = _mode == TwitchMode.Twitch && enemy is { IsDockedAtOwnBase: true } && !canSiege;
+        // Its enemy docked in a base it cannot break, the bot waits outside (BotLoiter); one it can break it lays siege to
+        // once the opening grace is over, and before that roams as usual. It stops waiting while it sees the enemy (who
+        // then has a shot at it too) or soon after it is hit, and fights.
+        bool breakable = enemy?.Base is { IsDestroyed: false } enemyBase && world.CanBreakBase(tank, enemyBase);
+        bool canSiege = _gunner.BaseSiegeAllowed && breakable;
+        TrackHits(tank);
+        bool loiter = _mode == TwitchMode.Twitch && enemy is { IsDockedAtOwnBase: true, Base: { IsDestroyed: false } } &&
+            !breakable && !_gunner.EnemyInSight && _loiterBreakFrames == 0;
+        _waiting = loiter;
         WatchForStuck(tank, enemy, world, canSiege, loiter);
 
         if (_maneuverFrames > 0)
@@ -635,6 +642,9 @@ public partial class BotTankAI
         hash = Fnv1a.Mix(hash, _maneuverFrames);
         hash = Fnv1a.Mix(hash, _maneuverIsBreakout);
         hash = Fnv1a.Mix(hash, _rechargeLowestHeat);
+        hash = Fnv1a.Mix(hash, _lastHealth);
+        hash = Fnv1a.Mix(hash, _loiterBreakFrames);
+        hash = Fnv1a.Mix(hash, _waiting);
         return Fnv1a.Mix(hash, _rechargeStallFrames);
     }
 }

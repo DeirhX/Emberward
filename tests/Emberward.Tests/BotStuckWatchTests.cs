@@ -51,6 +51,17 @@ public class BotStuckWatchTests
     }
 
     [Fact]
+    public void ASlowTankMakingHeadway_IsNotGoingNowhere()
+    {
+        var watch = new BotStuckWatch();
+        var at = new Position(20, 50);
+        // Barely more than the radius in a window: slow, but getting somewhere.
+        int ticksPerCell = Window / (Tweaks.Bot.StuckRadiusCells + 2);
+        for (int tick = 0; tick < 5 * Window; tick++)
+            Assert.False(watch.Watch(at + new Offset(tick / ticksPerCell, (tick / 3) % 2)), $"fired at tick {tick}");
+    }
+
+    [Fact]
     public void ADetour_EndsWhenReached_OrWhenItsTimeIsUp_AndStaysOnTheMap()
     {
         var watch = new BotStuckWatch();
@@ -130,5 +141,51 @@ public class BotStuckWatchTests
         int detourFromEnemy = Math.Max(Math.Abs(detour.Value.X - hideout.X), Math.Abs(detour.Value.Y - hideout.Y));
         Assert.True(detourFromEnemy > Tweaks.Bot.StuckRadiusCells, $"the new goal should be away from the old one: {detour}");
         Assert.True(farthest > Tweaks.Bot.StuckRadiusCells, $"the bot should leave the wall it was pinned against: {farthest} cells");
+    }
+
+    /// <summary>
+    /// The bot carries ore home to a dark base and gets nowhere (it is held in place, as if pinned): the stuck watch
+    /// gives up the return, and the dark-base rule that sent it home does not send it back and wipe the detour.
+    /// </summary>
+    [Fact]
+    public void ABotGoingNowhereOnItsWayHome_GivesUpTheReturn_AndKeepsItsDetour()
+    {
+        var size = new Size(160, 110);
+        var ground = new TerrainGrid(size);
+        ground.Fill(TerrainPixel.Blank);
+        var world = new World(size, rules: new MatchRules { EnergyNetwork = true, TerrainRegrowth = false });
+        world.Initialize(ground, [new Position(25, 30), new Position(135, 30)]);
+        // No enemy: one in sight across the blank map would be fought, which the stuck watch does not watch.
+        var bot = world.TankList.Tanks[1];
+        var home = bot.Base!;
+        bot.Position = new Position(80, 75);
+
+        var ai = new BotTankAI(9);
+        for (int tick = 0; tick < 600 && ai.Mode != TwitchMode.Twitch; tick++)
+            ai.GetInput(bot, null, world);
+        Assert.Equal(TwitchMode.Twitch, ai.Mode);
+        bot.Hold.Ore = 1;
+        home.DrawCharge(home.Charge);
+        Assert.True(world.IsBaseDark(home));
+
+        // The world is not advanced: whatever the bot asks for, it stays where it is.
+        ai.GetInput(bot, null, world);
+        Assert.Equal(TwitchMode.Return, ai.Mode);
+        int gaveUpAt = -1;
+        for (int tick = 0; tick < 2 * Window && gaveUpAt < 0; tick++)
+        {
+            ai.GetInput(bot, null, world);
+            if (ai.Detour != null)
+                gaveUpAt = tick;
+        }
+        Assert.True(gaveUpAt >= 0, "the stuck watch should give up the return");
+        Assert.Equal(TwitchMode.Twitch, ai.Mode);
+
+        for (int tick = 0; tick < Fps; tick++)
+        {
+            ai.GetInput(bot, null, world);
+            Assert.True(ai.Detour != null && ai.Mode == TwitchMode.Twitch,
+                $"the detour should hold, {tick} ticks after it began: mode {ai.Mode}");
+        }
     }
 }

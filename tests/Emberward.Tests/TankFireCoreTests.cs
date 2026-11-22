@@ -348,6 +348,25 @@ public class TankFireCoreTests
     }
 
     [Fact]
+    public void TheDeathGlow_IsDrawnOverTheSmoke_UnderTheCore()
+    {
+        var (fire, motion) = Died(1);
+        var quads = Draw(fire, motion);
+        int glowAt = -1, lastSmokeAt = -1;
+        for (int v = 0; v < quads.VertexCount; v += 6)
+        {
+            EntityVertex vertex = quads.Vertices[v];
+            if (vertex.Kind == EntityShape.KindTankFire && vertex.P0 == 0f && vertex.B == 0f && vertex.G > 0f)
+                glowAt = v;
+            else if (vertex.Kind == EntityShape.KindFireParticle && vertex.P1 == (float)FireParticleKind.Smoke)
+                lastSmokeAt = v;
+        }
+        Assert.True(glowAt >= 0 && lastSmokeAt >= 0, "a just-dead tank draws its death glow and the smoke still rising");
+        // Drawn later is drawn on top: grey puffs over the flare read as a dark hole in it.
+        Assert.True(glowAt > lastSmokeAt, $"the death glow (vertex {glowAt}) should come after the smoke (last at {lastSmokeAt})");
+    }
+
+    [Fact]
     public void TheDeathGlow_HoldsStill_WhileTheWorldIsPaused()
     {
         var (fire, motion) = Died(3);

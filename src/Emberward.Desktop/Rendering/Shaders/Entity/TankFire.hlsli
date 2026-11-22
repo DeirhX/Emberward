@@ -156,7 +156,7 @@ float4 TankFire(float2 p, float4 params, float3 core, float aa)
     float dg = d * (1.0 + 0.35 * (n - 0.5));
     // A hot middle over a wide, dim tail, so even a flare's glow has no shoulder that reads as a rim.
     float spread = dg * dg / (size * size);
-    float fall = (0.7 * exp(-1.6 * spread) + 0.3 * exp(-0.45 * spread)) * (1.0 - smoothstep(3.5, 6.3, d))
+    float fall = (0.7 * exp(-1.6 * spread) + 0.3 * exp(-0.45 * spread)) * (1.0 - smoothstep(3.5, 5.8, d))
         * (0.8 + 0.4 * fine);
     float3 g = heat * (glow * 0.6 * fall);
     float m = max(max(g.r, g.g), max(g.b, 1e-4));
