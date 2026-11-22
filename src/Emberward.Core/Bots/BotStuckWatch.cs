@@ -66,17 +66,33 @@ public sealed class BotStuckWatch
     /// </summary>
     public bool StartDetour(Position at, Offset heading, Size size)
     {
+        if (!TryPlanDetour(at, heading, size, out Position end))
+            return false;
+        BeginDetour(end);
+        return true;
+    }
+
+    /// <summary>Where a detour from <paramref name="at"/> along <paramref name="heading"/> would end; false when it would start none.</summary>
+    public static bool TryPlanDetour(Position at, Offset heading, Size size, out Position end)
+    {
+        end = default;
         if (heading.X == 0 && heading.Y == 0)
             return false;
-        var end = at + new Offset(heading.X * Tweaks.Bot.DetourCells, heading.Y * Tweaks.Bot.DetourCells);
+        var far = at + new Offset(heading.X * Tweaks.Bot.DetourCells, heading.Y * Tweaks.Bot.DetourCells);
         var clamped = new Position(
-            Math.Clamp(end.X, EdgeMargin, Math.Max(EdgeMargin, size.X - 1 - EdgeMargin)),
-            Math.Clamp(end.Y, EdgeMargin, Math.Max(EdgeMargin, size.Y - 1 - EdgeMargin)));
+            Math.Clamp(far.X, EdgeMargin, Math.Max(EdgeMargin, size.X - 1 - EdgeMargin)),
+            Math.Clamp(far.Y, EdgeMargin, Math.Max(EdgeMargin, size.Y - 1 - EdgeMargin)));
         if (Math.Abs(at.X - clamped.X) <= DetourReach && Math.Abs(at.Y - clamped.Y) <= DetourReach)
             return false;
-        _detour = clamped;
-        _detourFramesLeft = DetourFrames;
+        end = clamped;
         return true;
+    }
+
+    /// <summary>Starts a detour to <paramref name="end"/> (from <see cref="TryPlanDetour"/>).</summary>
+    public void BeginDetour(Position end)
+    {
+        _detour = end;
+        _detourFramesLeft = DetourFrames;
     }
 
     /// <summary>A tick on the detour from <paramref name="at"/>: it ends when reached or when its time is up.</summary>

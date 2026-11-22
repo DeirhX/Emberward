@@ -4,6 +4,7 @@ using Emberward.Core.Collision;
 using Emberward.Core.Entities.Bases;
 using Emberward.Core.Entities.Tanks;
 using Emberward.Core.Input;
+using Emberward.Core.Types;
 
 /// <summary>
 /// What the bot does besides roaming and fighting: waiting outside a base it cannot break while its enemy is docked
@@ -31,8 +32,8 @@ public partial class BotTankAI
         _stuckWatch.AdvanceDetour(tank.Position);
         if (!_stuckWatch.Watch(tank.Position))
             return;
-        if (!_stuckWatch.StartDetour(tank.Position, _navigator.ChooseBreakoutHeading(tank, target: null, world, MayTorchRock(tank)),
-                world.Terrain.Size))
+        if (!BotStuckWatch.TryPlanDetour(tank.Position, _navigator.ChooseBreakoutHeading(tank, target: null, world, MayTorchRock(tank)),
+                world.Terrain.Size, out Position detourEnd))
             return;
         if (_mode == TwitchMode.Return)
         {
@@ -42,6 +43,7 @@ public partial class BotTankAI
         _maneuverFrames = 0;
         _timeToChange = 0;
         _navigator.ResetProgress();
+        _stuckWatch.BeginDetour(detourEnd);
     }
 
     /// <summary>
