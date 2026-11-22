@@ -204,8 +204,10 @@ The tank lives in a band around 0. Both ends hurt, and the world has places at b
   crystal shows the shield, the number under it the hull, and the plate reads FIRE ABOARD while it burns.
   **A tank's shield is seen only while it blocks hits.** A hit brings up a translucent plastic dome of swirling blue
   with raised, shimmering hexagon ridges, a glossy highlight and a brighter rim, thin enough to see the tank through.
-  It fades in at once, stays while hits keep coming and dissolves about 0.75 s after the last. How much of it shows is
-  the shield left: the outer edge erodes first as it drains, leaving a thick lit lip (orange when low).
+  It fades in over one simulation step (the frame of the hit itself shows nothing yet), stays while hits keep coming,
+  and after the last starts to dissolve at about 0.3 s and is gone at 0.75 s; while the game is paused or waiting on the
+  network it freezes as drawn. How much of it shows is the shield left: the outer edge erodes first as it drains,
+  leaving a thick lit lip, and it turns orange gradually below half the shield.
   **A hit on a shield** is seen and heard: its own zap (and a shatter when it breaks), a pulse that lights the veins of
   what is left of the shield, and a red patch where the shot landed; a break flashes the whole bubble as it collapses.
   A base's gate shield shows hits the same way.

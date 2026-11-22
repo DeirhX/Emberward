@@ -11,8 +11,8 @@ using Emberward.Core.Types;
 /// living hexagonal lattice around the tank, showing how much shield is left (its outer edge goes first as it drains,
 /// a small core at the centre last); the veins light up with a wavefront from the impact and a red patch glows where the
 /// shot landed. The bubble fades in over a step, stays while hits keep coming (each one refreshes it) and dissolves
-/// after the last. The hit that breaks the shield sends <see cref="BrokenFill"/>, and the whole bubble flashes and
-/// collapses. Hits are read from <see cref="World.StepEvents"/> after each step. Nothing is drawn, and nothing costs
+/// after the last. After the hit that breaks the shield the fill is 0, and the whole bubble flashes and collapses.
+/// While the world is held (paused, or a network tick with no step) the bubble freezes as drawn (<see cref="Hold"/>). Hits are read from <see cref="World.StepEvents"/> after each step. Nothing is drawn, and nothing costs
 /// anything, while no hit is fresh. Output only.
 /// </summary>
 public sealed class TankShieldQuads
@@ -40,12 +40,6 @@ public sealed class TankShieldQuads
     /// <summary>The steps of visibility .w carries in its whole part (the loop is its fraction).</summary>
     public const float VisibleLevels = 255f;
 
-    /// <summary>
-    /// The fill a pulse sends for the hit that broke the shield: the shader then shows the whole bubble flashing and
-    /// collapsing to the centre, rather than the nothing an empty shield has left.
-    /// </summary>
-    public const float BrokenFill = -1f;
-
     /// <summary>The hit angle sent when there is no hit point (a bite): past any real angle.</summary>
     public const float NoHitAngle = 10f;
 
@@ -63,17 +57,43 @@ public sealed class TankShieldQuads
     private readonly List<Pulse> _pulses = new();
     private readonly Dictionary<int, Position> _before = new();
     private long _step;
+    private World? _world;
+    private long _worldAdvance;
+    private bool _held;
+    private float _heldAlpha, _heldLoop, _lastAlpha, _lastLoop;
 
     /// <summary>Call after each simulation step, while <see cref="World.StepEvents"/> still holds that step's events.</summary>
     public void CaptureStep(World world)
     {
+        ArgumentNullException.ThrowIfNull(world);
+        CaptureStep(world, world.StepEvents);
+    }
+
+    /// <summary>
+    /// Records a step whose events are <paramref name="events"/> (normally the world's own; tests pass their own). A new
+    /// world, or one that did not just take one step (a restart, a late joiner's loaded match), drops what was showing:
+    /// pulses and positions are keyed by tank colour, which the new world reuses for other tanks.
+    /// </summary>
+    public void CaptureStep(World world, ReadOnlySpan<StepEvent> events)
+    {
+        ArgumentNullException.ThrowIfNull(world);
+        long advance = world.AdvanceCount;
+        if (!ReferenceEquals(world, _world) || advance < _worldAdvance || advance > _worldAdvance + 1)
+        {
+            _pulses.Clear();
+            _before.Clear();
+        }
+        _world = world;
+        _worldAdvance = advance;
+        _held = false;
+        _lastAlpha = 0f;
         _step++;
         for (int i = _pulses.Count - 1; i >= 0; i--)
         {
             if (_step - _pulses[i].LastHit >= ShowSteps + 1)
                 _pulses.RemoveAt(i);
         }
-        foreach (ref readonly StepEvent e in world.StepEvents)
+        foreach (ref readonly StepEvent e in events)
         {
             if (e.Kind is not (StepEventKind.TankShieldHit or StepEventKind.TankShieldBroken))
                 continue;
@@ -81,9 +101,10 @@ public sealed class TankShieldQuads
             var tank = FindTank(world, color);
             if (tank == null)
                 continue;
-            // A bite has no direction: it never replaces the pulse of a shell that landed in the same step.
+            // A bite has no direction: it never replaces the pulse of a shell that landed in the same step. That pulse's
+            // fill is read at the end of the step, so a bite that broke the shield still shows as the break.
             bool shell = e.Cause == DamageCause.EnemyFire;
-            int existing = _pulses.FindIndex(p => p.Color == color);
+            int existing = FindPulse(color);
             if (!shell && existing >= 0 && _pulses[existing].LastHit == _step)
                 continue;
             // Projectiles run before tanks move, so the impact is measured from where the tank stood at the step's start.
@@ -97,7 +118,9 @@ public sealed class TankShieldQuads
                 Started = existing >= 0 ? _pulses[existing].Started : _step,
                 LastHit = _step,
                 HitAngle = shell && (dx != 0 || dy != 0) ? MathF.Atan2(dy, dx) : NoHitAngle,
-                Fill = e.Kind == StepEventKind.TankShieldBroken ? BrokenFill : world.TankShieldOf(tank).ShieldFill,
+                // The fill at the end of the step: 0 after the hit that broke the shield, which the shader shows as the
+                // whole bubble flashing and collapsing.
+                Fill = world.TankShieldOf(tank).ShieldFill,
             };
             if (existing >= 0)
                 _pulses[existing] = pulse;
@@ -106,6 +129,29 @@ public sealed class TankShieldQuads
         }
         foreach (var tank in world.TankList.Tanks)
             _before[tank.Color] = tank.Position;
+    }
+
+    private int FindPulse(int color)
+    {
+        for (int i = 0; i < _pulses.Count; i++)
+        {
+            if (_pulses[i].Color == color)
+                return i;
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// Freezes the bubble as it is drawn now, swirl included, until the next step is captured: the world takes no step
+    /// (a pause, a network tick that carried none), so nothing should fade or move ahead of it.
+    /// </summary>
+    public void Hold()
+    {
+        if (_held)
+            return;
+        _held = true;
+        _heldAlpha = _lastAlpha;
+        _heldLoop = _lastLoop;
     }
 
     private static Emberward.Core.Entities.Tanks.Tank? FindTank(World world, int color)
@@ -137,8 +183,10 @@ public sealed class TankShieldQuads
         if (_pulses.Count == 0)
             return;
         float scale = quads.View.PixelScale;
-        float stepNow = _step + quads.Alpha;
-        float loop = quads.Phase % LoopSeconds / LoopSeconds;
+        _lastAlpha = _held ? _heldAlpha : quads.Alpha;
+        _lastLoop = _held ? _heldLoop : quads.Phase % LoopSeconds / LoopSeconds;
+        float stepNow = _step + _lastAlpha;
+        float loop = _lastLoop;
         ReadOnlySpan<TankRenderState> tanks = motion.Tanks;
         foreach (var pulse in _pulses)
         {

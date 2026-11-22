@@ -40,8 +40,8 @@
 //                   color.rgb = team colour
 //  21 shield hit  — .x = age (0 just hit, 1 gone), .y = shield strength when hit (0..1), .z = 1 for the killing hit;
 //                   color.rgb = team colour
-//  22 tank shield — .x = shield fill (0..1; the bubble erodes from its edge inward as it falls), or -1 for the hit
-//                   that broke it (TankShieldQuads.BrokenFill: the whole bubble flashes and collapses), .y = age of
+//  22 tank shield — .x = shield fill after the hit (0..1; the bubble erodes from its edge inward as it falls; 0 is the
+//                   hit that broke it: the whole bubble flashes and collapses), .y = age of
 //                   the latest hit's effects (0 just hit, 1 or more = spent), .z = the angle (radians) from the tank's
 //                   centre to where the shot landed (TankShieldQuads.NoHitAngle, 10, for none), .w = how much of the
 //                   bubble shows in whole 255ths plus the animation loop as the fraction (0..1 over

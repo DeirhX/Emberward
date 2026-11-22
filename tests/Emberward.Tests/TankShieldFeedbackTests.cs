@@ -3,6 +3,7 @@ using Emberward.Core.Config;
 using Emberward.Core.Entities;
 using Emberward.Core.Entities.Projectiles;
 using Emberward.Core.Rendering;
+using Emberward.Core.Sensing;
 using Emberward.Core.Terrain;
 using Emberward.Core.Types;
 using Emberward.Desktop.Rendering;
@@ -81,6 +82,11 @@ public class TankShieldFeedbackTests
         Assert.Empty(Draw(shield, world, victim, phase: 0f));
     }
 
+    /// <summary>A shield event on <paramref name="victim"/>, landing <paramref name="dx"/> cells east of its centre.</summary>
+    private static StepEvent[] ShieldEvent(Emberward.Core.Entities.Tanks.Tank victim, DamageCause cause, int dx = -3,
+        StepEventKind kind = StepEventKind.TankShieldHit) =>
+        [new StepEvent(kind, victim.Position + new Offset(dx, 0), victim.Color, Count: 5, Cause: cause)];
+
     [Fact]
     public void RepeatedHits_KeepTheBubbleUp_WithoutFadingInAgain()
     {
@@ -89,14 +95,99 @@ public class TankShieldFeedbackTests
         shield.CaptureStep(world);
 
         // Hits every 8 steps keep it showing well past one hit's span.
-        Run(world, shield, victim, 2 * TankShieldQuads.ShowSteps, shotAt: [8, 16, 24, 32]);
+        for (int i = 1; i <= 2 * TankShieldQuads.ShowSteps; i++)
+            shield.CaptureStep(world, i % 8 == 0 ? ShieldEvent(victim, DamageCause.EnemyFire) : []);
 
         Assert.Equal(1, shield.PulseCount);
         var vertices = Draw(shield, world, victim, phase: 0f);
         Assert.NotEmpty(vertices);
-        // Four steps after the last hit: fully shown (a fresh run would still be fading in at alpha 0.5), effects spent.
+        // Four steps after the last hit (step 32): fully shown, where a fresh run would still be fading in at alpha
+        // 0.5, and that hit's effects half spent.
         Assert.All(vertices, v => Assert.Equal(TankShieldQuads.VisibleLevels, MathF.Floor(v.P3)));
-        Assert.All(vertices, v => Assert.InRange(v.P1, 0.4f, 0.6f));
+        Assert.All(vertices, v => Assert.Equal(4.5f / 9f, v.P1, precision: 4));
+    }
+
+    [Fact]
+    public void ABite_ShowsTheBubble_WithNoHitPoint()
+    {
+        var (world, victim) = Shot(Tweaks.Weapon.BulletDamage);
+        var shield = new TankShieldQuads();
+        shield.CaptureStep(world);
+        shield.CaptureStep(world, ShieldEvent(victim, DamageCause.Emberite));
+
+        var vertices = Draw(shield, world, victim, phase: 0f);
+
+        Assert.NotEmpty(vertices);
+        Assert.All(vertices, v => Assert.Equal(TankShieldQuads.NoHitAngle, v.P2));
+    }
+
+    [Fact]
+    public void AShellAndABreakingBiteInOneStep_ShowTheBreak_WhereTheShellCameIn()
+    {
+        var (world, victim) = Shot(Tweaks.Weapon.BulletDamage);
+        var shield = new TankShieldQuads();
+        shield.CaptureStep(world);
+        victim.TakeDamage(Tweaks.TankShield.Capacity, DamageCause.Emberite);
+        Assert.Equal(0f, world.TankShieldOf(victim).ShieldFill);
+
+        shield.CaptureStep(world, [.. ShieldEvent(victim, DamageCause.EnemyFire),
+            .. ShieldEvent(victim, DamageCause.Emberite, dx: 0, kind: StepEventKind.TankShieldBroken)]);
+        var vertices = Draw(shield, world, victim, phase: 0f);
+
+        Assert.NotEmpty(vertices);
+        Assert.All(vertices, v => Assert.Equal(0f, v.P0));
+        Assert.All(vertices, v => Assert.True(MathF.Abs(v.P2) > 2.5f && MathF.Abs(v.P2) <= MathF.PI, $"hit angle {v.P2}"));
+    }
+
+    [Fact]
+    public void AnUnseenTank_OrADeadOne_ShowsNoShield()
+    {
+        var (world, victim) = Shot(Tweaks.Weapon.BulletDamage);
+        var vision = world.TrackVision(world.TankList.Tanks[0]);
+        var shield = new TankShieldQuads();
+        shield.CaptureStep(world);
+        Assert.False(vision.IsVisible(victim.Position));
+
+        Assert.NotEmpty(Draw(shield, world, victim, phase: 0f));
+        Assert.Empty(Draw(shield, world, victim, phase: 0f, vision: vision));
+        Assert.Empty(Draw(shield, world, victim, phase: 0f, dead: true));
+    }
+
+    [Fact]
+    public void ANewWorld_OrAJumpInSteps_DropsThePulses()
+    {
+        var (world, victim) = Shot(Tweaks.Weapon.BulletDamage);
+        var shield = new TankShieldQuads();
+        shield.CaptureStep(world);
+        Assert.Equal(1, shield.PulseCount);
+
+        // A restart: another world, whose tank of the same colour was never hit.
+        var (other, _) = Shot(Tweaks.Weapon.BulletDamage);
+        shield.CaptureStep(other, []);
+        Assert.Equal(0, shield.PulseCount);
+
+        // A late joiner's loaded match: the same world, many steps on.
+        shield.CaptureStep(world);
+        Assert.Equal(1, shield.PulseCount);
+        world.Advance(_ => default);
+        world.Advance(_ => default);
+        shield.CaptureStep(world, []);
+        Assert.Equal(0, shield.PulseCount);
+    }
+
+    [Fact]
+    public void WhileHeld_TheBubbleFreezesAsDrawn()
+    {
+        var (world, victim) = Shot(Tweaks.Weapon.BulletDamage);
+        var shield = new TankShieldQuads();
+        shield.CaptureStep(world);
+        var before = Draw(shield, world, victim, phase: 3f, alpha: 0.5f)[0];
+
+        shield.Hold();
+        var held = Draw(shield, world, victim, phase: 9f, alpha: 1f)[0];
+
+        Assert.Equal(before.P1, held.P1);
+        Assert.Equal(before.P3, held.P3);
     }
 
     /// <summary>The tank shield quads drawn for <paramref name="victim"/> after <paramref name="world"/>'s last step.</summary>
@@ -108,15 +199,15 @@ public class TankShieldFeedbackTests
     }
 
     private static EntityVertex[] Draw(TankShieldQuads shield, World world, Emberward.Core.Entities.Tanks.Tank victim,
-        float phase, float alpha = 0.5f)
+        float phase, float alpha = 0.5f, VisionMap? vision = null, bool dead = false)
     {
         var motion = new EntityMotion();
-        motion.CaptureTanks([new TankRenderState(victim.Position, victim.Color, Direction: 4, IsDead: false,
+        motion.CaptureTanks([new TankRenderState(victim.Position, victim.Color, Direction: 4, IsDead: dead,
             TurretDirection: default)]);
         motion.SetAlpha(alpha);
         var quads = new EntityQuads();
         quads.Begin(new RenderView(new Size(1000, 1000), world.Terrain.Size, default, 2), phase, alpha);
-        shield.Emit(quads, motion, vision: null);
+        shield.Emit(quads, motion, vision);
         return quads.Vertices.AsSpan(0, quads.VertexCount).ToArray();
     }
 
@@ -223,10 +314,10 @@ public class TankShieldFeedbackTests
 
         var vertices = EmitPulse(world, victim);
 
-        // The break marker, not the empty shield's 0 (which would draw nothing), and the hit for the red patch.
+        // Fill 0 on a pulse is the break (the shader collapses the whole bubble), with the hit for the red patch.
         Assert.NotEmpty(vertices);
         Assert.All(vertices, v => Assert.Equal(EntityShape.KindTankShield, v.Kind));
-        Assert.All(vertices, v => Assert.Equal(TankShieldQuads.BrokenFill, v.P0));
+        Assert.All(vertices, v => Assert.Equal(0f, v.P0));
         Assert.All(vertices, v => Assert.InRange(v.P1, 0f, 0.5f));
         Assert.All(vertices, v => Assert.True(MathF.Abs(v.P2) > 2.5f && MathF.Abs(v.P2) <= MathF.PI, $"hit angle {v.P2}"));
     }

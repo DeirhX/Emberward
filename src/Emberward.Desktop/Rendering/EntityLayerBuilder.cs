@@ -94,6 +94,7 @@ public sealed class EntityLayerBuilder
         _motion.Hold();
         _projectiles.Hold();
         _emberites.Hold();
+        _tankShields.Hold();
     }
 
     /// <summary>

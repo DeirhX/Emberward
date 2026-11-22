@@ -38,7 +38,7 @@ static const float3 kTankShieldEmber = float3(0.45, 0.10, 0.04);
 // the vein lattice) and `reach` is the cutoff. The cutoff's radius grows with the square root of the fill, so the area
 // left falls roughly in step with the fill (a little over half the bubble at half fill): the outer edge goes first and a
 // core at the centre last. Any shield at all keeps a core a couple of cells across, so the last sliver still reads.
-// A broken shield (fill 0 or less) has its whole bubble at the hit, shrinking to nothing as the pulse ages.
+// A broken shield (fill 0: a pulse is drawn only for a hit, so an empty shield was just broken) has its whole bubble at the hit, shrinking to nothing as the pulse ages.
 float TankShieldReach(float fill, float age, float broken)
 {
     float left = max(sqrt(saturate(fill)) * 1.3 - 0.16, 0.3);
