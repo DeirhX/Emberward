@@ -59,7 +59,7 @@
 //  25 fire particle — .x = age (0 born, 1 gone), .y = FireParticleKind (0 spark, 1 smoke, 2 flame lick, 3 cinder),
 //                   .z = strength (0..1: fades it in with the fire), .w = a per-particle seed (0..1); local +x along its
 //                   motion (smoke: upright). color.rgb = smoke (0, radius, 0), a flame lick (stretch, radius, swirl
-//                   seed), a spark or cinder (trail length, head radius, starting heat).
+//                   phase), a spark or cinder (trail length, head radius, starting heat).
 //  26 danger ring — .x = radius (cells), .y = level (NestDangerLevel: 0 dormant, 1 awake, 2 swarming: it pulses),
 //                   .z = phase, .w = opacity; color.rgb = the ring's colour
 //

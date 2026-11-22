@@ -22,8 +22,9 @@ using Emberward.Core.Types;
 /// that long ago (the trail of its last <see cref="TrailSteps"/> step positions), so a moving tank leaves a trail that
 /// stays where it was made, and nothing is allocated per step or per frame. A slot is in the air in a life when its
 /// hash falls under the level's share (<see cref="FireParticles.Share"/>), fading in as the share passes it, so the
-/// count, and with it the birth rate, grows smoothly with the fire. Their clock is the steps captured, so they are
-/// step-locked: they stand still while the world does and are the same on every machine.
+/// count, and with it the birth rate, grows smoothly with the fire. Their clock is the steps this client has captured,
+/// so they are step-locked: they stand still while the world does. They use no wall clock or shared random source, but
+/// two clients that joined at different steps show different particles (output only, never compared).
 /// </remarks>
 public sealed class TankFireQuads
 {
@@ -42,6 +43,12 @@ public sealed class TankFireQuads
     /// <summary>How much longer than it is wide a flame lick is drawn, along the way it rises.</summary>
     public const float FlameStretch = 1.8f;
 
+    /// <summary>
+    /// The most quads one tank's fire adds to a frame: every particle slot, its light and core, and the light and glow
+    /// of a death still fading where it died.
+    /// </summary>
+    public static int MaxQuadsPerTank => FireParticles.MaxPerTank + 4;
+
     private const float DeathFadeSeconds = 1.5f;
     private const float DeathPeakGlow = 2f;
     private const float PhaseCycleSeconds = 4f;
@@ -59,6 +66,7 @@ public sealed class TankFireQuads
     private long[] _diedStep = [];          // the capture a tank was seen to die at (0: no death glow drawn)
     private float[] _deathGlow = [];        // its core's glow just before it died
     private float[] _deathLevel = [];       // and its fire level, which the particles then in the air keep
+    private float[] _deathHull = [];        // and its hull, which sizes the core those particles rise from
     private Position[] _deathAt = [];
     private float[] _deathHeading = [];
     private int _count;
@@ -120,6 +128,7 @@ public sealed class TankFireQuads
             Array.Resize(ref _diedStep, count);
             Array.Resize(ref _deathGlow, count);
             Array.Resize(ref _deathLevel, count);
+            Array.Resize(ref _deathHull, count);
             Array.Resize(ref _deathAt, count);
             Array.Resize(ref _deathHeading, count);
             for (int i = old; i < count; i++)
@@ -150,6 +159,7 @@ public sealed class TankFireQuads
             _deathAt[slot] = position;
             _deathGlow[slot] = CoreGlow(slot);
             _deathLevel[slot] = _levels[slot];
+            _deathHull[slot] = _hull[slot];
         }
         _alive[slot] = !dead;
         float follow = continuous ? FireOnset.StepFollow : 1f;
@@ -252,10 +262,10 @@ public sealed class TankFireQuads
             if (!IsDrawn(tanks[i], level, vision))
                 continue;
 
-            for (int f = 0; f < FireParticles.UnderCore; f++)
-                EmitParticles(quads, vision, i, level, clock, families[f]);
-
             var (start, drift) = motion.TankMotion(i);
+            for (int f = 0; f < FireParticles.UnderCore; f++)
+                EmitParticles(quads, vision, i, level, clock, start, drift, families[f]);
+
             if (!quads.IsOffScreen(quads.ScreenX(start.X), quads.ScreenY(start.Y), 9f * scale))
             {
                 // The core's glow reaches 6 cells round it, and a sagging core's drips run further down the screen.
@@ -268,7 +278,7 @@ public sealed class TankFireQuads
             }
 
             for (int f = FireParticles.UnderCore; f < families.Length; f++)
-                EmitParticles(quads, vision, i, level, clock, families[f]);
+                EmitParticles(quads, vision, i, level, clock, start, drift, families[f]);
         }
     }
 
@@ -351,11 +361,15 @@ public sealed class TankFireQuads
     /// Once the tank has died, those born before live out their lives at the level it died at, and no more are born.
     /// </summary>
     private void EmitParticles(EntityQuads quads, VisionMap? vision, int slot, float level, double clock,
-        in FireParticleFamily family)
+        PositionF start, PositionF drift, in FireParticleFamily family)
     {
         long died = _alive[slot] ? 0 : _diedStep[slot];
+        float hull = _hull[slot];
         if (died != 0)
+        {
             level = _deathLevel[slot];
+            hull = _deathHull[slot];
+        }
         FireParticleKind kind = family.Kind;
         float share = FireParticles.Share(kind, level);
         if (share <= 0f)
@@ -363,7 +377,7 @@ public sealed class TankFireQuads
         float life = family.LifeSeconds;
         int count = family.Count;
         float strength = kind == FireParticleKind.Smoke ? 0.4f + (0.6f * level) : 1f;
-        float coreRadius = FireParticles.CoreRadius(_hull[slot]);
+        float coreRadius = FireParticles.CoreRadius(hull);
         double lifeSteps = life * Tweaks.Perf.TargetFps;
         float scale = quads.View.PixelScale;
         for (int k = 0; k < count; k++)
@@ -377,11 +391,10 @@ public sealed class TankFireQuads
             float shown = Math.Clamp((share - Hash(slot, k, cycle, family.Salt)) * ShareFade, 0f, 1f);
             if (shown <= 0f)
                 continue;
-            // The frame is drawn alpha of a step after the latest step, so that much less of the trail lies behind it.
-            int stepsAgo = (int)Math.Round((age * lifeSteps) - (clock - _steps));
-            Position birth = TrailPosition(slot, stepsAgo);
+            PositionF birth = BirthPosition(slot, clock - (age * lifeSteps), start, drift);
             var h = new FireParticles.Hashes(Hash(slot, k, cycle, family.Salt + 1), Hash(slot, k, cycle, family.Salt + 2),
-                Hash(slot, k, cycle, family.Salt + 3), Hash(slot, k, cycle, family.Salt + 4));
+                Hash(slot, k, cycle, family.Salt + 3), Hash(slot, k, cycle, family.Salt + 4),
+                Hash(slot, k, cycle, family.Salt + 5), Hash(slot, k, cycle, family.Salt + 6));
             float seconds = age * life;
             PositionF offset = FireParticles.Offset(kind, seconds, level, coreRadius, h);
             float x = EntityQuads.Centre(birth.X) + offset.X, y = EntityQuads.Centre(birth.Y) + offset.Y;
@@ -399,6 +412,27 @@ public sealed class TankFireQuads
         }
     }
 
+    /// <summary>
+    /// Where tank <paramref name="slot"/> was drawn at step time <paramref name="born"/> (the steps captured, fractional):
+    /// during the step being drawn, where the drawn tank was then (<paramref name="start"/> plus <paramref name="drift"/>
+    /// times the progress), so a fresh particle is born under the drawn hull and never ahead of it; before that, on its
+    /// trail, which the drawn tank follows about a step behind the latest capture.
+    /// </summary>
+    public PositionF BirthPosition(int slot, double born, PositionF start, PositionF drift)
+    {
+        double into = born - _steps;
+        if (into >= 0)
+        {
+            float a = (float)Math.Min(into, 1.0);
+            return new PositionF(start.X + (drift.X * a), start.Y + (drift.Y * a));
+        }
+        double back = 1.0 - into;                    // steps behind the latest capture, a step of lag included
+        int n = (int)Math.Floor(back);
+        float f = (float)(back - n);
+        Position near = TrailPosition(slot, n), far = TrailPosition(slot, n + 1);
+        return new PositionF(near.X + ((far.X - near.X) * f), near.Y + ((far.Y - near.Y) * f));
+    }
+
     // One particle's quad. A smoke puff is upright; a lick, a spark and a cinder turn their local +x along their motion.
     private static void AddParticle(EntityQuads quads, FireParticleKind kind, float x, float y, float age, float size,
         float strength, float seconds, float level, float coreRadius, in FireParticles.Hashes h)
@@ -408,15 +442,15 @@ public sealed class TankFireQuads
         {
             float half = 1.3f * size;
             quads.Add(x, y, 1f, 0f, -half, half, -half, half, 0f, size, 0f, EntityShape.KindFireParticle, age, particle,
-                strength, h.B);
+                strength, h.Seed);
             return;
         }
         var (dir, speed) = FireParticles.Motion(kind, seconds, level, coreRadius, h);
         if (kind == FireParticleKind.Flame)
         {
             float along = 1.5f * size * FlameStretch, across = 1.5f * size;
-            quads.Add(x, y, dir.X, dir.Y, -along, along, -across, across, FlameStretch, size, h.C,
-                EntityShape.KindFireParticle, age, particle, strength, h.B);
+            quads.Add(x, y, dir.X, dir.Y, -along, along, -across, across, FlameStretch, size, h.Swirl,
+                EntityShape.KindFireParticle, age, particle, strength, h.Seed);
             return;
         }
         // A spark or a cinder: a hot head with a streak behind it, as long as it is fast.
@@ -424,7 +458,7 @@ public sealed class TankFireQuads
         float glow = 3.5f * size;
         float heat = kind == FireParticleKind.Spark ? 1f : 0.75f;
         quads.Add(x, y, dir.X, dir.Y, -trail - glow, glow, -glow, glow, trail, size, heat,
-            EntityShape.KindFireParticle, age, particle, strength, h.B);
+            EntityShape.KindFireParticle, age, particle, strength, h.Seed);
     }
 
     private static float Seed(int slot) => ((slot * 0.618034f) + 0.31f) % 1f;

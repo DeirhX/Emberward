@@ -29,6 +29,9 @@ static const float kFireSparkKind = 0.0;
 static const float kFireSmokeKind = 1.0;
 static const float kFireFlameKind = 2.0;
 static const float kFireCinderKind = 3.0;
+
+// How hot a flame lick is born on FireRamp (yellow); sparks are born at 1 (white).
+static const float kFlameHeat = 0.8;
 static const float2 kFireHullCenter = float2(-0.5, 0.0);   // the hull box of Tank.hlsli
 static const float2 kFireHullHalf = float2(2.45, 1.55);
 
@@ -185,8 +188,10 @@ float4 FireSmokePuff(float2 p, float age, float strength, float seed, float radi
 }
 
 // A flame lick, local +x along its motion: a soft teardrop, round at its foot and drawn out to its tip, `radius` cells
-// across and `stretch` times that along. It glows white-yellow when born and cools through orange and deep red,
-// flickering, to a wisp of dark smoke as it dies. Its glow adds light; only the smoke darkens what is under it.
+// across and `stretch` times that along. It is born yellow (kFlameHeat on FireRamp, cooler than a spark's white) and
+// cools through orange and deep red, flickering, to a wisp of dark smoke as it dies. It is drawn over what is under it
+// with a little cover rather than added, so where many licks overlap the colour tends to the licks' own instead of
+// adding up past white: the fire reads as separate tongues.
 float4 FireFlame(float2 p, float age, float strength, float seed, float stretch, float radius, float swirl)
 {
     float2 q = p / max(radius, 0.01);
@@ -194,13 +199,14 @@ float4 FireFlame(float2 p, float age, float strength, float seed, float stretch,
     float taper = 1.0 - 0.5 * saturate(q.x);                    // narrower toward the tip
     float across = q.y / taper;
     float body = exp(-2.6 * (q.x * q.x + across * across));
-    float heat = saturate(1.1 - 1.2 * age - 0.15 * seed + 0.2 * body);
+    float heat = saturate(kFlameHeat * (1.05 - 1.1 * age) - 0.1 * seed + 0.08 * body);
     float flicker = 0.75 + 0.25 * sin(age * 47.0 + seed * 6.283185 + swirl * 3.0);
     float life = smoothstep(0.0, 0.1, age) * (1.0 - smoothstep(0.75, 1.0, age)) * strength;
     float burning = smoothstep(0.1, 0.55, heat);
     float smoke = (1.0 - burning) * body * 0.3 * life;
-    float3 glow = FireRamp(heat) * body * burning * flicker * life * 0.6;
-    return float4(glow + kFireSmoke * smoke, smoke);
+    float cover = burning * body * 0.35 * life;
+    float3 glow = FireRamp(heat) * flicker * cover * 1.3;    // overlapping licks tend to 1.3x the ramp: red clips, green stays under 1
+    return float4(glow + kFireSmoke * smoke, cover + smoke);
 }
 
 // A spark or a cinder, local +x along its motion: a hot head `radius` cells across with a streak `trail` cells long
@@ -221,20 +227,20 @@ float4 FireStreak(float2 p, float age, float strength, float seed, float trail, 
 }
 
 // One of a burning tank's particles (TankFireQuads, FireParticles): params.x = age (0 born, 1 gone), params.y = what it
-// is (kFireSpark, kFireSmoke, kFireFlame, kFireCinder), params.z = strength (0..1: it fades in with the fire),
-// params.w = a seed (0..1); shape = colour channels: smoke (unused, radius, unused), a flame lick (stretch, radius,
-// swirl seed), a spark or cinder (trail, radius, starting heat).
+// is (kFireSparkKind, kFireSmokeKind, kFireFlameKind, kFireCinderKind), params.z = strength (0..1: it fades in with
+// the fire), params.w = a seed (0..1); shape = colour channels: smoke (unused, radius, unused), a flame lick (stretch,
+// radius, swirl phase), a spark or cinder (trail, radius, starting heat).
 float4 FireParticle(float2 p, float4 params, float3 shape, float aa)
 {
     float age = saturate(params.x);
     float strength = saturate(params.z);
     float seed = params.w;
-    float4 result;
+    float4 result = float4(0.0, 0.0, 0.0, 0.0);
     if (abs(params.y - kFireSmokeKind) < 0.5)
         result = FireSmokePuff(p, age, strength, seed, shape.y);
     else if (abs(params.y - kFireFlameKind) < 0.5)
         result = FireFlame(p, age, strength, seed, shape.x, shape.y, shape.z);
-    else
+    else if (abs(params.y - kFireSparkKind) < 0.5 || abs(params.y - kFireCinderKind) < 0.5)
         result = FireStreak(p, age, strength, seed, shape.x, shape.y, shape.z, aa);
     return result;
 }

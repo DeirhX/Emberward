@@ -205,7 +205,7 @@ The tank lives in a band around 0. Both ends hurt, and the world has places at b
   drips slag, below 5% it pulses white; a regenerated shield hides it), a flickering light in the core's colour on the
   ground around it, heat shimmer over it, and the fire itself as particles, the way a shot's burst throws glowing
   fragments: soft flame licks rising off the core and the hull with a little swirl, flickering and cooling from
-  white-yellow through orange and deep red to a wisp of dark smoke in half a second; small sparks that shoot up as
+  yellow through orange and deep red to a wisp of dark smoke in half a second; small white-hot sparks that shoot up as
   streaks; now and then a larger cinder thrown off to one side that arcs up and falls; and smoke. More of them, and
   bigger, the more the hull burns. Each is born where the tank was, so a moving tank's fire streams out behind it and
   leaves a trail (none of it shown out of sight). Nothing pops in: from 75% hull each part eases in from nothing, in

@@ -30,18 +30,25 @@ public readonly record struct FireParticleFamily(FireParticleKind Kind, int Coun
 
 /// <summary>
 /// Where a burning tank's particles are and how big, at a time in their lives: rendering only, a pure function of the
-/// particle's hashes, its age and the fire level, so the particles are step-locked and the same on every machine. Each
+/// particle's hashes, its age and the fire level, with no clock or random source of its own. Each
 /// is born on or around the hull (a flame lick mostly on the exposed core) and rises with a little turbulence; sparks
 /// shoot up and slow, cinders arc up and fall, smoke drifts up and spreads. Positions are offsets in cells from the
 /// tank's centre where the particle was born (screen +y is down).
 /// </summary>
 public static class FireParticles
 {
-    /// <summary>A particle's four hashes (0..1), fixed for its life.</summary>
-    public readonly record struct Hashes(float A, float B, float C, float D);
+    /// <summary>
+    /// A particle's hashes (0..1), fixed for its life, each read for one thing: <paramref name="A"/> how far from the
+    /// centre it is born, <paramref name="B"/> at what angle and its sideways drift, <paramref name="C"/> whether a lick is
+    /// born on the core (a cinder's side), <paramref name="D"/> its speed and size, <paramref name="Swirl"/> the phase
+    /// of its swirl, and <paramref name="Seed"/> the shader's seed (its flicker and the lumps of a smoke puff).
+    /// </summary>
+    public readonly record struct Hashes(float A, float B, float C, float D, float Swirl, float Seed);
 
     /// <summary>The families, in the order they are drawn: smoke under the core, the flames, sparks and cinders over it.</summary>
-    public static readonly FireParticleFamily[] Families =
+    public static ReadOnlySpan<FireParticleFamily> Families => s_families;
+
+    private static readonly FireParticleFamily[] s_families =
     [
         new(FireParticleKind.Smoke, 16, 1.8f, 71),
         new(FireParticleKind.Flame, 30, 0.5f, 53),
@@ -58,7 +65,6 @@ public static class FireParticles
     private const float HullRadius = 2.2f;
     private const float FlameBuoyancy = 10f;
     private const float SparkDrag = 2.2f;
-    private const float SmokeLifeSeconds = 1.8f;
     private const float ProbeSeconds = 0.02f;
 
     /// <summary>Every family's slots together: the most particles one tank can have in the air.</summary>
@@ -67,7 +73,7 @@ public static class FireParticles
         get
         {
             int total = 0;
-            foreach (FireParticleFamily family in Families)
+            foreach (FireParticleFamily family in s_families)
                 total += family.Count;
             return total;
         }
@@ -99,7 +105,7 @@ public static class FireParticles
                 PositionF at = Disc(onCore ? Math.Max(coreRadius * 0.8f, 0.6f) : HullRadius, h.A, h.B);
                 float rise = (3f + (3f * h.D)) * (0.7f + (0.6f * level));
                 float drift = (h.B - 0.5f) * 1.5f * t;
-                float swirl = 0.4f * MathF.Sin(MathF.Tau * ((2.25f * t) + h.C)) * Math.Min(t * 3f, 1f);
+                float swirl = 0.4f * MathF.Sin(MathF.Tau * ((2.25f * t) + h.Swirl)) * Math.Min(t * 3f, 1f);
                 return new PositionF(at.X + drift + swirl, at.Y - (rise * t) - (0.5f * FlameBuoyancy * t * t));
             }
             case FireParticleKind.Spark:
@@ -109,7 +115,7 @@ public static class FireParticles
                 float speed = 0.75f + (0.5f * level);
                 float vx = (h.B - 0.5f) * 7f * speed, vy = -(5f + (7f * h.D)) * speed;
                 float slowed = (1f - MathF.Exp(-SparkDrag * t)) / SparkDrag;
-                float jink = 0.5f * MathF.Sin(MathF.Tau * ((3f * t) + h.C)) * Math.Min(t * 2f, 1f);
+                float jink = 0.5f * MathF.Sin(MathF.Tau * ((3f * t) + h.Swirl)) * Math.Min(t * 2f, 1f);
                 return new PositionF(at.X + (vx * slowed) + jink, at.Y + (vy * slowed) - (3f * t));
             }
             case FireParticleKind.Cinder:
@@ -123,8 +129,7 @@ public static class FireParticles
             default:
             {
                 // Smoke: rises above the hull and spreads as it goes.
-                float age = t / SmokeLifeSeconds;
-                return new PositionF(((h.A - 0.5f) * 2f) + ((h.B - 0.5f) * 2.5f * age), -0.5f - (4f * t));
+                return new PositionF(((h.A - 0.5f) * 2f) + ((h.B - 0.5f) * 1.4f * t), -0.5f - (4f * t));
             }
         }
     }

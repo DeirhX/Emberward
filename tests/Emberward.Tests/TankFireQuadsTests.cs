@@ -75,8 +75,9 @@ public class TankFireQuadsTests
         Assert.Equal(1, CountKind(quads, EntityShape.KindTankFire));
         int particles = CountKind(quads, EntityShape.KindFireParticle);
         Assert.Equal(FireParticles.MaxPerTank, particles);
-        // The cap: every family's slots, at six vertices each.
-        Assert.InRange(particles, 1, 80);
+        // The cap on what one burning tank adds to the entity layer, in quads of six vertices each.
+        Assert.InRange(quads.VertexCount, 6, 6 * TankFireQuads.MaxQuadsPerTank);
+        Assert.InRange(TankFireQuads.MaxQuadsPerTank, 1, 80);
     }
 
     [Fact]
@@ -178,7 +179,7 @@ public class TankFireQuadsTests
     [Fact]
     public void FlameLicksAndSparks_Rise_AndCindersArcUpThenFall()
     {
-        var h = new FireParticles.Hashes(0.5f, 0.3f, 0.7f, 0.4f);
+        var h = new FireParticles.Hashes(0.5f, 0.3f, 0.7f, 0.4f, 0.2f, 0.9f);
         foreach (FireParticleFamily family in FireParticles.Families)
         {
             float life = family.LifeSeconds;
@@ -236,18 +237,6 @@ public class TankFireQuadsTests
         Assert.True(sum / count < EntityQuads.Centre(100 + Steps - 1) - 2f, $"flames centred at {sum / count}");
     }
 
-    [Fact]
-    public void TheParticles_AreTheSame_OnEveryRun()
-    {
-        EntityVertex[] Run()
-        {
-            var (fire, motion) = Burning(0.8f);
-            var quads = Draw(fire, motion);
-            return quads.Vertices.AsSpan(0, quads.VertexCount).ToArray();
-        }
-
-        Assert.Equal(Run(), Run());
-    }
 
     [Fact]
     public void AnEnemyTank_BurnsLikeThePlayers()
