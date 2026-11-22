@@ -329,9 +329,10 @@ public class TankFireCoreTests
 
         var (fire, motion) = Died(1);
         var quads = Draw(fire, motion);
-        // The flames and the light pool are still there, easing out; the core has become the death glow.
-        EntityVertex flames = Quads(quads, EntityShape.KindTankFire).Single(v => v.P0 > 0f);
-        Assert.Equal(0f, flames.G);
+        // The light pool is still there, easing out; the core has become the death glow, and no soot is drawn over it
+        // (it darkened the flare's middle).
+        Assert.Single(Quads(quads, EntityShape.KindTankFire));
+        Assert.Equal(0f, DeathQuad(quads).P0);
         Assert.InRange(fire.DrawnLevel(0), 0.8f * levelBefore, levelBefore);
         Assert.Equal(2, Quads(quads, EntityShape.KindTankFireLight).Count);
         // The smoke and embers already in the air stay (a step's worth of births fewer at most).

@@ -258,22 +258,26 @@ public sealed class TankFireQuads
         {
             float level = _levels[i];
             float heading = motion.HullHeading(i);
+            bool drawn = IsDrawn(tanks[i], level, vision);
+            var (start, drift) = motion.TankMotion(i);
+            if (drawn)
+            {
+                for (int f = 0; f < FireParticles.UnderCore; f++)
+                    EmitParticles(quads, vision, i, level, clock, start, drift, families[f]);
+            }
+            // A dying core's glow goes over the smoke still rising from it, lighting it, rather than under it, where
+            // the grey puffs read as a dark hole in the flare.
             EmitDeath(quads, vision, i, tanks[i].IsDead ? heading : float.NaN, clock, t, scale);
-            if (!IsDrawn(tanks[i], level, vision))
+            if (!drawn)
                 continue;
 
-            var (start, drift) = motion.TankMotion(i);
-            for (int f = 0; f < FireParticles.UnderCore; f++)
-                EmitParticles(quads, vision, i, level, clock, start, drift, families[f]);
-
-            if (!quads.IsOffScreen(quads.ScreenX(start.X), quads.ScreenY(start.Y), 9f * scale))
+            // A dead tank's core is the death glow now, and its hull is gone: no soot is left to darken the flare.
+            if (!tanks[i].IsDead && !quads.IsOffScreen(quads.ScreenX(start.X), quads.ScreenY(start.Y), 9f * scale))
             {
                 // The core's glow reaches 6 cells round it, and a sagging core's drips run further down the screen.
                 float below = _hull[i] < SagHullFraction ? 8f : 6.5f;
-                // A dead tank's core is the death glow now; its soot dies down here.
-                float core = tanks[i].IsDead ? 0f : CoreGlow(i);
                 quads.Add(EntityQuads.Centre(start.X), EntityQuads.Centre(start.Y), 1f, 0f, -6.5f, 6.5f, -6.5f, below,
-                    _hull[i], core, FireOnset.Soot(level), EntityShape.KindTankFire, FireOnset.Flames(level), t,
+                    _hull[i], CoreGlow(i), FireOnset.Soot(level), EntityShape.KindTankFire, FireOnset.Flames(level), t,
                     Seed(i), heading, drift);
             }
 

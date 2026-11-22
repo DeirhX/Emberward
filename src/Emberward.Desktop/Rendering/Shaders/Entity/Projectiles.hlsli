@@ -11,7 +11,8 @@
 #include "Common.hlsli"
 
 // A glowing shot: white-hot head, a tail that cools from yellow to the shot's
-// colour, and an additive halo around both.
+// colour, and an additive halo around both. params.z (0..1) softens the head from a
+// crisp disc (a bullet) to a gaussian ember with no edge (shrapnel).
 float4 HotShot(float2 p, float3 body, float4 params, float aa)
 {
     float trail = max(params.x, 0.01);
@@ -20,7 +21,10 @@ float4 HotShot(float2 p, float3 body, float4 params, float aa)
     float along = saturate(1.0 + p.x / trail);                 // 0 at the tail, 1 at the head
     float taper = lerp(0.35, 1.0, along);
 
-    float core = FillAlpha(dist - radius * taper, aa) * lerp(0.25, 1.0, along);
+    float crisp = FillAlpha(dist - radius * taper, aa);
+    float spread = dist / max(radius * taper, aa);
+    float soft = exp(-1.4 * spread * spread);
+    float core = lerp(crisp, soft, saturate(params.z)) * lerp(0.25, 1.0, along);
     float3 coreColor = lerp(body, float3(1.0, 0.86, 0.42), along);
     coreColor = lerp(coreColor, float3(1.0, 0.98, 0.90), smoothstep(0.75, 1.0, along));
 
