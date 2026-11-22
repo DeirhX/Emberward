@@ -77,6 +77,8 @@ internal sealed class PerfCaptureSession
             $"p50={p50:F3}ms p95={p95:F3}ms p99={p99:F3}ms min={min:F3}ms max={max:F3}ms");
         // The frame time above includes waiting on the display. These say where: the GPU's own time is what the
         // shaders cost, and a long swapchain wait or submit with a short GPU time is the OS holding presents back.
+        // Waiting for the GPU every frame stops the CPU queueing the next one meanwhile, so a GPU-bound frame time reads
+        // higher here than in play, and higher than captures made before the split.
         ReportPart("swapchainWait", _swapchainWaitMs);
         ReportPart("submit", _submitMs);
         ReportPart("gpu", _gpuMs);

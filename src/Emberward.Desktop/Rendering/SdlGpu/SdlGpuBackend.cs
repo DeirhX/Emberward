@@ -130,7 +130,8 @@ public sealed unsafe partial class SdlGpuBackend : IGameRenderBackend
         {
             if (SupportsUi)
                 ImGui.Render();
-            _ = SubmitFrame(screenshotPath: null);
+            // Nothing to present, but a capture still reads this frame's timing, not the last one's.
+            LastFrameTiming = new RenderTiming(0, 0, SubmitFrame(screenshotPath: null));
             return;
         }
 
@@ -205,7 +206,10 @@ public sealed unsafe partial class SdlGpuBackend : IGameRenderBackend
         return _frameCommandBuffer;
     }
 
-    /// <returns>How long the GPU took after the submit, when this waited for it (<see cref="MeasureGpuTime"/>); else 0.</returns>
+    /// <returns>
+    /// How long the GPU took after the submit, when this waited for it (<see cref="MeasureGpuTime"/>, or a screenshot);
+    /// else 0. A screenshot's readback is not in it.
+    /// </returns>
     private double SubmitFrame(string? screenshotPath)
     {
         nint cmd = _frameCommandBuffer;
@@ -217,25 +221,19 @@ public sealed unsafe partial class SdlGpuBackend : IGameRenderBackend
         }
 
         nint fence = SDL.SubmitGPUCommandBufferAndAcquireFence(cmd);
-        if (screenshotPath == null)
-        {
-            if (fence == nint.Zero)
-                return 0;
-            long gpuStart = Stopwatch.GetTimestamp();
-            SDL.WaitForGPUFences(_device, true, [fence], 1);
-            SDL.ReleaseGPUFence(_device, fence);
-            return Stopwatch.GetElapsedTime(gpuStart).TotalMilliseconds;
-        }
-
         if (fence == nint.Zero)
         {
-            Console.WriteLine($"[Render] Screenshot failed: {screenshotPath} ({SDL.GetError()})");
+            if (screenshotPath != null)
+                Console.WriteLine($"[Render] Screenshot failed: {screenshotPath} ({SDL.GetError()})");
             return 0;
         }
+        long gpuStart = Stopwatch.GetTimestamp();
         SDL.WaitForGPUFences(_device, true, [fence], 1);
+        double gpuMs = Stopwatch.GetElapsedTime(gpuStart).TotalMilliseconds;
         SDL.ReleaseGPUFence(_device, fence);
-        WriteScreenshot(screenshotPath);
-        return 0;
+        if (screenshotPath != null)
+            WriteScreenshot(screenshotPath);
+        return gpuMs;
     }
 
     private void QueueScreenshotDownload(nint cmd)
