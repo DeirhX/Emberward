@@ -771,7 +771,13 @@ and drives up to its core to put it down, as a player must. Hot with
 When the tank dies its hold spills back into the ground as plain ore in the nearest open or dirt cells around the wreck,
 never under another tank or a machine (ore blocks links, so it would cut a relay); what does not fit within a few cells
 is lost. Torching rock no longer yields anything. The MATERIALS panel shows a pile of Pyrite growing inside the
-hold and the exact ore count against capacity. Beneath the hold window it says ORE, CARGO HOT with 20 or more
+hold and two rows under it: HOLD, the ore aboard against capacity, and BASE, the base store (which every relay
+shares) with how fast it has grown over the last 30 seconds (banked and harvested). Banking is shown where it
+happens: crystals pour from the hold into the core or relay, the core glows with its reactor's heat and pulses as
+they land, a `+N` rises for the player's own side (a rival's pour shows in sight, without numbers), and the nearest
+powered relay carries a BASE STORE label. On the HUD the hold drains and the store counts up over the pour (0.9 s),
+the BASE row flashes gold once, a short cascade of clinks plays once per pour, and the first bank of a match is toasted.
+Beneath the hold window it says ORE, CARGO HOT with 20 or more
 aboard, TO CORE inside the own base with ore aboard (BURN AT CORE while the base is dark; nothing while its store is full), and while the hold empties a blinking UNLOADING with down
 arrows. The base panel also shows the store.
 

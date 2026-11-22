@@ -75,23 +75,31 @@ public sealed record BuildSlotView(
     public static int OrePileFrame(Tank player)
     {
         ArgumentNullException.ThrowIfNull(player);
-        if (player.OreHeld == 0)
+        return OrePileFrame(player.OreHeld, player.OreHoldCapacity);
+    }
+
+    /// <summary>The pile's frame for <paramref name="held"/> units in a hold of <paramref name="capacity"/> (as above).</summary>
+    public static int OrePileFrame(int held, int capacity)
+    {
+        if (held <= 0)
             return -1;
         const int frames = 40;
         // Even the first unit in an upgraded hold shows a stone. Reserve the final pile for a full hold.
-        return player.IsOreHoldFull ? frames - 1 : Math.Clamp((int)MathF.Round(player.HoldFill * frames), 1, frames - 1) - 1;
+        float fill = Math.Clamp(held / (float)Math.Max(1, capacity), 0f, 1f);
+        return held >= capacity ? frames - 1 : Math.Clamp((int)MathF.Round(fill * frames), 1, frames - 1) - 1;
     }
 
     /// <summary>
     /// The line beneath the hold window: the hold emptying into the base; in the base with ore aboard, what touching
     /// the core would do with it (<see cref="Tank.CoreDropOff"/>: bank it, or burn it to restart a dark base; nothing
-    /// is said while the store is full); a load big enough to heat the tank; else a plain label. The base's ore store
-    /// is not here: it only changes at the base and at its machines, and shows on the upgrade panels there.
+    /// is said while the store is full); a load big enough to heat the tank; else a plain label. The base's store has
+    /// its own row (<see cref="MaterialsView"/>). <paramref name="pouring"/> holds UNLOADING for the length of the pour
+    /// the HUD stretches a deposit over (<see cref="OreLedgerView.IsPouring"/>).
     /// </summary>
-    public static string OreLine(Tank player)
+    public static string OreLine(Tank player, bool pouring = false)
     {
         ArgumentNullException.ThrowIfNull(player);
-        if (player.IsUnloadingOre)
+        if (player.IsUnloadingOre || pouring)
             return "UNLOADING";
         if (player.OreHeld > 0 && player.CoreDropOff == CoreDropOff.Banks)
             return "TO CORE";

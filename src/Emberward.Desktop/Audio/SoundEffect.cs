@@ -31,4 +31,5 @@ public enum SoundEffect
     ShieldHit,
     ShieldBreak,
     FireLoop,
+    Deposit,
 }

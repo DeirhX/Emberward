@@ -153,6 +153,7 @@ public partial class Game
                         gameTextureSize.Y,
                         player,
                         _world,
+                        _entityLayer.OreLedger,
                         dt,
                         _commandController.ShowHeatDebugOverlay,
                         _commandController.EnabledPostPasses,

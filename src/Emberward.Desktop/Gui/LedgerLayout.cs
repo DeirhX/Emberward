@@ -24,6 +24,21 @@ public static class LedgerLayout
     /// <summary>The share of a text size its capitals and digits stand (a little over most fonts', to be safe).</summary>
     public const float InkHeight = 0.75f;
 
+    /// <summary>The MATERIALS readout plate's inside (art pixels), 20 high where SHIELD/HULL's is 24.</summary>
+    public const float MaterialsPlateTop = 174f, MaterialsPlateBottom = 194f;
+
+    /// <summary>The MATERIALS rows' text lines, HOLD above BASE. They carry no bars (the pile shows the hold).</summary>
+    public const float HoldRowY = 179.2f, BaseRowY = 189f;
+
+    /// <summary>The MATERIALS rows' columns, relative to the panel's left edge: labels, the rate after BASE, numbers.</summary>
+    public const float MaterialsLeft = 35f, MaterialsRateX = 72f, MaterialsRight = 205f;
+
+    /// <summary>Where a deposit's rising <c>+N</c> is centred, between the labels and the numbers.</summary>
+    public const float MaterialsDeltaX = 130f;
+
+    /// <summary>The rate's text size, smaller than the numbers.</summary>
+    public const float RateSize = 9f;
+
     /// <summary>The top and bottom of a row's number ink (the taller of its label and number).</summary>
     public static (float Top, float Bottom) Text(float rowY) =>
         (rowY - (NumberSize * InkHeight * 0.5f), rowY + (NumberSize * InkHeight * 0.5f));

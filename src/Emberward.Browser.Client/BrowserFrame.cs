@@ -2,6 +2,7 @@ namespace Emberward.Browser.Client;
 
 using System.Text.Json.Serialization;
 using Emberward.Core.Types;
+using Emberward.Desktop.Gui;
 
 /// <param name="Dial">The heat dial's colours, with a match's first frame only; null after it.</param>
 /// <param name="Net">The network match (<see cref="BrowserNetMatch"/>); null in a local one.</param>
@@ -57,6 +58,7 @@ public sealed record HeatDial(string[] Bands, float Ambient, float Safe, float M
 /// <param name="OrePileFrame">The hold's sprite frame, or -1 when empty (<c>BuildSlotView.OrePileFrame</c>).</param>
 /// <param name="OreLine">The line beneath the hold window (<c>BuildSlotView.OreLine</c>).</param>
 /// <param name="Plate">What the SHIELD/HULL plate shows.</param>
+/// <param name="Materials">What the MATERIALS plate shows: HOLD and BASE rows, a deposit's pour (<c>MaterialsView</c>).</param>
 public sealed record PlayerStatus(
     Position Position, Position Home, float Heat, float HeatLimit, float HeatGauge, string HeatColor,
     float HitFlash, float HitFromX, float HitFromY, float Hull, bool ShieldActive, float ShieldFill, bool ShieldLow, float FireLevel,
@@ -64,7 +66,7 @@ public sealed record PlayerStatus(
     bool Docked, bool OffNetwork, float SafeSeconds, bool Dead, double RespawnSeconds, bool CanRecall,
     string Outcome, string? Carrying, bool BaseDestroyed,
     int Health, float Frozen, float Boil, bool Burning, bool HullLow, bool HitFresh, int OrePileFrame,
-    bool Unloading, bool HoldFull, bool OffNetworkUrgent, string OreLine, HullPlate Plate);
+    bool Unloading, bool HoldFull, bool OffNetworkUrgent, string OreLine, HullPlate Plate, MaterialsView Materials);
 
 /// <summary>What the desktop's SHIELD/HULL plate shows (<c>HudStrip</c>, <c>LiquidGauges</c>); colours as #rrggbb.</summary>
 /// <param name="Word">The status word (<c>HullStatuses</c>), in <paramref name="WordColor"/>, alternating four times a

@@ -200,6 +200,18 @@ public class BrowserSessionArtStripTests
         Assert.Equal(19, BrowserFrameBuilder.Capture(session, includeEvents: false).Player.OrePileFrame);
         player.Hold.Add(player.OreHoldCapacity);
         Assert.Equal(39, BrowserFrameBuilder.Capture(session, includeEvents: false).Player.OrePileFrame);
+
+        // The MATERIALS rows, as the desktop's HudStrip draws them (MaterialsView).
+        var materials = BrowserFrameBuilder.Capture(session, includeEvents: false).Player.Materials;
+        Assert.Equal(MaterialsView.Of(player, session.Scene.OreLedger), materials);
+        Assert.Equal($"{player.OreHoldCapacity} / {player.OreHoldCapacity}", materials.HoldText);
+        Assert.Equal(player.Base!.Store.Ore.ToString("N0", System.Globalization.CultureInfo.InvariantCulture), materials.BaseText);
+        string json = System.Text.Json.JsonSerializer.Serialize(BrowserFrameBuilder.Capture(session, includeEvents: false),
+            BrowserJsonContext.Default.BrowserFrame);
+        using var parsed = System.Text.Json.JsonDocument.Parse(json);
+        var m = parsed.RootElement.GetProperty("player").GetProperty("materials");
+        foreach (string field in new[] { "holdText", "holdFull", "baseText", "rateText", "flash", "deltaText", "deltaRise", "deltaAlpha", "pileFrame", "oreLine", "unloading" })
+            Assert.True(m.TryGetProperty(field, out _), $"strip.js reads materials.{field}");
     }
 
 }

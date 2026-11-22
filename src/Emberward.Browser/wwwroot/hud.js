@@ -64,7 +64,9 @@ export class StatusView {
             $("position"),
             `X ${p.position.x} / Y ${p.position.y} · WORLD ${f.seed}`,
         );
-        setText($("ore"), `${p.ore}/${p.holdCapacity} ORE`);
+        // The hold, and under it the base store every relay shares (MaterialsView), with how fast it grows.
+        const m = p.materials;
+        setText($("ore"), `${m.holdText.replace(" / ", "/")} ORE · BASE ${m.baseText}${m.rateText ? " " + m.rateText : ""}`);
         const pile = $("ore-pile");
         setHidden(pile, p.orePileFrame < 0);
         if (p.orePileFrame >= 0) {

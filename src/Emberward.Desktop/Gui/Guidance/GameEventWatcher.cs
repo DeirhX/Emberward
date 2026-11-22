@@ -44,6 +44,12 @@ public sealed class GameEventWatcher
     private bool _baseShieldBroken;
     private bool _baseCoreHit;
     private bool _baseDestroyed;
+    private bool _depositTold;
+    private int _depositUnits;
+    private int _stepsSinceDeposit;
+
+    /// <summary>Steps without a deposit after which the player's first bank counts as done and is told.</summary>
+    private const int DepositSettleSteps = 6;
 
     /// <summary>When the player's base last took enemy fire, in HUD seconds; negative before the first hit.</summary>
     public float LastBaseHitTime { get; private set; } = -1e9f;
@@ -71,6 +77,8 @@ public sealed class GameEventWatcher
         _nestExplained = false;
         _nestsWoke.Clear();
         _nestsStarved.Clear();
+        _depositTold = false;
+        _depositUnits = 0;
     }
 
     /// <summary>
@@ -79,10 +87,16 @@ public sealed class GameEventWatcher
     /// </summary>
     public void AfterStep(World world, Tank player)
     {
+        _stepsSinceDeposit++;
         foreach (ref readonly StepEvent e in world.StepEvents)
         {
             if (e.Kind == StepEventKind.OreHarvested && e.Color == player.Color)
                 _harvestedSinceReport += e.Count;
+            else if (e.Kind == StepEventKind.OreUnloaded && e.Color == player.Color && !_depositTold)
+            {
+                _depositUnits += e.Count;
+                _stepsSinceDeposit = 0;
+            }
             else if (e.Color == player.Color && e.Kind is StepEventKind.BaseDamaged or StepEventKind.BaseDestroyed or StepEventKind.BaseShieldHit
                 or StepEventKind.BaseShieldBroken)
             {
@@ -127,6 +141,16 @@ public sealed class GameEventWatcher
         CoreTap? core = world.CoreTapOf(home);
         bool tappingCore = core?.TapPerSecond > 1.0;
         bool meetingGoal = core?.IsMeetingGoal == true;
+
+        // The first pyrite the player banks this match, once the bank is done: what the store is for.
+        if (!_depositTold && _depositUnits > 0 && _stepsSinceDeposit > DepositSettleSteps)
+        {
+            _depositTold = true;
+            feed.Post(now, "first-deposit", string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                    $"Pyrite banked: +{_depositUnits} (base {store})"),
+                "The base store pays for what you build inside the network. Touch the core or a powered relay to unload.",
+                NotificationKind.Good, cooldown: 1e9f);
+        }
 
         if (_baseHits > 0)
         {

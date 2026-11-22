@@ -51,6 +51,7 @@ public static class BrowserFrameBuilder
                 tap.HoldSeconds, Tweaks.Goal.GoalHoldSeconds, tap.HasTapped) : null;
         var (hitFromX, hitFromY) = HitFrom(player);
         var shield = world.TankShieldOf(player);
+        var materials = MaterialsView.Of(player, session.Scene.OreLedger);
         var status = new PlayerStatus(player.Position, home.Position, player.Heat, Tank.HeatBudgetCapacity,
             HeatScale.Fraction(player.Heat), HexColor(HeatScale.ColorRgb(player.Heat)),
             player.IsDead ? 0f : player.HitFlashTicks / (float)Tank.HitFlashDuration, hitFromX, hitFromY,
@@ -60,8 +61,8 @@ public static class BrowserFrameBuilder
             world.MatchOutcomeFor(player).ToString(), player.CarriedMachineType?.ToString(), home.IsDestroyed,
             Math.Max(0, player.Reactor.Health), HeatScale.Frozen(player.Heat), HeatScale.Boil(player.Heat),
             player.IsOverheating || player.IsAboveSafeHeat, player.IsHullLow(latched: false),
-            player.HitFlashTicks > Tank.HitFlashDuration - HitFreshTicks, BuildSlotView.OrePileFrame(player), player.IsUnloadingOre,
-            player.IsOreHoldFull, player.IsOffNetworkUrgent, BuildSlotView.OreLine(player), Plate(player, shield));
+            player.HitFlashTicks > Tank.HitFlashDuration - HitFreshTicks, materials.PileFrame, materials.Unloading,
+            player.IsOreHoldFull, player.IsOffNetworkUrgent, materials.OreLine, Plate(player, shield), materials);
         return new BrowserFrame(session.Seed, world.AdvanceCount, Tweaks.Perf.TargetFps, status,
             session.Sounds.Frame(takePlays: includeEvents), builds, upgrades, preview, goal, Guidance(session.Guidance),
             includeDial ? Dial() : null, net?.Status(), BasePower(world, player), MachineUpgrade(session),

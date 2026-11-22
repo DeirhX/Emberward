@@ -30,7 +30,7 @@ const HEADROOM = 44;
 // HudStrip.cs: the plates' centres, title rows and readout rows.
 const TEMP = { x: HEAT_X + 170, title: 151.5, readout: 179, right: HEAT_X + 239 },
     SHIELD = { x: SHIELD_X + 80.5, title: 153.5, readout: 180 },
-    MATERIALS = { x: MATERIALS_X + 120, title: 154, readout: 184 };
+    MATERIALS = { x: MATERIALS_X + 120, title: 154 };
 // HudStrip.DrawLedger: SHIELD above HULL in the readout plate, a label left, a number right, a hairline bar under each.
 // LedgerLayout.cs: the SHIELD/HULL rows, laid out so no number, bar or outline overlaps another or leaves the plate.
 const LEDGER = {
@@ -42,6 +42,16 @@ const SHIELD_CYAN = 0xffffe0a0,
     SHIELD_SLATE = 0xff997f5f,
     HULL_NEUTRAL = 0xff70b8ff;
 const ORE_LINE = { x: MATERIALS_X + 122, y: 133, size: 15 };
+// LedgerLayout.cs and HudStrip.DrawMaterials: the MATERIALS plate's HOLD and BASE rows (no bars), the rate after BASE.
+const MATERIALS_LEDGER = {
+    left: MATERIALS_X + 35, rateX: MATERIALS_X + 72, right: MATERIALS_X + 205, deltaX: MATERIALS_X + 130, holdY: 179.2, baseY: 189,
+    label: 10, number: 11, rate: 9,
+};
+// HudStrip's MATERIALS colours (ABGR): labels, rate, the store and its deposit flash.
+const MATERIALS_LABEL = 0xff9ac8e8,
+    MATERIALS_RATE = 0xff5aa0c8,
+    STORE_COLOR = 0xffb8f0ff,
+    STORE_FLASH = 0xff40c4ff;
 
 // HeatGauge.cs
 const ORB = { x: HEAT_X + 168, y: 72, r: 47 };
@@ -264,7 +274,7 @@ export class StripView {
             const column = p.orePileFrame % 8, row = Math.floor(p.orePileFrame / 8);
             left.drawImage(this.art.orePile, column * 288, row * 120, 288, 120, MATERIALS_X + 51, 48, 144, 60);
         }
-        readout(`${p.ore} / ${p.holdCapacity}`, MATERIALS);
+        drawMaterials(left, p.materials);
 
         const oreColor = p.unloading ? 0xff60ff90 : p.holdFull ? 0xff2880ff : 0xff78e6ff;
         stripText(left, p.oreLine, ORE_LINE.x, ORE_LINE.y, ORE_LINE.size, abgr(oreColor), abgr(0x2840b0ff));
@@ -674,6 +684,37 @@ function stripText(ctx, text, cx, cy, size, color, glow, align = "center") {
     ctx.fillStyle = color;
     ctx.fillText(text, cx, y);
     ctx.fillText(text, cx + 0.6, y);
+}
+
+// HudStrip.DrawMaterials: HOLD above BASE, a label left and a number right; the store flashes gold as a deposit lands,
+// its rate after the label, and the deposit's +N rising out of the row.
+function drawMaterials(ctx, m) {
+    const L = MATERIALS_LEDGER;
+    stripText(ctx, "HOLD", L.left, L.holdY, L.label, abgr(MATERIALS_LABEL), null, "left");
+    stripText(ctx, m.holdText, L.right, L.holdY, L.number, abgr(m.holdFull ? 0xff2880ff : 0xffaafacd), null, "right");
+    stripText(ctx, "BASE", L.left, L.baseY, L.label, abgr(MATERIALS_LABEL), null, "left");
+    if (m.rateText) stripText(ctx, m.rateText, L.rateX, L.baseY, L.rate, abgr(MATERIALS_RATE), null, "left");
+    const store = lerpAbgr(STORE_COLOR, STORE_FLASH, m.flash);
+    const glow = m.flash > 0 ? withAlpha(STORE_FLASH, 0.3 * m.flash) : null;
+    stripText(ctx, m.baseText, L.right, L.baseY, L.number, abgr(store), glow, "right");
+    if (m.deltaText)
+        stripText(ctx, m.deltaText, L.deltaX, L.baseY - 2 - 14 * m.deltaRise, L.number, withAlpha(STORE_FLASH, m.deltaAlpha), null);
+}
+
+// HudPalette.Lerp: channel by channel between two ABGR colours.
+function lerpAbgr(a, b, t) {
+    const k = Math.min(1, Math.max(0, t));
+    let out = 0;
+    for (let shift = 0; shift < 32; shift += 8) {
+        const ca = (a >>> shift) & 0xff, cb = (b >>> shift) & 0xff;
+        out |= Math.round(ca + (cb - ca) * k) << shift;
+    }
+    return out >>> 0;
+}
+
+// An ABGR colour with its alpha set to `alpha` (0 to 1), as CSS.
+function withAlpha(color, alpha) {
+    return abgr(((color & 0x00ffffff) | (Math.round(Math.min(1, Math.max(0, alpha)) * 255) << 24)) >>> 0);
 }
 
 // HudStrip.DrawLedgerRow: a label left, a number right, and a hairline bar beneath, filled `fill` of the way.
