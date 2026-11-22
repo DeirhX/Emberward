@@ -218,7 +218,8 @@ The tank lives in a band around 0. Both ends hurt, and the world has places at b
   same third of a second, and the particles already in the air live out their lives. It crackles, fading in as it catches, higher as
   it grows and sizzling higher still once the core sags; the HUD's hull number eases from its neutral colour onto the
   heat ramp between 75% and 60%, and the HUD's
-  crystal shows the shield, the number under it the hull, and the plate names the worst state: SLAG, MELTING (under
+  crystal shows the shield, the line under it both numbers (`SHIELD 400 | 1000 HULL`, each half with its bar), and the
+  plate names the worst state: SLAG, MELTING (under
   5%), HULL BREACH while it burns, except that an empty shield on a hull only just alight (fire level up to 0.2)
   still reads SHIELD DOWN, then SHIELD DOWN and SHIELDED.
   **A tank's shield is seen only while it blocks hits.** A hit brings up a translucent plastic dome of swirling blue
@@ -429,12 +430,19 @@ A base must not fall to a tank that drives up and shoots it. It is a keep (`Base
   core through an open gate or from the courtyard. Only a destroyed base ends a side; there are no lives. Relays cost 4
   ore, so a cut has to cost the defender time (relink, dearer links), or rebuilding makes attacks pointless.
 - **The bot** (`BotSiege`) shoots a shut gate, fires at the core through it once it opens, and drives in to a
-  corner when it has no shot from outside. It lays siege only to a base it can break (`World.CanBreakBase`: what its
-  gun fires in 60 seconds against the shield, the shield the store can buy back in that time, and the core with its
-  repairs), so a lone bot leaves a sound keep alone and goes for a worn, dark or unshielded one; a base it can break
-  it roams round until its 240-second opening grace is over. While its enemy sits docked in a base it cannot break it
-  waits 12 cells out from the wall beside the nearest gate, out of the straight line of fire through it, fire held
-  (`BotLoiter`). It stops waiting and fights while it sees the enemy, or for 5 seconds after it is hit. A bot that
+  corner when it has no shot from outside. It lays siege only to a base it can break (`World.CanBreakBase` plays the
+  siege forward a second at a time: its gun for up to 60 seconds, or until its off-network clock (run first for the
+  drive there, counted at open-ground pace) would send it home,
+  against the shield, the shield the store can buy back while its reactor has room for the heat, gates that shut
+  again at a quarter shield, and the core with its repairs while it is damaged), so a lone bot leaves a sound keep
+  alone and goes for a worn, dark or unshielded one; a base it can break it roams round until its 240-second opening
+  grace is over. Once it has decided it can break a base it holds to that while fire 15 % stronger still would, so a
+  store at the edge does not flip it every tick. While its enemy sits docked in a base it cannot break it waits 12
+  cells out from the wall beside the nearest gate, out of the straight line of fire through it, fire held even to
+  torch (`BotLoiter`); a post in rock or a wall is passed over, and a bot that gets no nearer its post for 15 seconds
+  gives up waiting for 20 (a hit meanwhile does not shorten that); a manoeuvre begun while roaming ends when it starts
+  waiting. It stops waiting and fights while it sees the enemy, or for 5 seconds after it is hit. An
+  enemy at the bot's own base is fought before a nearer one docked at home. A bot that
   stays within 10 cells of one spot for 10 seconds while trying to get somewhere drops its goal for a detour
   (`BotStuckWatch`).
 - *Still open:* the numbers are untested in play; a turret covers a gate from inside its 24 cells, which may make a
@@ -630,10 +638,10 @@ Pyrite pockets and lumps at least 60 cells from every base hold a nest (a pocket
 60 by size); specks hold none. Heat is the noise a tank makes and the fight makes heat:
 
 - *Scout.* A guarded deposit shows resting embers on the ore, and the radar returns a life echo from the nest's centre
-  and from each creature out where it is. Once a side has discovered a nest (seen its centre; the radar's echo alone does not
-  discover it), a thin pink danger ring is drawn over it, a small mark around the nest's ground, titled "EMBERITE NEST" over "DANGER: EMBERITES". It is
+  and from each creature out where it is. Once a side has discovered a nest (seen any of its ground: a lump's centre lies deeper in the ore than
+  sight reaches, so the face of the deposit is enough; the radar's echo alone does not discover it), a thin pink danger ring is drawn over it, a small mark around the nest's ground, titled "EMBERITE NEST" over "DANGER: EMBERITES". It is
   faint while the nest sleeps, full once it is awake, and pulses while its creatures are out; a cleared nest has
-  none. The ring shows the nest as the side last saw it (its centre in sight): out of sight, a
+  none. The ring shows the nest as the side last saw it (some of its ground in sight): out of sight, a
   nest that wakes or is cleared keeps its old ring, as remembered ground keeps its old look. The ring marks the nest, not
   how far it senses (a hunt starts from 40 to 110 cells by heat and a nest follows a tank much farther, up to 220 cells by heat), so
   the pulse says it is hunting. A nest the player has seen cleared loses its ring for good. Rock

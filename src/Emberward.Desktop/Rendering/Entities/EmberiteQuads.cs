@@ -7,7 +7,9 @@ using Emberward.Core.Types;
 
 /// <summary>
 /// The emberites: one quad per creature out of its nest (drawn along its velocity, like a shot), and a quad of
-/// resting embers over each nest that has creatures in it, flaring while the nest stirs. Only what the player's sight covers is drawn.
+/// resting embers over each nest that has creatures in it, flaring while the nest stirs. Only what the player's sight covers is drawn:
+/// a nest once any of its ground is in sight, as <see cref="NestDiscovery"/> finds it, since its centre may lie deeper in the
+/// deposit than sight reaches.
 /// </summary>
 public sealed class EmberiteQuads
 {
@@ -52,7 +54,7 @@ public sealed class EmberiteQuads
         for (int i = 0; i < _nestCount; i++)
         {
             ref readonly NestRenderState nest = ref _nests[i];
-            if (nest.IsCleared || nest.Occupied == 0 || !Sight.Sees(vision, nest.Centre))
+            if (nest.IsCleared || nest.Occupied == 0 || !Sight.SeesAny(vision, nest.Centre, nest.Radius))
                 continue;
             float extent = nest.Radius * 0.6f + 2f;
             if (quads.IsOffScreen(quads.ScreenX(nest.Centre.X), quads.ScreenY(nest.Centre.Y), extent * scale))

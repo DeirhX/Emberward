@@ -184,7 +184,8 @@ public class EmberiteSensingTests
         var (world, player) = Arena(TerrainPixel.Blank);
         player.Position = Centre;
         var near = Centre + new Offset(30, 0);
-        var mid = Centre + new Offset(55, 0);
+        // Its ground (12 cells around it) begins 48 cells off, past sight.
+        var mid = Centre + new Offset(60, 0);
         var far = Centre + new Offset(58, 20);
         world.Emberites!.AddNest(near, radius: 4, creatures: 3);
         world.Emberites.AddNest(mid, radius: 12, creatures: 3); // wide enough for the radar's rays to find
@@ -196,7 +197,7 @@ public class EmberiteSensingTests
         Assert.False(NestAlert.Covers(world, player, mid));
         Assert.False(NestAlert.Covers(world, player, far));
 
-        // With the radar running, the nest 55 cells off shows as a life echo and is covered.
+        // With the radar running, the nest 60 cells off shows as a life echo and is covered.
         world.TrackRadar(player);
         Tick(world, player, 3 * Tweaks.Radar.PulsePeriodTicks, heat: 20f);
         Assert.True(NestAlert.Covers(world, player, mid));

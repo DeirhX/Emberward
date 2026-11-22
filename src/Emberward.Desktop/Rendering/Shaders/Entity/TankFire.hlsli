@@ -237,8 +237,12 @@ float4 FireStreak(float2 p, float age, float strength, float seed, float trail, 
     float heat = saturate(heat0 * (1.05 - age));
     float width = max(radius * lerp(0.4, 1.0, along), aa);
     float x = dist / width;
-    float core = exp(-1.6 * x * x) * lerp(0.2, 1.0, along);
-    float halo = exp(-dist * (2.4 / max(radius, 0.05))) * lerp(0.15, 1.0, along);
+    // As bright as the flat head and shouldered halo it replaced (#110), but soft: the gaussian is as wide across as
+    // that head (its integral matches a disc `width` across), and the halo keeps the old falloff outside half a
+    // radius, eased round the head (a hyperbola, no kink) instead of flat inside it.
+    float core = exp(-0.8 * x * x) * lerp(0.2, 1.0, along);
+    float shoulder = radius * 0.5;
+    float halo = exp(-(sqrt(dist * dist + shoulder * shoulder) - shoulder) * (2.4 / max(radius, 0.05))) * lerp(0.15, 1.0, along);
     float twinkle = 0.7 + 0.3 * sin(age * 53.0 + seed * 6.283185);
     float life = smoothstep(0.0, 0.06, age) * (1.0 - smoothstep(0.75, 1.0, age)) * strength;
     float3 colour = FireRamp(heat * lerp(0.8, 1.0, along));

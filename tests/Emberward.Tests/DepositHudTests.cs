@@ -8,7 +8,7 @@ using Emberward.Desktop.Gui.Guidance;
 namespace Emberward.Tests;
 
 /// <summary>
-/// The deposit on the HUD (docs/pyrite-deposit-feedback-design.md §5, §6): the MATERIALS rows (<see cref="MaterialsView"/>,
+/// The deposit on the HUD (docs/pyrite-deposit-feedback-design.md §5, §6): the MATERIALS line (<see cref="MaterialsView"/>,
 /// <see cref="OreLedgerView"/>), the deposit sound and the first-deposit toast.
 /// </summary>
 public class DepositHudTests
@@ -56,7 +56,7 @@ public class DepositHudTests
     {
         var (s, ledger) = AtCore();
         var idle = MaterialsView.Of(s.Tank, ledger);
-        Assert.Equal("40 / 40", idle.HoldText);
+        Assert.Equal("40", idle.HoldText);
         Assert.True(idle.HoldFull);
         Assert.Null(idle.RateText);
         Assert.Null(idle.DeltaText);
@@ -72,7 +72,7 @@ public class DepositHudTests
 
         Step(s, ledger, MaterialsView.DeltaSteps);
         var after = MaterialsView.Of(s.Tank, ledger);
-        Assert.Equal("0 / 40", after.HoldText);
+        Assert.Equal("0", after.HoldText);
         Assert.Equal(s.Base.Store.Ore.ToString("N0", System.Globalization.CultureInfo.InvariantCulture), after.BaseText);
         Assert.Null(after.DeltaText);
         Assert.Equal(0f, after.Flash);
@@ -90,15 +90,15 @@ public class DepositHudTests
     }
 
     [Fact]
-    public void TheMaterialsRows_NeitherOverlapNorLeaveThePlate()
+    public void TheMaterialsLine_StaysInThePlate()
     {
-        var hold = LedgerLayout.Text(LedgerLayout.HoldRowY);
-        var store = LedgerLayout.Text(LedgerLayout.BaseRowY);
-        Assert.True(hold.Top >= LedgerLayout.MaterialsPlateTop, $"HOLD starts at {hold.Top}, above the plate");
-        Assert.True(store.Top >= hold.Bottom, $"BASE ({store.Top}) overlaps HOLD ({hold.Bottom})");
-        Assert.True(store.Bottom <= LedgerLayout.MaterialsPlateBottom, $"BASE ends at {store.Bottom}, below the plate");
+        var line = LedgerLayout.Text(LedgerLayout.MaterialsLineY);
+        Assert.True(line.Top >= LedgerLayout.MaterialsPlateTop, $"the line starts at {line.Top}, above the plate");
+        Assert.True(line.Bottom <= LedgerLayout.MaterialsPlateBottom, $"the line ends at {line.Bottom}, below the plate");
         Assert.True(LedgerLayout.RateSize <= LedgerLayout.NumberSize);
-        Assert.True(LedgerLayout.MaterialsLeft < LedgerLayout.MaterialsRateX && LedgerLayout.MaterialsRateX < LedgerLayout.MaterialsRight);
+        Assert.True(LedgerLayout.MaterialsLeft < LedgerLayout.MaterialsSplit
+            && LedgerLayout.MaterialsSplit < LedgerLayout.MaterialsRateRight
+            && LedgerLayout.MaterialsRateRight < LedgerLayout.MaterialsRight);
     }
 
     [Fact]
@@ -209,24 +209,25 @@ public class DepositHudTests
     }
 
     /// <summary>
-    /// The two rows fit across the plate: label, rate and number do not run into each other, at a generous width for
-    /// the HUD font (each character at most <c>Advance</c> of the text size).
+    /// HOLD 70 | 99,999 +999/m BASE fits across the plate: the labels, numbers and rate do not run into each other, at
+    /// a generous width for the HUD font (each character at most <c>Advance</c> of the text size; Chakra Petch's
+    /// capitals and digits measure about 0.45).
     /// </summary>
     [Fact]
-    public void TheMaterialsRows_FitAcrossThePlate()
+    public void TheMaterialsLine_FitsAcrossThePlate()
     {
-        const float Advance = 0.62f;
+        const float Advance = 0.5f;
         static float Width(string text, float size) => text.Length * size * Advance;
-        float labelEnd = LedgerLayout.MaterialsLeft + Width("BASE", LedgerLayout.LabelSize);
-        float rateEnd = LedgerLayout.MaterialsRateX + Width("+999/m", LedgerLayout.RateSize);
-        float numberStart = LedgerLayout.MaterialsRight - Width("99,999", LedgerLayout.NumberSize);
-        float holdStart = LedgerLayout.MaterialsRight - Width("70 / 70", LedgerLayout.NumberSize);
-        float deltaHalf = Width("+70", LedgerLayout.NumberSize) * 0.5f;
+        float split = LedgerLayout.MaterialsSplit, gap = LedgerLayout.SplitGap;
+        float holdLabelEnd = LedgerLayout.MaterialsLeft + Width("HOLD", LedgerLayout.LabelSize);
+        float holdStart = split - gap - Width("70", LedgerLayout.NumberSize);
+        float storeEnd = split + gap + Width("99,999", LedgerLayout.NumberSize);
+        float rateStart = LedgerLayout.MaterialsRateRight - Width("+999/m", LedgerLayout.RateSize);
+        float baseLabelStart = LedgerLayout.MaterialsRight - Width("BASE", LedgerLayout.LabelSize);
 
-        Assert.True(labelEnd < LedgerLayout.MaterialsRateX, $"BASE ends at {labelEnd}, past the rate at {LedgerLayout.MaterialsRateX}");
-        Assert.True(rateEnd < numberStart, $"the rate ends at {rateEnd}, past the store's start at {numberStart}");
-        Assert.True(LedgerLayout.MaterialsLeft + Width("HOLD", LedgerLayout.LabelSize) < LedgerLayout.MaterialsDeltaX - deltaHalf);
-        Assert.True(LedgerLayout.MaterialsDeltaX + deltaHalf < holdStart, "the rising +N clears the HOLD number");
+        Assert.True(holdLabelEnd < holdStart, $"HOLD ends at {holdLabelEnd}, past the hold's number at {holdStart}");
+        Assert.True(storeEnd < rateStart, $"the store ends at {storeEnd}, past the rate's start at {rateStart}");
+        Assert.True(LedgerLayout.MaterialsRateRight < baseLabelStart, "the rate ends before BASE");
     }
 
     [Fact]

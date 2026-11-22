@@ -201,4 +201,125 @@ public class NestDangerTests
 
         Assert.Equal(2, Dangers(world, tank).Length);
     }
+    [Fact]
+    public void ANestWhoseCentreIsBuried_IsFound_WhenItsGroundComesIntoSight()
+    {
+        var (world, tank) = Arena();
+        // The centre lies 12 cells into the dirt beyond the pocket's edge, deeper than sight reaches into solid
+        // ground; the nest's ground reaches the pocket.
+        var nest = world.Emberites!.AddNest(Centre + new Offset(24, 0), radius: 14, creatures: 6);
+
+        Tick(world, tank, 2);
+
+        var vision = world.TrackVision(tank);
+        Assert.False(vision.IsVisible(nest.Centre));
+        Assert.True(vision.IsVisible(Centre + new Offset(11, 0)));
+        var danger = Assert.Single(Dangers(world, tank));
+        Assert.Equal(nest.Centre, danger.Centre);
+        Assert.Equal(6, Emitted(world).Rings.Count);
+    }
+
+    /// <summary>
+    /// The report this guards: a tank in a tunnel beside a generated lump sees the lump's face (and the radar's square
+    /// echo of the nest) but not the deposit's first cell, which is the nest's centre, and so never got the ring. The
+    /// tunnel runs just outside the nest's circle (which reaches past the lump's ore), so the ring comes from seeing the
+    /// nest's own solid ground from beside it, not open ground dug into it.
+    /// </summary>
+    [Fact]
+    public void ALumpSeenFromATunnelBesideIt_ShowsItsNestRing()
+    {
+        var world = Emberward.Core.Match.MatchSetup.Build(new Size(320, 200), TestHelpers.DefaultSeed,
+            Emberward.Core.Match.MatchRules.Standard with { Emberites = true, TerrainRegrowth = false });
+        var lump = world.OreDeposits.First(d => d.Kind == Emberward.Core.LevelGen.OreDepositKind.Lump);
+        int nestIndex = Enumerable.Range(0, world.Emberites!.Nests.Count).Single(i => world.Emberites.Nests[i].Centre == lump.Center);
+        var nest = world.Emberites.Nests[nestIndex];
+        // A tunnel seven cells wide running past the lump, its near edge one cell outside the nest's circle.
+        int tunnelY = lump.Center.Y + nest.Radius + 4;
+        for (int x = lump.Center.X - 30; x <= lump.Center.X + 30; x++)
+            for (int y = tunnelY - 3; y <= tunnelY + 3; y++)
+                if (Pixel.IsSoil(world.Terrain.GetPixelRaw(new Position(x, y))))
+                    world.Terrain.SetPixel(new Position(x, y), TerrainPixel.Blank);
+        var tank = world.TankList.Tanks[0];
+        tank.Position = new Position(lump.Center.X, tunnelY);
+        var vision = world.TrackVision(tank);
+
+        Tick(world, tank, 3);
+
+        Assert.False(vision.IsVisible(lump.Center));
+        Assert.True(SolidGroundInSight(world, vision, nest.Centre, nest.Radius), "the tank should see some of the nest's solid ground");
+        Assert.Contains(Dangers(world, tank), d => d.Centre == nest.Centre);
+    }
+
+    /// <summary>Whether a cell within <paramref name="radius"/> of <paramref name="around"/> that is not open ground is in sight.</summary>
+    private static bool SolidGroundInSight(World world, Emberward.Core.Sensing.VisionMap vision, Position around, int radius)
+    {
+        for (int y = -radius; y <= radius; y++)
+            for (int x = -radius; x <= radius; x++)
+            {
+                var cell = around + new Offset(x, y);
+                if (x * x + y * y <= radius * radius && vision.IsVisible(cell) && !Pixel.IsOpenGround(world.Terrain.GetPixelRaw(cell)))
+                    return true;
+            }
+        return false;
+    }
+
+    /// <summary>
+    /// What finding nests costs follows what changes in sight: with a still tank and still ground, a nest out of sight
+    /// costs no cell reads tick after tick, and nor does one in sight.
+    /// </summary>
+    [Fact]
+    public void NestsInAndOutOfSight_CostNoCellReads_WhileVisionStaysAsItIs()
+    {
+        var (world, tank) = Arena();
+        world.Emberites!.AddNest(Centre + new Offset(45, 0), radius: 12, creatures: 6);
+        world.Emberites.AddNest(Centre + new Offset(8, 0), radius: 4, creatures: 6);
+        var vision = world.TrackVision(tank);
+        Tick(world, tank, 3);
+        Assert.Single(Dangers(world, tank));
+
+        long before = vision.AreaCellReads;
+        Tick(world, tank, 60);
+
+        Assert.Equal(before, vision.AreaCellReads);
+        Assert.Single(Dangers(world, tank));
+    }
+
+    /// <summary>The remembered answers are the answers a full look gives, as the tank moves and the ground is dug.</summary>
+    [Fact]
+    public void TheRememberedAreaAnswers_MatchAFullLook()
+    {
+        var (world, tank) = Arena();
+        var vision = world.TrackVision(tank);
+        (Position Centre, int Radius)[] areas = [(Centre + new Offset(20, 0), 4), (Centre + new Offset(30, 5), 9), (Centre + new Offset(-25, -8), 6)];
+        for (int tick = 0; tick < 80; tick++)
+        {
+            tank.Position = Centre + new Offset(tick % 40 - 20, (tick / 40) * 6 - 3);
+            if (tick == 50)
+                for (int x = 12; x <= 40; x++)
+                    for (int y = -2; y <= 2; y++)
+                        world.Terrain.SetPixel(Centre + new Offset(x, y), TerrainPixel.Blank);
+            Tick(world, tank, 1);
+            foreach (var (centre, radius) in areas)
+            {
+                Assert.Equal(FullLook(vision, centre, radius, explored: false), vision.IsAnyVisibleWithin(centre, radius));
+                Assert.Equal(FullLook(vision, centre, radius, explored: true), vision.IsAnyExploredWithin(centre, radius));
+            }
+        }
+    }
+
+    private static bool FullLook(Emberward.Core.Sensing.VisionMap vision, Position centre, int radius, bool explored)
+    {
+        const int stride = Emberward.Core.Sensing.VisionMap.AreaStride;
+        for (int y = centre.Y - radius; y <= centre.Y + radius; y++)
+            for (int x = centre.X - radius; x <= centre.X + radius; x++)
+            {
+                int dx = x - centre.X, dy = y - centre.Y;
+                if (dx % stride != 0 || dy % stride != 0 || dx * dx + dy * dy > radius * radius)
+                    continue;
+                var cell = new Position(x, y);
+                if (explored ? vision.IsExplored(cell) : vision.IsVisible(cell))
+                    return true;
+            }
+        return false;
+    }
 }

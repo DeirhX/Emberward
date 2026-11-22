@@ -201,10 +201,10 @@ public class BrowserSessionArtStripTests
         player.Hold.Add(player.OreHoldCapacity);
         Assert.Equal(39, BrowserFrameBuilder.Capture(session, includeEvents: false).Player.Materials.PileFrame);
 
-        // The MATERIALS rows, as the desktop's HudStrip draws them (MaterialsView).
+        // The MATERIALS line, as the desktop's HudStrip draws them (MaterialsView).
         var materials = BrowserFrameBuilder.Capture(session, includeEvents: false).Player.Materials;
         Assert.Equal(MaterialsView.Of(player, session.Scene.OreLedger), materials);
-        Assert.Equal($"{player.OreHoldCapacity} / {player.OreHoldCapacity}", materials.HoldText);
+        Assert.Equal(player.OreHoldCapacity.ToString(System.Globalization.CultureInfo.InvariantCulture), materials.HoldText);
         Assert.Equal(player.Base!.Store.Ore.ToString("N0", System.Globalization.CultureInfo.InvariantCulture), materials.BaseText);
         string json = System.Text.Json.JsonSerializer.Serialize(BrowserFrameBuilder.Capture(session, includeEvents: false),
             BrowserJsonContext.Default.BrowserFrame);

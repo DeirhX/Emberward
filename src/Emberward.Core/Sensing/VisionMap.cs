@@ -1,5 +1,6 @@
 namespace Emberward.Core.Sensing;
 
+using System.Runtime.InteropServices;
 using Emberward.Core.Config;
 using Emberward.Core.Terrain;
 using Emberward.Core.Types;
@@ -54,6 +55,14 @@ public sealed class VisionMap
 
     private DirtyRect _dirty;
 
+    // For the area questions (a nest's ground): a stamp per tile, raised whenever a cell in it comes into or goes out
+    // of sight, which is also the only time a cell becomes explored. An area whose tiles kept their stamps gives the
+    // answer it gave last time, so an area out of sight costs a look at its tiles, not its cells.
+    private readonly long[] _sightStamp;
+    // Stamps start above zero, so an area first asked about is looked at.
+    private long _lastSightStamp = 1;
+    private readonly Dictionary<(Position Centre, int Radius), AreaMemo> _areaMemo = new();
+
     /// <summary>Starts with nothing seen; <see cref="Known"/> starts as a copy of <paramref name="terrain"/>.</summary>
     public VisionMap(ITerrainPixelReadOnly terrain)
     {
@@ -69,6 +78,7 @@ public sealed class VisionMap
             _blocksSight[i] = Pixel.BlocksLink(pixels[i]);
         _tilesX = (_width + TileSize - 1) / TileSize;
         _eyesByTile = new List<VisionEye>?[_tilesX * ((_height + TileSize - 1) / TileSize)];
+        _sightStamp = new long[_eyesByTile.Length];
     }
 
     public int Width => _width;
@@ -88,6 +98,108 @@ public sealed class VisionMap
 
     public bool IsExplored(Position pos) =>
         (uint)pos.X < (uint)_width && (uint)pos.Y < (uint)_height && _explored[pos.X + pos.Y * _width];
+
+    /// <summary>
+    /// Cells apart that <see cref="IsAnyVisibleWithin"/> and <see cref="IsAnyExploredWithin"/> look at. Sight comes in
+    /// runs wider than this (a tunnel, and the <see cref="Tweaks.Vision.WallSkin"/> of wall beside it), so a grid this
+    /// fine finds any of it that reaches the circle.
+    /// </summary>
+    public const int AreaStride = 2;
+
+    /// <summary>
+    /// Whether any cell within <paramref name="radius"/> of <paramref name="centre"/> is in sight, looked at on a grid of
+    /// every <see cref="AreaStride"/>th cell through the centre. For what covers ground, such as a nest, whose middle
+    /// may lie deeper in solid ground than sight reaches while its edge is in plain view.
+    /// </summary>
+    /// <remarks>
+    /// Its cost follows what changes: an area none of whose tiles saw a cell come into or go out of sight since it was
+    /// last asked gives the same answer from memory, and one that was in sight looks first at the cell it was last
+    /// seen by. Meant for a few fixed areas (the nests); each one asked is remembered.
+    /// </remarks>
+    public bool IsAnyVisibleWithin(Position centre, int radius)
+    {
+        ref AreaMemo memo = ref MemoOf(centre, radius, out long stamp);
+        if (memo.VisibleStamp == stamp)
+            return memo.Visible;
+        memo.VisibleStamp = stamp;
+        if (memo.VisibleHit >= 0)
+        {
+            AreaCellReads++;
+            if (_level[memo.VisibleHit] != 0)
+                return memo.Visible = true;
+        }
+        memo.VisibleHit = FindWithin(centre, radius, explored: false);
+        return memo.Visible = memo.VisibleHit >= 0;
+    }
+
+    /// <summary>Like <see cref="IsAnyVisibleWithin"/>, for cells that have been in sight at least once (which stay so).</summary>
+    public bool IsAnyExploredWithin(Position centre, int radius)
+    {
+        ref AreaMemo memo = ref MemoOf(centre, radius, out long stamp);
+        if (memo.Explored || memo.ExploredStamp == stamp)
+            return memo.Explored;
+        memo.ExploredStamp = stamp;
+        return memo.Explored = FindWithin(centre, radius, explored: true) >= 0;
+    }
+
+    /// <summary>
+    /// How many cells <see cref="IsAnyVisibleWithin"/> and <see cref="IsAnyExploredWithin"/> have read, all told: the
+    /// measure of what they cost. It stays put while the areas asked about keep out of changing sight.
+    /// </summary>
+    public long AreaCellReads { get; private set; }
+
+    private ref AreaMemo MemoOf(Position centre, int radius, out long stamp)
+    {
+        int minTx = Math.Clamp(centre.X - radius, 0, _width - 1) / TileSize;
+        int maxTx = Math.Clamp(centre.X + radius, 0, _width - 1) / TileSize;
+        int minTy = Math.Clamp(centre.Y - radius, 0, _height - 1) / TileSize;
+        int maxTy = Math.Clamp(centre.Y + radius, 0, _height - 1) / TileSize;
+        stamp = 1;
+        for (int ty = minTy; ty <= maxTy; ty++)
+            for (int tx = minTx; tx <= maxTx; tx++)
+                stamp = Math.Max(stamp, _sightStamp[tx + ty * _tilesX]);
+        ref AreaMemo memo = ref CollectionsMarshal.GetValueRefOrAddDefault(_areaMemo, (centre, radius), out bool existed);
+        if (!existed)
+            memo = new AreaMemo { VisibleHit = -1 };
+        return ref memo;
+    }
+
+    /// <summary>The offset of the first cell on the grid within the circle that is in sight (or explored), or -1.</summary>
+    private int FindWithin(Position centre, int radius, bool explored)
+    {
+        int minY = Math.Max(0, centre.Y - radius), maxY = Math.Min(_height - 1, centre.Y + radius);
+        int minX = Math.Max(0, centre.X - radius), maxX = Math.Min(_width - 1, centre.X + radius);
+        long radiusSq = (long)radius * radius;
+        // On the grid through the centre, so the centre itself is always looked at.
+        int startY = minY + GridOffset(centre.Y - minY), startX = minX + GridOffset(centre.X - minX);
+        for (int y = startY; y <= maxY; y += AreaStride)
+        {
+            long dy = y - centre.Y;
+            for (int x = startX; x <= maxX; x += AreaStride)
+            {
+                long dx = x - centre.X;
+                if (dx * dx + dy * dy > radiusSq)
+                    continue;
+                int offset = x + y * _width;
+                AreaCellReads++;
+                if (explored ? _explored[offset] : _level[offset] != 0)
+                    return offset;
+            }
+        }
+        return -1;
+    }
+
+    /// <summary>What an area question last answered, and at which stamp of its tiles.</summary>
+    private struct AreaMemo
+    {
+        public long VisibleStamp;
+        public bool Visible;
+        public int VisibleHit;
+        public long ExploredStamp;
+        public bool Explored;
+    }
+
+    private static int GridOffset(int distance) => ((distance % AreaStride) + AreaStride) % AreaStride;
 
     /// <summary>
     /// The terrain as this side last saw it: a cell in sight matches the world, a cell out of sight keeps the pixel
@@ -282,6 +394,8 @@ public sealed class VisionMap
 
         _level[offset] = next;
         MarkDirty(x, y);
+        if (level == 0 || next == 0)
+            _sightStamp[x / TileSize + y / TileSize * _tilesX] = ++_lastSightStamp;
         if (level == 0)
         {
             _explored[offset] = true;
