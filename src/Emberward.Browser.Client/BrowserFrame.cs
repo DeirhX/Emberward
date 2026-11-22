@@ -56,7 +56,7 @@ public sealed record HeatDial(string[] Bands, float Ambient, float Safe, float M
 /// <param name="FireLevel">How big the fire on the damaged hull is, 0 to 1 (0: not burning).</param>
 /// <param name="HitFresh">The first frames after a hit, when the shield crystal flashes white.</param>
 /// <param name="Plate">What the SHIELD/HULL plate shows.</param>
-/// <param name="Materials">What the MATERIALS plate shows: HOLD and BASE rows, the hold's pile, the ore line and a
+/// <param name="Materials">What the MATERIALS plate shows: its HOLD and BASE line, the hold's pile, the ore line and a
 /// deposit's pour (<c>MaterialsView</c>).</param>
 public sealed record PlayerStatus(
     Position Position, Position Home, float Heat, float HeatLimit, float HeatGauge, string HeatColor,

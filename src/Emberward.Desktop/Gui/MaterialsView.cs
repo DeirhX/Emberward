@@ -5,16 +5,17 @@ using Emberward.Core.Entities.Tanks;
 
 /// <summary>
 /// What the MATERIALS plate shows (docs/pyrite-deposit-feedback-design.md §5.1), the same on desktop
-/// (<see cref="HudStrip"/>) and in the browser (<c>strip.js</c>, <c>hud.js</c>): two rows, HOLD (the hold against
-/// what it takes) above BASE (the base store, which every relay shares, with how fast it grows), the hold's pile, and
-/// the line beneath the hold window. A deposit is stretched over its pour: the hold drains, the store counts up, the
-/// BASE row flashes gold once and a <c>+N</c> rises out of it.
+/// (<see cref="HudStrip"/>) and in the browser (<c>strip.js</c>, <c>hud.js</c>): one line, HOLD (what the hold
+/// carries; the pile shows how full it is) and BASE (the base store, which every relay shares, with how fast it
+/// grows) with their numbers meeting in the middle, the hold's pile, and the line beneath the hold window. A deposit
+/// is stretched over its pour: the hold drains, the store counts up, the store's number flashes gold once and a
+/// <c>+N</c> rises out of it.
 /// </summary>
-/// <param name="HoldText">The HOLD row's number, <c>23 / 40</c>.</param>
+/// <param name="HoldText">The ore in the hold, <c>23</c>: the amount alone, not the capacity.</param>
 /// <param name="HoldFull">The hold is full: its number turns deep orange.</param>
-/// <param name="BaseText">The BASE row's number, thousands separated.</param>
+/// <param name="BaseText">The base store's number, thousands separated.</param>
 /// <param name="RateText">How fast the store grows, <c>+18/m</c>, or null when it does not.</param>
-/// <param name="Flash">The BASE row's gold flash, 1 as a deposit begins, fading to 0 over its pour.</param>
+/// <param name="Flash">The store number's gold flash, 1 as a deposit begins, fading to 0 over its pour.</param>
 /// <param name="DeltaText">The rising <c>+N</c> of the latest deposit, or null when none shows.</param>
 /// <param name="DeltaRise">How far it has risen, 0 to 1.</param>
 /// <param name="DeltaAlpha">Its opacity, 0 to 1.</param>
@@ -37,11 +38,11 @@ public sealed record MaterialsView(
         int held = Math.Max(player.OreHeld, ledger.DisplayedHold);
         int rate = ledger.RatePerMinute;
         // The +N rises from the deposit's start and stays up while it keeps growing (a relay visit); it fades, and the
-        // row's flash restarts, from its latest growth.
+        // store's flash restarts, from its latest growth.
         long age = ledger.DepositAge, last = ledger.LastDepositAge;
         bool showDelta = ledger.DepositUnits > 0 && last >= 0 && last < DeltaSteps;
         return new MaterialsView(
-            string.Create(inv, $"{held} / {player.OreHoldCapacity}"),
+            held.ToString(inv),
             player.IsOreHoldFull,
             ledger.DisplayedStore.ToString("N0", inv),
             rate > 0 ? string.Create(inv, $"+{rate}/m") : null,

@@ -21,10 +21,14 @@ public sealed class HudStrip
     private const uint ReadoutColor = 0xFFAAFACDu;
     private const float ReadoutSize = 22f;
 
-    // The SHIELD/HULL readout plate holds two stacked rows, SHIELD above HULL, each a label on the left, its number on
-    // the right and a hairline bar under both (art pixels; LedgerLayout places them).
-    private const float LedgerLeft = ShieldX + 19f, LedgerRight = ShieldX + 140f;
+    // The SHIELD/HULL readout plate holds one line, SHIELD 400 | 1000 HULL, with a hairline bar under each half (art
+    // pixels; LedgerLayout places them).
+    private const float LedgerLeft = ShieldX + LedgerLayout.LedgerLeft, LedgerRight = ShieldX + LedgerLayout.LedgerRight;
+    private const float LedgerSplit = ShieldX + LedgerLayout.LedgerSplit;
     private const float StatusWordSize = 17f;
+
+    // The hairline between the two values of a readout line.
+    private const uint SplitColor = 0x60A0B4C8u;
 
     // The ore line, drawn on the narrow plate beneath the hold window (art pixels): the pale gold of the Pyrite in
     // the hold (tools/hud/make_hold_pyrite.py), deep orange once the hold is full, bright green while it unloads.
@@ -32,7 +36,7 @@ public sealed class HudStrip
     private const uint OreLineColor = 0xFF78E6FFu, OreLineFullColor = 0xFF2880FFu, OreLineUnloadColor = 0xFF60FF90u;
     private const uint OreLineGlow = 0x2840B0FFu;
 
-    // The MATERIALS rows: the labels' warm grey, the rate's dim gold, the store's pale gold and its deposit flash.
+    // The MATERIALS line: the labels' warm grey, the rate's dim gold, the store's pale gold and its deposit flash.
     private const uint MaterialsLabelColor = 0xFF9AC8E8u, MaterialsRateColor = 0xFF5AA0C8u;
     private const uint StoreColor = 0xFFB8F0FFu, StoreFlashColor = 0xFF40C4FFu;
 
@@ -115,7 +119,7 @@ public sealed class HudStrip
         _heat.DrawTrend(dl, player, TempPlate.ReadoutRight - 12f, TempPlate.ReadoutY);
         _heat.DrawOffNetworkTag(dl, player, HeatX + HeatPanelW * 0.5f, time, reserve);
 
-        // SHIELD and HULL: two stacked rows, each with its number and a hairline bar.
+        // SHIELD and HULL: one line, the numbers in the middle, a hairline bar under each half.
         DrawLedger(dl, player, shield);
 
         // MATERIALS: the hold and the base store (MaterialsView). The pile is a sheet of 8 x 5 frames drawn by
@@ -174,75 +178,94 @@ public sealed class HudStrip
     }
 
     /// <summary>
-    /// The SHIELD/HULL readout: SHIELD above HULL, a label and a number on each row and a hairline bar under it. The
-    /// shield is cyan, slate once empty; the hull's number and bar take the hotspot ramp's colour
-    /// (<see cref="HudPalette.HullHeat"/>). A match with no shield shows the hull row alone, in the middle of the plate.
-    /// A dead tank's shield is spent too (death resets it to full for the respawn).
+    /// The SHIELD/HULL readout, one line with its numbers in the middle: SHIELD and its number left of the split, HULL
+    /// and its number right of it, and under each half a hairline bar filled from the plate's outer edge. The shield is
+    /// cyan, slate once empty; the hull's number and bar take the hotspot ramp's colour (<see cref="HudPalette.HullHeat"/>).
+    /// A match with no shield shows the hull alone: HULL left, its number centred, its bar across the plate. A dead
+    /// tank's shield is spent too (death resets it to full for the respawn).
     /// </summary>
     private void DrawLedger(ImDrawListPtr dl, Tank player, in TankShieldView shield)
     {
         var inv = System.Globalization.CultureInfo.InvariantCulture;
-        float hullRow = LedgerLayout.HullRowY;
-        if (shield.Active)
-        {
-            int points = player.IsDead ? 0 : Math.Max(0, shield.Shield);
-            float fill = player.IsDead ? 0f : shield.ShieldFill;
-            uint color = points > 0 ? HudPalette.Shield : HudPalette.ShieldEmpty;
-            DrawLedgerRow(dl, LedgerLayout.ShieldRowY, "SHIELD", color, points.ToString(inv), color, fill, color,
-                HudTheme.WithAlphaByte(HudPalette.ShieldEmpty, 0x70));
-        }
-        else
-        {
-            hullRow = LedgerLayout.SoloRowY;
-        }
-
+        float y = LedgerLayout.LineY, gap = LedgerLayout.SplitGap;
         int health = Math.Max(0, player.Reactor.Health);
         float hull = player.IsDead ? 0f : player.HullFraction;
         // A dead hull has cooled to slag; a living one glows on the ramp as it falls.
         uint hullColor = player.IsDead ? HudPalette.TextDim : HudPalette.HullHeat(hull);
-        DrawLedgerRow(dl, hullRow, "HULL", HudPalette.HullNeutral, health.ToString(inv), hullColor, hull, hullColor,
-            HudTheme.WithAlphaByte(HudPalette.HullEmber(HudPalette.HullHeatStart), 0x90), numberGlow: 0x30106AFFu);
+        uint hullTrack = HudTheme.WithAlphaByte(HudPalette.HullEmber(HudPalette.HullHeatStart), 0x90);
+        const uint hullGlow = 0x30106AFFu;
+
+        if (!shield.Active)
+        {
+            DrawStripText(dl, "HULL", LedgerLeft, y, LedgerLayout.LabelSize, HudPalette.HullNeutral, align: 0f);
+            DrawStripText(dl, health.ToString(inv), LedgerSplit, y, LedgerLayout.NumberSize, hullColor, hullGlow);
+            DrawLedgerBar(dl, LedgerLeft, LedgerRight, hull, fromRight: false, hullColor, hullTrack);
+            return;
+        }
+
+        int points = player.IsDead ? 0 : Math.Max(0, shield.Shield);
+        float fill = player.IsDead ? 0f : shield.ShieldFill;
+        uint color = points > 0 ? HudPalette.Shield : HudPalette.ShieldEmpty;
+        DrawStripText(dl, "SHIELD", LedgerLeft, y, LedgerLayout.LabelSize, color, align: 0f);
+        DrawStripText(dl, points.ToString(inv), LedgerSplit - gap, y, LedgerLayout.NumberSize, color, align: 1f);
+        DrawSplit(dl, LedgerSplit, y);
+        DrawStripText(dl, health.ToString(inv), LedgerSplit + gap, y, LedgerLayout.NumberSize, hullColor, hullGlow, align: 0f);
+        DrawStripText(dl, "HULL", LedgerRight, y, LedgerLayout.LabelSize, HudPalette.HullNeutral, align: 1f);
+
+        float barGap = LedgerLayout.BarGap;
+        DrawLedgerBar(dl, LedgerLeft, LedgerSplit - barGap, fill, fromRight: false, color,
+            HudTheme.WithAlphaByte(HudPalette.ShieldEmpty, 0x70));
+        DrawLedgerBar(dl, LedgerSplit + barGap, LedgerRight, hull, fromRight: true, hullColor, hullTrack);
     }
 
     /// <summary>
-    /// The MATERIALS readout: HOLD above BASE (<see cref="LedgerLayout"/>), a label left and a number right. The hold is
-    /// in the readout green, deep orange when full; the store in pale gold, flashing gold as a deposit lands, with its
-    /// rate after the label and the deposit's <c>+N</c> rising out of the row.
+    /// The MATERIALS readout, one line with its numbers in the middle (<see cref="LedgerLayout"/>): HOLD and the hold's
+    /// amount left of the split, the base store, its rate and BASE right of it. The hold is in the readout green, deep
+    /// orange when full; the store in pale gold, flashing gold as a deposit lands, with the deposit's <c>+N</c> rising
+    /// out of it.
     /// </summary>
     private void DrawMaterials(ImDrawListPtr dl, MaterialsView view)
     {
-        float left = MaterialsX + LedgerLayout.MaterialsLeft, right = MaterialsX + LedgerLayout.MaterialsRight;
-        DrawStripText(dl, "HOLD", left, LedgerLayout.HoldRowY, LedgerLayout.LabelSize, MaterialsLabelColor, align: 0f);
-        DrawStripText(dl, view.HoldText, right, LedgerLayout.HoldRowY, LedgerLayout.NumberSize,
+        float y = LedgerLayout.MaterialsLineY, split = MaterialsX + LedgerLayout.MaterialsSplit, gap = LedgerLayout.SplitGap;
+        DrawStripText(dl, "HOLD", MaterialsX + LedgerLayout.MaterialsLeft, y, LedgerLayout.LabelSize, MaterialsLabelColor, align: 0f);
+        DrawStripText(dl, view.HoldText, split - gap, y, LedgerLayout.NumberSize,
             view.HoldFull ? OreLineFullColor : ReadoutColor, align: 1f);
-        DrawStripText(dl, "BASE", left, LedgerLayout.BaseRowY, LedgerLayout.LabelSize, MaterialsLabelColor, align: 0f);
-        if (view.RateText != null)
-            DrawStripText(dl, view.RateText, MaterialsX + LedgerLayout.MaterialsRateX, LedgerLayout.BaseRowY,
-                LedgerLayout.RateSize, MaterialsRateColor, align: 0f);
+        DrawSplit(dl, split, y);
         uint storeColor = HudPalette.Lerp(StoreColor, StoreFlashColor, view.Flash);
-        DrawStripText(dl, view.BaseText, right, LedgerLayout.BaseRowY, LedgerLayout.NumberSize, storeColor,
-            view.Flash > 0f ? HudTheme.WithAlpha(StoreFlashColor, 0.3f * view.Flash) : 0u, align: 1f);
+        DrawStripText(dl, view.BaseText, split + gap, y, LedgerLayout.NumberSize, storeColor,
+            view.Flash > 0f ? HudTheme.WithAlpha(StoreFlashColor, 0.3f * view.Flash) : 0u, align: 0f);
+        if (view.RateText != null)
+            DrawStripText(dl, view.RateText, MaterialsX + LedgerLayout.MaterialsRateRight, y, LedgerLayout.RateSize,
+                MaterialsRateColor, align: 1f);
+        DrawStripText(dl, "BASE", MaterialsX + LedgerLayout.MaterialsRight, y, LedgerLayout.LabelSize, MaterialsLabelColor, align: 1f);
         if (view.DeltaText != null)
-            // In the plate's middle, clear of both numbers, rising past the HOLD row's gap.
-            DrawStripText(dl, view.DeltaText, MaterialsX + LedgerLayout.MaterialsDeltaX,
-                LedgerLayout.BaseRowY - 2f - 14f * view.DeltaRise, LedgerLayout.NumberSize,
-                HudTheme.WithAlpha(StoreFlashColor, view.DeltaAlpha));
+            // Rising out of the store's number, from just above the line.
+            DrawStripText(dl, view.DeltaText, split + gap, y - 2f - LedgerLayout.DeltaRise * view.DeltaRise,
+                LedgerLayout.NumberSize, HudTheme.WithAlpha(StoreFlashColor, view.DeltaAlpha), align: 0f);
     }
 
-    /// <summary>One ledger row centred on art y <paramref name="y"/>: label left, number right, bar beneath.</summary>
-    private void DrawLedgerRow(ImDrawListPtr dl, float y, string label, uint labelColor, string number, uint numberColor,
-        float fill, uint barColor, uint trackColor, uint numberGlow = 0)
+    /// <summary>The hairline between a line's two values, centred on art (<paramref name="x"/>, <paramref name="y"/>).</summary>
+    private void DrawSplit(ImDrawListPtr dl, float x, float y)
     {
-        DrawStripText(dl, label, LedgerLeft, y, LedgerLayout.LabelSize, labelColor, align: 0f);
-        DrawStripText(dl, number, LedgerRight, y, LedgerLayout.NumberSize, numberColor, numberGlow, align: 1f);
+        float half = LedgerLayout.SplitHalf;
+        dl.AddRectFilled(At(x - 0.5f, y - half), At(x + 0.5f, y + half), SplitColor);
+    }
 
-        // A hairline bar: a dark outline, the track, and the filled part from the left.
-        float barY = y + LedgerLayout.BarDrop, half = LedgerLayout.BarHalf, edge = LedgerLayout.BarOutline;
-        dl.AddRectFilled(At(LedgerLeft - edge, barY - half - edge), At(LedgerRight + edge, barY + half + edge), 0xC0000000u);
-        dl.AddRectFilled(At(LedgerLeft, barY - half), At(LedgerRight, barY + half), trackColor);
-        float f = Math.Clamp(fill, 0f, 1f);
-        if (f > 0f)
-            dl.AddRectFilled(At(LedgerLeft, barY - half), At(LedgerLeft + (LedgerRight - LedgerLeft) * f, barY + half), barColor);
+    /// <summary>
+    /// A hairline bar under the SHIELD/HULL line from art x <paramref name="left"/> to <paramref name="right"/>: a dark
+    /// outline, the track, and the filled part from the left end, or from the right one when <paramref name="fromRight"/>.
+    /// </summary>
+    private void DrawLedgerBar(ImDrawListPtr dl, float left, float right, float fill, bool fromRight, uint barColor, uint trackColor)
+    {
+        float barY = LedgerLayout.LineY + LedgerLayout.BarDrop, half = LedgerLayout.BarHalf, edge = LedgerLayout.BarOutline;
+        dl.AddRectFilled(At(left - edge, barY - half - edge), At(right + edge, barY + half + edge), 0xC0000000u);
+        dl.AddRectFilled(At(left, barY - half), At(right, barY + half), trackColor);
+        float filled = (right - left) * Math.Clamp(fill, 0f, 1f);
+        if (filled > 0f)
+        {
+            float from = fromRight ? right - filled : left;
+            dl.AddRectFilled(At(from, barY - half), At(from + filled, barY + half), barColor);
+        }
     }
 
     /// <summary>A plate's number, centred in its readout plate above the bar.</summary>

@@ -218,7 +218,8 @@ The tank lives in a band around 0. Both ends hurt, and the world has places at b
   same third of a second, and the particles already in the air live out their lives. It crackles, fading in as it catches, higher as
   it grows and sizzling higher still once the core sags; the HUD's hull number eases from its neutral colour onto the
   heat ramp between 75% and 60%, and the HUD's
-  crystal shows the shield, the number under it the hull, and the plate names the worst state: SLAG, MELTING (under
+  crystal shows the shield, the line under it both numbers (`SHIELD 400 | 1000 HULL`, each half with its bar), and the
+  plate names the worst state: SLAG, MELTING (under
   5%), HULL BREACH while it burns, except that an empty shield on a hull only just alight (fire level up to 0.2)
   still reads SHIELD DOWN, then SHIELD DOWN and SHIELDED.
   **A tank's shield is seen only while it blocks hits.** A hit brings up a translucent plastic dome of swirling blue
