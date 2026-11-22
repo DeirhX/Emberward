@@ -53,6 +53,29 @@ public static class TankSpriteShape
     }
 
     /// <summary>
+    /// Whether any cell of the tank facing <paramref name="dir"/> at <paramref name="origin"/> lies in the disc
+    /// <paramref name="diameter"/> cells across centred on <paramref name="center"/> (cells whose centres lie within
+    /// half the diameter of it, as <c>BaseLayout.IsCore</c> counts the core's).
+    /// </summary>
+    public static bool ReachesDisc(int dir, Position origin, Position center, int diameter)
+    {
+        int reach = diameter / 2 + 1;
+        if (Math.Abs(origin.X - center.X) > reach + Radius || Math.Abs(origin.Y - center.Y) > reach + Radius)
+            return false;
+        var sprite = Bitmap(dir);
+        int limit = diameter * diameter;
+        for (int sy = 0; sy < Size; sy++)
+            for (int sx = 0; sx < Size; sx++)
+            {
+                if (sprite[sx + sy * Size] == 0) continue;
+                int dx = origin.X - Radius + sx - center.X, dy = origin.Y - Radius + sy - center.Y;
+                if (4 * (dx * dx + dy * dy) <= limit)
+                    return true;
+            }
+        return false;
+    }
+
+    /// <summary>
     /// Whether the tank facing <paramref name="dirA"/> at <paramref name="a"/> shares a cell with the tank facing
     /// <paramref name="dirB"/> at <paramref name="b"/>.
     /// </summary>

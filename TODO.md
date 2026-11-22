@@ -7,7 +7,7 @@ Open work, written so an agent can pick up one item without the conversation tha
 ## Where things stand
 
 - **Done, in PR #75** (`claude/upgradables-review-8a3ab6`, not yet merged):
-  - **Sensors upgrade** (base-track key 5; Cargo hold and Radar moved to keys 6 and 7): +8 cells of sight per level for
+  - **Sensors upgrade** (base-track key 5; the hold upgrade, now the insulated hold, and Radar moved to keys 6 and 7): +8 cells of sight per level for
     relays (and generators) and the base. A relay sees 10 cells past its coverage circle before any upgrade
     (`Tweaks.Vision.NodeSightBonus`). Presentation only.
   - **Tranche 1, capacitors and island balance**, `src/Emberward.Core/Network/EnergyNetwork.cs`, behind

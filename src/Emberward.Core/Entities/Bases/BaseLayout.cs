@@ -8,9 +8,9 @@ public enum BasePart
 {
     /// <summary>Not a cell of the base.</summary>
     Outside,
-    /// <summary>Open ground inside: the courtyard, and the ring between the baffles and the core.</summary>
+    /// <summary>Open ground inside: the courtyard round the core.</summary>
     Floor,
-    /// <summary>The outer wall or a baffle plate: nothing passes and nothing damages it.</summary>
+    /// <summary>The outer wall: nothing passes and nothing damages it.</summary>
     Wall,
     /// <summary>A gate in the outer wall: open to the owner, shut to the enemy while the gate shield holds.</summary>
     Gate,
@@ -20,9 +20,9 @@ public enum BasePart
 
 /// <summary>
 /// The shape of every base (DESIGN.md §4.9), in cells from its centre: a square of walls with a gate in the middle of
-/// each side, the round core at the centre, and a baffle plate in front of each gate. The plates hide the core from every
-/// straight line that enters through a gate, so a shot reaches the core only through the gap two plates leave at a
-/// corner, and so only from the corner of the courtyard, inside the walls.
+/// each side, and the round core at the centre with open floor all round it, so a tank can drive up and touch it (that
+/// is where it unloads its ore, DESIGN.md §6.3). Nothing stands between a gate and the core: the gate shield is what
+/// keeps an enemy's shells and tank out.
 /// </summary>
 public static class BaseLayout
 {
@@ -46,11 +46,7 @@ public static class BaseLayout
             return BasePart.Outside;
         if (ax == Half || ay == Half)
             return Math.Min(ax, ay) <= GateHalf ? BasePart.Gate : BasePart.Wall;
-        if (IsCore(dx, dy))
-            return BasePart.Core;
-        bool plate = (ay == Tweaks.Keep.BaffleDistance && ax <= Tweaks.Keep.BaffleHalfLength) ||
-                     (ax == Tweaks.Keep.BaffleDistance && ay <= Tweaks.Keep.BaffleHalfLength);
-        return plate ? BasePart.Wall : BasePart.Floor;
+        return IsCore(dx, dy) ? BasePart.Core : BasePart.Floor;
     }
 
     /// <summary>
@@ -106,7 +102,7 @@ public static class BaseLayout
 
     /// <summary>
     /// The courtyard corner nearest to <paramref name="dx"/>, <paramref name="dy"/> from the centre, as an offset from
-    /// it: the only places a shot at the core can be fired from.
+    /// it: where an attacker inside the walls fires at the core from, out of the way of the gates.
     /// </summary>
     public static Offset NearestCorner(int dx, int dy) => new(dx < 0 ? -Lane : Lane, dy < 0 ? -Lane : Lane);
 }

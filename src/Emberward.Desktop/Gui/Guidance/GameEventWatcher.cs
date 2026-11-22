@@ -173,7 +173,7 @@ public sealed class GameEventWatcher
                 {
                     UpgradeRefusal.NotDocked => "Upgrades are bought while docked at your base.",
                     UpgradeRefusal.Maxed => "That upgrade is already at its top level.",
-                    _ => "Not enough ore in the base store. Bring ore home, or let harvesters mine it.",
+                    _ => "Not enough ore in the base store. Bring ore to the core or a relay, or let harvesters mine it.",
                 }, NotificationKind.Warning, cooldown: 2f);
 
             if (tappingCore && !_tappingCore)
@@ -225,11 +225,11 @@ public sealed class GameEventWatcher
             // Once each per match: the first ore in the hold, and the first time the hold fills.
             if (holdingOre && !_holdingOre)
                 feed.Post(now, "ore-collected", "Pyrite collected",
-                    "Ore rides in your hold (MATERIALS). Dock, or stay inside your network, to bank it; if you die, it spills where you fall.",
+                    "Ore rides in your hold (MATERIALS) and heats the tank, hard from 20. Touch your base's core, or a relay, to bank it; if you die, it spills where you fall.",
                     NotificationKind.Good, cooldown: 1e9f);
             if (oreHoldFull && !_oreHoldFull)
                 feed.Post(now, "ore-hold-full", "Ore hold full",
-                    $"The hold takes {player.OreHoldCapacity}. Bring it into your network or dock to bank it before you dig more ore.",
+                    $"The hold takes {player.OreHoldCapacity}, and a full load cooks the tank. Touch your core or a relay to bank it before you dig more ore.",
                     NotificationKind.Warning, cooldown: 1e9f);
             if (engineRunning && !_engineRunning)
                 feed.Post(now, "engine-running", "Base engine making charge",

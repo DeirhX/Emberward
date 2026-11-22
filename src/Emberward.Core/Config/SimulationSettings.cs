@@ -55,6 +55,10 @@ public readonly record struct SimulationSettings
     public float TankHeatDigPerPixel { get; init; }
     public float TankHeatShootPerShot { get; init; }
     public float TankHeatPerOrePerTick { get; init; }
+    public float TankCargoHeatPerOreAboveStartPerTick { get; init; }
+    public int TankCargoHeatStartOrePerLevel { get; init; }
+    public float TankCargoInsulationPerLevel { get; init; }
+    public int TankCargoHeatStartOre { get; init; }
     public float TankHeatCapacity { get; init; }
     public float TankFireHeatPerTickMax { get; init; }
     public double TankFireAirEnergyPerTickMax { get; init; }
@@ -111,7 +115,11 @@ public readonly record struct SimulationSettings
         ThermalAirNeighborCoupling = Tweaks.World.ThermalAirNeighborCoupling,
         TankHeatDigPerPixel = Tweaks.Tank.HeatDigPerPixel,
         TankHeatShootPerShot = Tweaks.Tank.HeatShootPerShot,
-        TankHeatPerOrePerTick = Tweaks.Tank.HeatPerOrePerSecond / Tweaks.Perf.TargetFps,
+        TankHeatPerOrePerTick = Tweaks.Cargo.HeatPerOrePerSecond / Tweaks.Perf.TargetFps,
+        TankCargoHeatPerOreAboveStartPerTick = Tweaks.Cargo.HeatPerOreAboveStartPerSecond / Tweaks.Perf.TargetFps,
+        TankCargoHeatStartOre = Tweaks.Cargo.HeatStartOre,
+        TankCargoHeatStartOrePerLevel = Tweaks.Cargo.HeatStartOrePerLevel,
+        TankCargoInsulationPerLevel = Tweaks.Cargo.InsulationPerLevel,
         TankHeatCapacity = Tweaks.Tank.TankHeatCapacity,
         TankFireHeatPerTickMax = Tweaks.TankShield.FireTankHeatPerTickMax,
         TankFireAirEnergyPerTickMax = Tweaks.TankShield.FireAirEnergyPerTickMax,

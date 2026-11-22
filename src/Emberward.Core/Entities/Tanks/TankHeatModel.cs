@@ -13,6 +13,26 @@ public static class TankHeatModel
     }
 
     /// <summary>
+    /// Degrees a tick a load of <paramref name="ore"/> pyrite adds to the tank before cooling (DESIGN.md §6.3,
+    /// <see cref="Tweaks.Cargo"/>): linear in the ore held, a mild share for every unit and a larger one for every unit
+    /// past <see cref="CargoHeatStartOre"/>, continuous there, with no step or spike anywhere. An insulated hold
+    /// (<paramref name="insulationLevel"/>, <c>BaseUpgrade.InsulatedHold</c>) divides the whole rate by
+    /// <c>1 + TankCargoInsulationPerLevel * level</c>.
+    /// </summary>
+    public static float ComputeCargoHeat(in SimulationSettings s, int ore, int insulationLevel = 0)
+    {
+        if (ore <= 0)
+            return 0f;
+        float raw = ore * s.TankHeatPerOrePerTick +
+            Math.Max(0, ore - CargoHeatStartOre(in s, insulationLevel)) * s.TankCargoHeatPerOreAboveStartPerTick;
+        return raw / (1f + s.TankCargoInsulationPerLevel * Math.Max(0, insulationLevel));
+    }
+
+    /// <summary>The load from which each unit heats the tank hard, at insulated hold level <paramref name="insulationLevel"/>.</summary>
+    public static int CargoHeatStartOre(in SimulationSettings s, int insulationLevel = 0) =>
+        s.TankCargoHeatStartOre + Math.Max(0, insulationLevel) * s.TankCargoHeatStartOrePerLevel;
+
+    /// <summary>
     /// Heat flowing into the tank from what it touches this tick (negative: the tank loses heat). Terrain and air
     /// contact use the same formula, with the conductance and heat capacity of the contact.
     /// </summary>

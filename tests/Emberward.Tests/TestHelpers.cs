@@ -13,6 +13,16 @@ internal static class TestHelpers
     public const int DefaultSeed = 42;
     public static readonly Size DefaultMapSize = new(320, 200);
 
+    /// <summary>
+    /// Where a tank of <paramref name="tankBase"/> stands pressed against its core on the side of the front gate,
+    /// touching it (<see cref="Tank.TouchesCore"/>): the only place inside the base where its hold unloads.
+    /// </summary>
+    public static Position AgainstCore(Emberward.Core.Entities.Bases.TankBase tankBase) =>
+        tankBase.Position + new Offset(tankBase.Front.X * AgainstCoreDistance, tankBase.Front.Y * AgainstCoreDistance);
+
+    /// <summary>Cells from a base's centre to a tank against its core: the core's half, the tank's and a cell between.</summary>
+    public const int AgainstCoreDistance = Emberward.Core.Entities.Bases.BaseLayout.CoreHalf + TankSpriteShape.Radius + 1;
+
     public static World CreateSeededWorld(
         Size? size = null,
         int seed = DefaultSeed,

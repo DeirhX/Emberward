@@ -1,3 +1,4 @@
+using Emberward.Core.Entities.Tanks;
 using Emberward.Core.Config;
 using Emberward.Core.Resources;
 using Emberward.Core.Input;
@@ -27,7 +28,7 @@ public class TankHeatBehaviorTests
 
         AdvanceTank(tank, world, Tweaks.Perf.TargetFps);
 
-        double expected = ore * Tweaks.Tank.HeatPerOrePerSecond * tank.ThermalCapacity;
+        double expected = Tweaks.Perf.TargetFps * (double)TankHeatModel.ComputeCargoHeat(world.Settings, ore) * tank.ThermalCapacity;
         Assert.True(tank.Heat > 0f);
         Assert.Equal(expected, ledger.Injected - startInjected, precision: 3);
         Assert.Equal(expected, world.SumSystemThermalEnergy() - startEnergy, precision: 3);
@@ -39,7 +40,7 @@ public class TankHeatBehaviorTests
             double injected = ledger.Injected;
             AdvanceTank(tank, world, 1);
             Assert.True(tank.OreHeld < before);
-            double remainingLoad = tank.OreHeld * world.Settings.TankHeatPerOrePerTick * tank.ThermalCapacity;
+            double remainingLoad = TankHeatModel.ComputeCargoHeat(world.Settings, tank.OreHeld) * (double)tank.ThermalCapacity;
             Assert.Equal(remainingLoad, ledger.Injected - injected, precision: 4);
         }
         double afterUnload = ledger.Injected;

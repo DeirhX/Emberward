@@ -117,8 +117,8 @@ Core decides what is seen; the renderer only shows it.
   and fades out at `Radar.PulseRange`, which the upgrade lengthens.
 - **Ore on the network.** Links carry two beams: heat home (orange, `KindLink`) and ore home (`KindOreBeam`, `OreBeam` in `Shaders/Entity/Beams.hlsli`: gold crystals with a pale
   glint, tumbling toward the base). `LinkQuads` draws the ore beam from `LinkRenderState.OreFlow`, which Core keeps up
-  for a moment after each unit passes (`Link.OreFlowTicks`), and `CoverageQuads` draws one from the tank to its
-  covering node beside the tether while `Tank.IsUnloadingOre`.
+  for a moment after each unit passes (`Link.OreFlowTicks`), and `CoverageQuads` draws one from the tank to the
+  core or relay it touches (`Tank.UnloadNode`) while `Tank.IsUnloadingOre`.
 
 ## Whole-screen effects
 
@@ -284,7 +284,7 @@ from repeating on the frames drawn between steps.
 | Build a machine, plant | `MachineBuilt` (the machine's own build sound), `MachinePlanted` (a tank that dies drops its machine silently) |
 | Plant refused | `PlantRefused`, and `BuildRefused` (not enough ore) (player only) |
 | Pickup | `OreCollected`. At most every 3 steps; a run of pickups climbs in pitch. |
-| Ore unloaded | `OreUnloaded` (player only): the pickup sound, quieter, once per unit unloaded through the network |
+| Ore unloaded | `OreUnloaded` (player only): the pickup sound, quieter, once per unit unloaded at a relay |
 | Dock | `Docked` (player only; a respawn is not a docking) |
 | Warnings | Player only, most urgent first like the HUD banner: overheating, low shield, running hot. The thresholds are shared with the HUD through `PlayerWarnings`. Each repeats at its own interval while it lasts. These follow the tank's state, not events. |
 | Engine loop | Per tank, while alive: idle, or louder and higher on steps with `TankMoved` |
