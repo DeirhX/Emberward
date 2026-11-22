@@ -100,7 +100,7 @@ internal sealed class SideSensing(TerrainGrid terrain, MachineList machines, Tan
         // After the radars, so that a life echo born this tick counts.
         if (emberites != null)
             foreach (var (tank, nests) in _discoveries)
-                nests.Update(emberites, TrackVision(tank), RadarOf(tank));
+                nests.Update(emberites, TrackVision(tank));
     }
 
     /// <summary>

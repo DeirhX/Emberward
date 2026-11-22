@@ -627,15 +627,13 @@ Pyrite pockets and lumps at least 60 cells from every base hold a nest (a pocket
 60 by size); specks hold none. Heat is the noise a tank makes and the fight makes heat:
 
 - *Scout.* A guarded deposit shows resting embers on the ore, and the radar returns a life echo from the nest's centre
-  and from each creature out where it is. Once a side has discovered a nest (seen its centre, or had the nest's own
-  life echo; a creature or tank echoing beside it does not count), a thin pink danger ring is drawn over it at the distance
-  from which it senses that side's tank now (40 cells for a tank too cool to be sensed, the nearest it ever senses
-  one, growing with the tank's heat to 110 at 100 degrees), titled "EMBERITE NEST" over "DANGER: EMBERITES". It is
+  and from each creature out where it is. Once a side has discovered a nest (seen its centre; the radar's echo alone does not
+  discover it), a thin pink danger ring is drawn over it, a small mark around the nest's ground, titled "EMBERITE NEST" over "DANGER: EMBERITES". It is
   faint while the nest sleeps, full once it is awake, and pulses while its creatures are out; a cleared nest has
-  none. The ring shows the nest as the side last saw it (its centre in sight, or its echo back): out of sight, a
-  nest that wakes or is cleared keeps its old ring, as remembered ground keeps its old look. The ring is the wake
-  distance, where a hunt starts; once hunting, a nest follows a tank much farther (by its heat up to 220 cells, or
-  by its creatures' sight), which no one ring can show truthfully, so the pulse says it is hunting instead. Rock
+  none. The ring shows the nest as the side last saw it (its centre in sight): out of sight, a
+  nest that wakes or is cleared keeps its old ring, as remembered ground keeps its old look. The ring marks the nest, not
+  how far it senses (a hunt starts from 40 cells and a nest follows a tank much farther, up to 220 cells by heat), so
+  the pulse says it is hunting. A nest the player has seen cleared loses its ring for good. Rock
   blocking the nest's sense, and digging its ore, which wakes it from anywhere, are not drawn.
 - *Sneak or fight.* A cool tank is not sensed. A tank at 45 degrees is sensed from 40 cells, one at 100 from 110. Digging
   the nest's ore wakes it whatever the tank's heat, and the thief is hunted for six seconds. A tank that cools below 35
