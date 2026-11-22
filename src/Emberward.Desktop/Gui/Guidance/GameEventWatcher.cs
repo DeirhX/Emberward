@@ -48,8 +48,11 @@ public sealed class GameEventWatcher
     private int _depositUnits;
     private int _stepsSinceDeposit;
 
-    /// <summary>Steps without a deposit after which the player's first bank counts as done and is told.</summary>
-    private const int DepositSettleSteps = 6;
+    /// <summary>
+    /// Steps without a deposit after which the player's first bank counts as done and is told: the HUD's join window,
+    /// well past a relay's unit interval, so a relay visit is told once, with its total.
+    /// </summary>
+    private const int DepositSettleSteps = OreLedgerView.JoinSteps;
 
     /// <summary>When the player's base last took enemy fire, in HUD seconds; negative before the first hit.</summary>
     public float LastBaseHitTime { get; private set; } = -1e9f;
@@ -147,7 +150,7 @@ public sealed class GameEventWatcher
         {
             _depositTold = true;
             feed.Post(now, "first-deposit", string.Create(System.Globalization.CultureInfo.InvariantCulture,
-                    $"Pyrite banked: +{_depositUnits} (base {store})"),
+                    $"Pyrite banked: +{_depositUnits} (base {store:N0})"),
                 "The base store pays for what you build inside the network. Touch the core or a powered relay to unload.",
                 NotificationKind.Good, cooldown: 1e9f);
         }

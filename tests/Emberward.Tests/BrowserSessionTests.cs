@@ -177,9 +177,9 @@ public class BrowserSessionArtStripTests
         var p = first.Player;
         Assert.Equal(player.Reactor.Health, p.Health);
         Assert.Equal((HeatScale.Frozen(player.Heat), HeatScale.Boil(player.Heat)), (p.Frozen, p.Boil));
-        Assert.Equal(BuildSlotView.OreLine(player), p.OreLine);
-        Assert.Equal(-1, p.OrePileFrame);
-        Assert.Equal("ORE", p.OreLine);
+        Assert.Equal(BuildSlotView.OreLine(player), p.Materials.OreLine);
+        Assert.Equal(-1, p.Materials.PileFrame);
+        Assert.Equal("ORE", p.Materials.OreLine);
         // Each machine in its desktop slot, as the desktop's BuildPanel draws it.
         Assert.Equal([0, 1, 2, 3, 4], first.Builds.Select(b => b.Slot).Order());
         foreach (var b in first.Builds)
@@ -195,11 +195,11 @@ public class BrowserSessionArtStripTests
         Assert.All(carrying.Where(b => b.Key != 1), b => Assert.Equal(nameof(BuildSlotState.Blocked), b.State));
 
         player.Hold.Add(1);
-        Assert.Equal(0, BrowserFrameBuilder.Capture(session, includeEvents: false).Player.OrePileFrame);
+        Assert.Equal(0, BrowserFrameBuilder.Capture(session, includeEvents: false).Player.Materials.PileFrame);
         player.Hold.Ore = player.OreHoldCapacity / 2;
-        Assert.Equal(19, BrowserFrameBuilder.Capture(session, includeEvents: false).Player.OrePileFrame);
+        Assert.Equal(19, BrowserFrameBuilder.Capture(session, includeEvents: false).Player.Materials.PileFrame);
         player.Hold.Add(player.OreHoldCapacity);
-        Assert.Equal(39, BrowserFrameBuilder.Capture(session, includeEvents: false).Player.OrePileFrame);
+        Assert.Equal(39, BrowserFrameBuilder.Capture(session, includeEvents: false).Player.Materials.PileFrame);
 
         // The MATERIALS rows, as the desktop's HudStrip draws them (MaterialsView).
         var materials = BrowserFrameBuilder.Capture(session, includeEvents: false).Player.Materials;

@@ -55,14 +55,14 @@ public static class BrowserFrameBuilder
         var status = new PlayerStatus(player.Position, home.Position, player.Heat, Tank.HeatBudgetCapacity,
             HeatScale.Fraction(player.Heat), HexColor(HeatScale.ColorRgb(player.Heat)),
             player.IsDead ? 0f : player.HitFlashTicks / (float)Tank.HitFlashDuration, hitFromX, hitFromY,
-            player.HullFraction, shield.Active, shield.ShieldFill, shield.Low, player.IsDead ? 0f : player.FireLevel, player.OreHeld, player.OreHoldCapacity, home.Store.Ore,
+            player.HullFraction, shield.Active, shield.ShieldFill, shield.Low, player.IsDead ? 0f : player.FireLevel, home.Store.Ore,
             home.ChargeFill, home.HeatStoreFill, home.ArmorFill, player.IsDockedAtOwnBase, player.IsOffNetwork,
             player.OffNetworkSecondsToOverheat, player.IsDead, player.RespawnRemaining.TotalSeconds, world.RecallOffered(player),
             world.MatchOutcomeFor(player).ToString(), player.CarriedMachineType?.ToString(), home.IsDestroyed,
             Math.Max(0, player.Reactor.Health), HeatScale.Frozen(player.Heat), HeatScale.Boil(player.Heat),
             player.IsOverheating || player.IsAboveSafeHeat, player.IsHullLow(latched: false),
-            player.HitFlashTicks > Tank.HitFlashDuration - HitFreshTicks, materials.PileFrame, materials.Unloading,
-            player.IsOreHoldFull, player.IsOffNetworkUrgent, materials.OreLine, Plate(player, shield), materials);
+            player.HitFlashTicks > Tank.HitFlashDuration - HitFreshTicks, player.IsOffNetworkUrgent, Plate(player, shield),
+            materials);
         return new BrowserFrame(session.Seed, world.AdvanceCount, Tweaks.Perf.TargetFps, status,
             session.Sounds.Frame(takePlays: includeEvents), builds, upgrades, preview, goal, Guidance(session.Guidance),
             includeDial ? Dial() : null, net?.Status(), BasePower(world, player), MachineUpgrade(session),

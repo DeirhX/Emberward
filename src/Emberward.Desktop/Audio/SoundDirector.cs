@@ -151,7 +151,12 @@ public sealed class SoundDirector
                 default:
                     if (StepEventSounds.CueFor(e) is { } cue &&
                         StepEventSounds.Hears(cue, tracked: index >= 0, isPlayer: e.Color == playerColor))
+                    {
+                        // A pour sounds once, on its first event: loud for the whole load, what is left aboard included.
+                        if (cue.Voice == CueVoice.Pour && index >= 0)
+                            cue = cue with { Gain = StepEventSounds.DepositGain(e.Count + tanks[index].OreHeld) };
                         PlayCue(cue, e.Position, index, ref impacts);
+                    }
                     break;
             }
         }

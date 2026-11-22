@@ -270,15 +270,16 @@ export class StripView {
         readout(`${p.dead ? 0 : Math.round(p.heat)}°`, TEMP);
         this.drawTrend(left, p);
         this.drawLedger(left, p);
-        if (p.orePileFrame >= 0) {
-            const column = p.orePileFrame % 8, row = Math.floor(p.orePileFrame / 8);
+        const m = p.materials;
+        if (m.pileFrame >= 0) {
+            const column = m.pileFrame % 8, row = Math.floor(m.pileFrame / 8);
             left.drawImage(this.art.orePile, column * 288, row * 120, 288, 120, MATERIALS_X + 51, 48, 144, 60);
         }
-        drawMaterials(left, p.materials);
+        drawMaterials(left, m);
 
-        const oreColor = p.unloading ? 0xff60ff90 : p.holdFull ? 0xff2880ff : 0xff78e6ff;
-        stripText(left, p.oreLine, ORE_LINE.x, ORE_LINE.y, ORE_LINE.size, abgr(oreColor), abgr(0x2840b0ff));
-        if (p.unloading) {
+        const oreColor = m.unloading ? 0xff60ff90 : m.holdFull ? 0xff2880ff : 0xff78e6ff;
+        stripText(left, m.oreLine, ORE_LINE.x, ORE_LINE.y, ORE_LINE.size, abgr(oreColor), abgr(0x2840b0ff));
+        if (m.unloading) {
             // Down arrows either side of the word, bobbing: the ore is going down into the base.
             const bob = ((time * 3) % 1) * 5;
             left.fillStyle = abgr(oreColor);

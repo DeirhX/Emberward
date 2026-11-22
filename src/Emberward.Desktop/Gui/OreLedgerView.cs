@@ -30,7 +30,8 @@ public sealed class OreLedgerView
     private int _sum;
 
     private long _step;
-    private long _pourStart = Never, _lastDeposit = Never, _countStart = Never;
+    private long _pourStart = Never, _lastDeposit = Never, _countStart = Never, _lastPour = Never;
+    private int _pourUnits;
     private int _storeFrom, _storeTo;
     private bool _seen;
     private float _shownHold;
@@ -54,19 +55,27 @@ public sealed class OreLedgerView
     /// <summary>Steps since the player's latest deposit began.</summary>
     public long DepositAge => _step - _pourStart;
 
-    /// <summary>True from the player's deposit until its pour has had time to land.</summary>
-    public bool IsPouring => _step - _lastDeposit <= PourSteps;
+    /// <summary>Steps since the player's latest deposit last grew (a relay visit grows a unit at a time).</summary>
+    public long LastDepositAge => _step - _lastDeposit;
+
+    /// <summary>
+    /// True from the player's deposit until its pour has had time to land: ore banked, or burned to restart a dark
+    /// base (which the world pours too, though the store does not change).
+    /// </summary>
+    public bool IsPouring => _step - _lastPour <= PourSteps;
 
     /// <summary>Call after each simulation step, while <see cref="World.StepEvents"/> still holds its events.</summary>
     public void CaptureStep(World world, int localSlot)
     {
         ArgumentNullException.ThrowIfNull(world);
         _step++;
-        int units = 0, deposited = 0;
+        int units = 0, deposited = 0, burned = 0;
         if (localSlot >= 0 && localSlot < world.TankList.Count && world.TankList.Tanks[localSlot] is { Base: { } home } player)
         {
             foreach (ref readonly StepEvent e in world.StepEvents)
             {
+                if (e.Kind == StepEventKind.RestartOreBurned && e.Color == player.Color)
+                    burned += e.Count;
                 if (e.Kind is not (StepEventKind.OreUnloaded or StepEventKind.OreHarvested) || e.Color != home.Color)
                     continue;
                 units += e.Count;
@@ -74,6 +83,7 @@ public sealed class OreLedgerView
                     deposited += e.Count;
             }
             CaptureStore(home.Store.Ore, deposited);
+            CapturePour(deposited + burned);
             CaptureHold(player.OreHeld);
         }
         _sum += units - _perStep[_next];
@@ -110,10 +120,21 @@ public sealed class OreLedgerView
         Store = store;
     }
 
+    /// <summary>The units the hold has poured out (banked or burned) since this pour began, which set how fast it drains.</summary>
+    private void CapturePour(int poured)
+    {
+        if (poured <= 0)
+            return;
+        if (_step - _lastPour > JoinSteps)
+            _pourUnits = 0;
+        _pourUnits += poured;
+        _lastPour = _step;
+    }
+
     private void CaptureHold(int held)
     {
         if (held < _shownHold && IsPouring)
-            _shownHold = MathF.Max(held, _shownHold - MathF.Max(1, DepositUnits) / (float)PourSteps);
+            _shownHold = MathF.Max(held, _shownHold - MathF.Max(1, _pourUnits) / (float)PourSteps);
         else
             _shownHold = held;
     }

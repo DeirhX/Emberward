@@ -121,17 +121,112 @@ public class DepositHudTests
     }
 
     [Fact]
-    public void ACoreBank_IsHeardOnce_ForItsFourEvents()
+    public void ACoreBank_IsHeardOnce_ForItsFourEvents_AsLoudAsItsWholeLoad()
     {
-        var (s, _) = AtCore();
-        var sink = new CountingSink();
-        var director = new SoundDirector(sink);
-        for (int i = 0; i < 8; i++)
+        float GainOf(int ore, out int plays)
         {
-            s.World.Advance(_ => default);
-            director.AfterStep(s.World, 0);
+            var (s, _) = AtCore(ore);
+            var sink = new CountingSink();
+            var director = new SoundDirector(sink);
+            for (int i = 0; i < 8; i++)
+            {
+                s.World.Advance(_ => default);
+                director.AfterStep(s.World, 0);
+            }
+            plays = sink.Plays(SoundEffect.Deposit);
+            return sink.Gain(SoundEffect.Deposit);
         }
-        Assert.Equal(1, sink.Plays(SoundEffect.Deposit));
+
+        float full = GainOf(40, out int fullPlays), tick = GainOf(Tweaks.Base.HomeAbsorbOre, out _);
+        Assert.Equal(1, fullPlays);
+        // The first event of both carries a tick's 10; the full hold still sounds for its 40.
+        Assert.Equal(StepEventSounds.DepositGain(40) / StepEventSounds.DepositGain(Tweaks.Base.HomeAbsorbOre), full / tick, 4);
+    }
+
+    [Fact]
+    public void ARelayVisit_CountsUp_AndKeepsItsPlusNUp_WhileUnitsArrive()
+    {
+        var s = RelayHeatTests.CreateScenario();
+        RelayHeatTests.PlantRelay(s);
+        var ledger = new OreLedgerView();
+        Step(s, ledger, 12);
+        s.Tank.Position = s.RelayPos;
+        s.Tank.Hold.Ore = 20;
+
+        Step(s, ledger, Tweaks.Perf.TargetFps * 3);
+
+        int banked = 20 - s.Tank.OreHeld;
+        Assert.True(banked >= 10, $"a relay banks 4 a second, got {banked}");
+        Assert.Equal(banked, ledger.DepositUnits);
+        Assert.True(ledger.DepositAge > MaterialsView.DeltaSteps, "the visit has lasted longer than one +N's rise");
+        var view = MaterialsView.Of(s.Tank, ledger);
+        Assert.Equal($"+{banked}", view.DeltaText);
+        Assert.Equal(1f, view.DeltaRise);
+        Assert.True(view.DeltaAlpha > 0f && view.Flash > 0f, "each unit restarts the flash and holds the +N up");
+        Assert.True(view.Unloading);
+    }
+
+    [Fact]
+    public void SpendingOrMiningDuringACountUp_MovesItWithTheStore()
+    {
+        var (s, ledger) = AtCore();
+        Step(s, ledger, 5);
+        int shown = ledger.DisplayedStore;
+        s.Base.Store.Ore -= 25;
+        Step(s, ledger);
+        Assert.InRange(ledger.DisplayedStore, shown - 25, shown - 25 + 40);
+        Step(s, ledger, OreLedgerView.PourSteps);
+        Assert.Equal(s.Base.Store.Ore, ledger.DisplayedStore);
+
+        s.Base.Store.Ore += 7;
+        Step(s, ledger);
+        Assert.Equal(s.Base.Store.Ore, ledger.DisplayedStore);
+    }
+
+    [Fact]
+    public void BurningOre_IsStretchedOnTheHudLikeABank_ButTheStoreStaysPut()
+    {
+        var s = RelayHeatTests.CreateScenario(energyNetwork: true);
+        var ledger = new OreLedgerView();
+        s.Base.DrawCharge(s.Base.Charge);
+        s.Tank.Position = s.Base.SpawnPosition;
+        s.Tank.Hold.Ore = 12;
+        Step(s, ledger);
+        Assert.True(s.World.IsBaseDark(s.Base));
+        int store = s.Base.Store.Ore;
+        s.Tank.Position = TestHelpers.AgainstCore(s.Base);
+
+        Step(s, ledger);
+
+        Assert.True(s.Tank.OreHeld < 12, "the hold burned");
+        Assert.Equal(store, s.Base.Store.Ore);
+        Assert.True(ledger.IsPouring);
+        Assert.True(ledger.DisplayedHold > s.Tank.OreHeld, "the hold drains over the pour");
+        var view = MaterialsView.Of(s.Tank, ledger);
+        Assert.Equal("UNLOADING", view.OreLine);
+        Assert.Equal(0, ledger.DepositUnits);
+        Assert.Null(view.DeltaText);
+    }
+
+    /// <summary>
+    /// The two rows fit across the plate: label, rate and number do not run into each other, at a generous width for
+    /// the HUD font (each character at most <c>Advance</c> of the text size).
+    /// </summary>
+    [Fact]
+    public void TheMaterialsRows_FitAcrossThePlate()
+    {
+        const float Advance = 0.62f;
+        static float Width(string text, float size) => text.Length * size * Advance;
+        float labelEnd = LedgerLayout.MaterialsLeft + Width("BASE", LedgerLayout.LabelSize);
+        float rateEnd = LedgerLayout.MaterialsRateX + Width("+999/m", LedgerLayout.RateSize);
+        float numberStart = LedgerLayout.MaterialsRight - Width("99,999", LedgerLayout.NumberSize);
+        float holdStart = LedgerLayout.MaterialsRight - Width("70 / 70", LedgerLayout.NumberSize);
+        float deltaHalf = Width("+70", LedgerLayout.NumberSize) * 0.5f;
+
+        Assert.True(labelEnd < LedgerLayout.MaterialsRateX, $"BASE ends at {labelEnd}, past the rate at {LedgerLayout.MaterialsRateX}");
+        Assert.True(rateEnd < numberStart, $"the rate ends at {rateEnd}, past the store's start at {numberStart}");
+        Assert.True(LedgerLayout.MaterialsLeft + Width("HOLD", LedgerLayout.LabelSize) < LedgerLayout.MaterialsDeltaX - deltaHalf);
+        Assert.True(LedgerLayout.MaterialsDeltaX + deltaHalf < holdStart, "the rising +N clears the HOLD number");
     }
 
     [Fact]
@@ -142,7 +237,7 @@ public class DepositHudTests
         var events = new GameEventWatcher();
         float now = 0f;
         events.Update(s.World, s.Tank, feed, now);
-        for (int i = 0; i < 20; i++)
+        for (int i = 0; i < 50; i++)
         {
             s.World.Advance(_ => default);
             events.AfterStep(s.World, s.Tank);
@@ -151,10 +246,10 @@ public class DepositHudTests
         }
 
         var toast = Assert.Single(feed.Active, n => n.Key == "first-deposit");
-        Assert.Equal($"Pyrite banked: +40 (base {s.Base.Store.Ore})", toast.Title);
+        Assert.Equal($"Pyrite banked: +40 (base {s.Base.Store.Ore:N0})", toast.Title);
 
         s.Tank.Hold.Ore = 10;
-        for (int i = 0; i < 20; i++)
+        for (int i = 0; i < 50; i++)
         {
             s.World.Advance(_ => default);
             events.AfterStep(s.World, s.Tank);
@@ -166,11 +261,13 @@ public class DepositHudTests
 
     private sealed class CountingSink : ISoundSink
     {
-        private readonly List<SoundEffect> _plays = new();
+        private readonly List<(SoundEffect Effect, float Gain)> _plays = new();
 
-        public int Plays(SoundEffect effect) => _plays.Count(p => p == effect);
+        public int Plays(SoundEffect effect) => _plays.Count(p => p.Effect == effect);
 
-        public void Play(SoundEffect effect, float gain, float pan, float rate, float muffle = 0f) => _plays.Add(effect);
+        public float Gain(SoundEffect effect) => _plays.First(p => p.Effect == effect).Gain;
+
+        public void Play(SoundEffect effect, float gain, float pan, float rate, float muffle = 0f) => _plays.Add((effect, gain));
 
         public int AddLoop(SoundEffect effect) => 0;
 

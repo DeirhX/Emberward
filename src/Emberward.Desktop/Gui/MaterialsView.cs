@@ -36,17 +36,19 @@ public sealed record MaterialsView(
         var inv = CultureInfo.InvariantCulture;
         int held = Math.Max(player.OreHeld, ledger.DisplayedHold);
         int rate = ledger.RatePerMinute;
-        long age = ledger.DepositAge;
-        bool showDelta = ledger.DepositUnits > 0 && age >= 0 && age < DeltaSteps;
+        // The +N rises from the deposit's start and stays up while it keeps growing (a relay visit); it fades, and the
+        // row's flash restarts, from its latest growth.
+        long age = ledger.DepositAge, last = ledger.LastDepositAge;
+        bool showDelta = ledger.DepositUnits > 0 && last >= 0 && last < DeltaSteps;
         return new MaterialsView(
             string.Create(inv, $"{held} / {player.OreHoldCapacity}"),
             player.IsOreHoldFull,
             ledger.DisplayedStore.ToString("N0", inv),
             rate > 0 ? string.Create(inv, $"+{rate}/m") : null,
-            ledger.DepositUnits > 0 ? Math.Clamp(1f - age / (float)OreLedgerView.PourSteps, 0f, 1f) : 0f,
+            ledger.DepositUnits > 0 ? Math.Clamp(1f - last / (float)OreLedgerView.PourSteps, 0f, 1f) : 0f,
             showDelta ? string.Create(inv, $"+{ledger.DepositUnits}") : null,
-            showDelta ? age / (float)DeltaSteps : 0f,
-            showDelta ? Math.Clamp((DeltaSteps - age) / (float)DeltaFadeSteps, 0f, 1f) : 0f,
+            showDelta ? Math.Clamp(age / (float)DeltaSteps, 0f, 1f) : 0f,
+            showDelta ? Math.Clamp((DeltaSteps - last) / (float)DeltaFadeSteps, 0f, 1f) : 0f,
             BuildSlotView.OrePileFrame(held, player.OreHoldCapacity),
             BuildSlotView.OreLine(player, ledger.IsPouring),
             player.IsUnloadingOre || ledger.IsPouring);
