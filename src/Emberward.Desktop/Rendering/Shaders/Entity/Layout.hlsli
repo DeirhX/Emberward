@@ -10,7 +10,8 @@
 //   0 tank hull   — .xy = facing (cos, sin), .z = tread travel (cells),
 //                   .w = state (0 normal, 1 hit flash, 2 spawn protection)
 //   1 tank turret — .xy = barrel direction (cos, sin), .w = state as above
-//   2 hot shot    — .x = trail length (cells), .y = core radius (cells)
+//   2 hot shot    — .x = trail length (cells), .y = core radius (cells), .z = softness (0 a crisp head, 1 a soft ember:
+//                   shrapnel)
 //   3 ore beam    — .x = length (cells, along +x), .y = ore flow (1 just after a unit passed, fading to 0),
 //                   .z = phase, .w = transition. Ore flows toward +x (the base).
 //   4 relay       — .x = powered (0/1), .y = pump fraction, .z = animation phase (s), .w = machine flags

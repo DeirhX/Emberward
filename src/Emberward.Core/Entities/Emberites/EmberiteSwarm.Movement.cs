@@ -171,7 +171,7 @@ public sealed partial class EmberiteSwarm
             emberite.Velocity = default;
             return;
         }
-        if (emberite.Charge > 0.0 && TryResumeHunt(ref emberite))
+        if (HasFullCharge(emberite) && TryResumeHunt(ref emberite))
             return;
         if (!HasFullCharge(emberite) && emberite.FailedSeeks < Tweaks.Emberites.MaxFailedSeeks && --emberite.Timer <= 0)
         {
@@ -186,7 +186,7 @@ public sealed partial class EmberiteSwarm
     }
 
     /// <summary>
-    /// A creature on its way home that has charge left goes back to hunting a tank it can see: not docked in its base,
+    /// A creature on its way home with a full charge goes back to hunting a tank it can see: not docked in its base,
     /// within <see cref="Tweaks.Emberites.HuntLeashCells"/>, with a line clear of rock, looked for once in
     /// <see cref="Tweaks.Emberites.SightCheckTicks"/> ticks. A tank it cannot see, it does not care about.
     /// </summary>

@@ -77,9 +77,10 @@ public sealed class ProjectileQuads
                 case ProjectileType.Shrapnel:
                 {
                     float trail = Math.Clamp(speed * 1.6f, 0.25f, 1.4f);
+                    // A soft ember (softness 1): a burst's fragments read as hot sparks, not a spray of dots.
                     const float radius = 0.22f, glow = 0.8f;
                     quads.Add(px, py, dx, dy, -trail - glow, glow, -glow, glow, body, EntityShape.KindHotShot,
-                        trail, radius, 0f, 0f, motion);
+                        trail, radius, 1f, 0f, motion);
                     break;
                 }
                 case ProjectileType.Round:
