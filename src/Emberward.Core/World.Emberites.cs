@@ -20,10 +20,9 @@ public partial class World
     public int CopyEmberiteRenderStates(Span<EmberiteRenderState> destination) => _emberites?.CopyRenderStates(destination) ?? 0;
 
     /// <summary>
-    /// Writes the nests <paramref name="tank"/>'s side has discovered (seen, or found by its radar) that still have
-    /// creatures, with their danger rings for that tank's heat; returns how many (<see cref="NestDanger"/>). Output only:
-    /// discovery is what the side's vision (<see cref="TrackVision"/>) and radar learned, which nothing in the simulation
-    /// reads. A side whose vision is not tracked plays without fog of war and knows every nest.
+    /// Writes the nests <paramref name="tank"/>'s side has discovered (seen; a radar echo does not discover one) that
+    /// still have creatures, with their danger rings; returns how many (<see cref="NestDanger"/>). Output only:
+    /// discovery is what the side's vision (<see cref="TrackVision"/>) learned, which nothing in the simulation reads. A side whose vision is not tracked plays without fog of war and knows every nest.
     /// </summary>
     public int CopyNestDangers(Tank tank, Span<NestDanger> destination) => _sensing.CopyNestDangers(tank, destination);
 

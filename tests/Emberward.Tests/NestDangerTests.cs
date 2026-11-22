@@ -12,9 +12,8 @@ namespace Emberward.Tests;
 
 /// <summary>
 /// The danger ring over a discovered nest (<see cref="World.CopyNestDangers"/>, <see cref="NestDangerQuads"/>): a nest
-/// the side has seen or found by radar, and that still has creatures, gets a ring at the distance from which it senses
-/// the side's tank and a title; an undiscovered nest gets nothing, nor does a cleared one; discovery outlasts the sight
-/// or the blip that made it.
+/// the side has seen, and that still has creatures, gets a small ring around its ground and a title; an undiscovered
+/// nest gets nothing (a radar echo does not discover one), nor does one seen cleared; discovery outlasts the sight.
 /// </summary>
 public class NestDangerTests
 {
@@ -115,7 +114,7 @@ public class NestDangerTests
     }
 
     [Fact]
-    public void ANestOnlyTheRadarFound_HasNoRing_UntilTheTankSeesIt()
+    public void ANestOnlyTheRadarFound_HasNoRing()
     {
         var (world, tank) = Arena(halfWidth: 4);
         // Wide enough for the radar's rays to find it, out of the tank's sight through the dirt.
@@ -125,7 +124,29 @@ public class NestDangerTests
         Tick(world, tank, 8 + Tweaks.Radar.PulsePeriodTicks);
         Assert.False(world.TrackVision(tank).IsExplored(nest.Centre));
         var radar = world.RadarOf(tank)!;
-        Assert.Contains(Enumerable.Range(0, radar.ContactCount), i => radar.ContactAt(i).Echo == Emberward.Core.Sensing.RadarEcho.Life);
+        Assert.Contains(Enumerable.Range(0, radar.ContactCount),
+            i => radar.ContactAt(i).Echo == Emberward.Core.Sensing.RadarEcho.Life && radar.ContactAt(i).Position == nest.Centre);
+        Assert.Empty(Dangers(world, tank));
+    }
+
+    [Fact]
+    public void ANestClearedOutOfSight_KeepsItsRing_UntilTheTankSeesItCleared()
+    {
+        var (world, tank) = Arena();
+        var nest = world.Emberites!.AddNest(Centre + new Offset(8, 0), radius: 4, creatures: 6);
+        Tick(world, tank, 2);
+        Assert.Single(Dangers(world, tank));
+
+        tank.Position = Centre + new Offset(-40, 0);
+        Tick(world, tank, 2);
+        Assert.False(world.TrackVision(tank).IsVisible(nest.Centre));
+        nest.NeverReleased = 0;
+        Tick(world, tank, 1);
+        Assert.True(nest.IsCleared);
+        Assert.Single(Dangers(world, tank));
+
+        tank.Position = Centre;
+        Tick(world, tank, 1);
         Assert.Empty(Dangers(world, tank));
     }
 

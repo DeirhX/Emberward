@@ -632,7 +632,7 @@ Pyrite pockets and lumps at least 60 cells from every base hold a nest (a pocket
   faint while the nest sleeps, full once it is awake, and pulses while its creatures are out; a cleared nest has
   none. The ring shows the nest as the side last saw it (its centre in sight): out of sight, a
   nest that wakes or is cleared keeps its old ring, as remembered ground keeps its old look. The ring marks the nest, not
-  how far it senses (a hunt starts from 40 cells and a nest follows a tank much farther, up to 220 cells by heat), so
+  how far it senses (a hunt starts from 40 to 110 cells by heat and a nest follows a tank much farther, up to 220 cells by heat), so
   the pulse says it is hunting. A nest the player has seen cleared loses its ring for good. Rock
   blocking the nest's sense, and digging its ore, which wakes it from anywhere, are not drawn.
 - *Sneak or fight.* A cool tank is not sensed. A tank at 45 degrees is sensed from 40 cells, one at 100 from 110. Digging
