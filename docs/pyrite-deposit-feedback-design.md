@@ -12,8 +12,8 @@ by 7, the core a disc 5 cells across).
   `RecordInjected`). Both heats exist: the cargo heats the tank while carried (DESIGN.md §6.3, already booked) and
   the deposit heats the reactor when put down. At the core the bank runs **after** `PumpHeatAtBase`, so the deposit
   takes only the reactor room the tank's dock cooling left, so it never cuts that tick's cooling. The heat it leaves
-  does take room in the ticks after, so near a full reactor a deposit costs some later dock cooling, relay extraction
-  and shield recharge; a full hold vents in under a second only when nothing else feeds the reactor. A reactor with no room
+  takes room for the rest of that tick and after, so near a full reactor a deposit costs some relay extraction and
+  shield recharge later in that tick, and dock cooling in the ticks after; a full hold vents in under a second only when nothing else feeds the reactor. A reactor with no room
   takes the ore but none of its heat, and the glow then shows the pulse only (it reads the real `HeatStoreFill`,
   never the requested heat). None of the five existing `SimulationFingerprintTests` constants changed (none of those
   runs banks ore); a sixth run, `TankBanksAtCore`, now records a bank and its deposit heat.
@@ -104,7 +104,8 @@ a relay. (`StepEvent.Machine` cannot carry it: `MachineType`'s default is `Harve
 `RestartOreBurned` moves its `Position` from the tank to the core's centre too, so the burn path can draw the same
 pour (it becomes charge rather than store; §4.3). Its only reader today (`BasePowerTests`) checks `Count`.
 
-Nothing in the simulation reads step events, so this changes no result. Readers of `OreUnloaded` today:
+The only reader of step events in the simulation is `EmberiteSwarm.WatchForThieves`, which reads `OreCollected`
+alone, so moving and adding `OreUnloaded` events changes no result. Readers of `OreUnloaded` today:
 `StepEventSounds` (positional `Pickup`, heard by the player; the receiver is beside the player), `GuidanceTests` (sums
 `Count`; the core path now adds to it, which is right) and `OreEconomyTests` (sums `Count` at a relay; gains a
 `Position` check).

@@ -505,9 +505,11 @@ The bot drives its tank through the same `ControllerOutput` as a player, and ask
   to `DetourSeconds`. Fighting in sight, laying siege, waiting outside a base and anything in its own base are not
   watched.
 - **Sieges and waiting.** The bot asks `World.CanBreakBase` (the one owner of the answer) whether its gun alone can
-  break the enemy's base in `Tweaks.Bot.SiegeWindowSeconds` of steady fire. Only then does it lay siege (`BotSiege`).
-  While the enemy sits docked in a base it cannot break it waits at a post `LoiterCellsOutsideWall` out from the wall
-  in front of the nearest gate (`BotLoiter`), turret on the base and fire held, and fights once the enemy comes out.
+  break the enemy's base in `Tweaks.Bot.SiegeWindowSeconds` of steady fire. Only then does it lay siege (`BotSiege`),
+  once `Tweaks.Weapon.BotBaseSiegeGraceSeconds` are over; before that it roams. While the enemy sits docked in a base
+  it cannot break it waits at a post `LoiterCellsOutsideWall` out from the wall and `BotLoiter.PostSideStep` to one
+  side of the nearest gate, out of the gate's straight line of fire, turret on the base and fire held. It stops
+  waiting and fights while the enemy is in sight or for 5 s after a hit (`BotTankAI.TrackHits`).
 
 It still has no route planner (moves are scored one step at a time), sees the whole map and always knows where the
 enemy is.
@@ -608,7 +610,9 @@ A creature out is a small state machine (`EmberiteState`): `Hunting` with a char
 `HotspotSeekTicks`; after `MaxFailedSeeks` failures since it last filled up, `Emberite.FailedSeeks`, it looks no more and goes
 home, so every trip ends), `Recharging` there for `HotspotRechargeTicks` (`Emberite.Timer`) before it takes a full charge with
 `ExtractEnergyInRadiusArea` and hunts again, and `Returning` home when it has lost its tank or found no hot ground
-(`EmberiteSwarm.Hotspots.cs`). A creature going home short of a full charge looks for hot ground on its way
+(`EmberiteSwarm.Hotspots.cs`). A tank docked in its own base is no target (`ValidTarget`, `PickTarget`) and wakes no
+nest; a creature returning with a full charge takes up a tank it sees within `HuntLeashCells` again (`TryResumeHunt`,
+once in `SightCheckTicks`). A creature going home short of a full charge looks for hot ground on its way
 (`TryFindHotspotOnWayHome`: a fixed scan of `HomeScanCells` around it, at once and then once in `HomeScanTicks`, within
 `HomeDetourCells` of detour and away from the `Emberite.Hotspot` it last drained) and seeks it as above. A tank on ground at `HotZoneHeat`, within `HotZoneKeepCells` of the creature and not docked in its own base, is kept
 whatever its heat (one heat read per hunting creature).

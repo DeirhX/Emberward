@@ -176,7 +176,6 @@ public class BotLoiterTests
     }
 
     [Fact]
-    [Trait("Category", "Slow")]
     public void PastTheSiegeGrace_TheBotStillWaitsOutsideASoundBase()
     {
         var world = CreateWorld(width: 160);

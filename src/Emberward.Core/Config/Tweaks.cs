@@ -659,8 +659,8 @@ public static partial class Tweaks
         // short of a sound keep with its store behind it (60,000 shield, 28,800 bought back, 8,880 core with repairs):
         // a lone bot lays siege to a worn, dark or unshielded base and waits outside a sound one.
         public const int SiegeWindowSeconds = 60;
-        // While its enemy sits docked in a base it cannot break, the bot waits this many cells out from the wall, in
-        // front of the gate nearest it, and holds its fire (BotLoiter).
+        // While its enemy sits docked in a base it cannot break, the bot waits this many cells out from the wall, beside
+        // the gate nearest it (out of the gate's line of fire), and holds its fire (BotLoiter).
         public const int LoiterCellsOutsideWall = 12;
         // A bot that stays within StuckRadiusCells of one spot for StuckWindowSeconds, other than fighting in sight,
         // waiting outside a base or recharging at home, is going nowhere: it drops what it was after and heads for a
