@@ -148,7 +148,7 @@ public sealed class SoundDirector
                         PlayCue(wake, e.Position, index, ref impacts);
                     break;
                 default:
-                    if (StepEventSounds.CueFor(e.Kind, e.Machine) is { } cue &&
+                    if (StepEventSounds.CueFor(e) is { } cue &&
                         StepEventSounds.Hears(cue, tracked: index >= 0, isPlayer: e.Color == playerColor))
                         PlayCue(cue, e.Position, index, ref impacts);
                     break;

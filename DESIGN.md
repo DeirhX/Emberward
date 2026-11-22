@@ -762,9 +762,11 @@ after 5 seconds; in the open past 100 in about 5), and 40 is an emergency: past 
 4 in a tunnel, on the network or off it. The heat is the ore's own energy, booked as injected in the ledger. Banking
 also warms the core: each unit a tank banks, at the core or at a relay, brings 250 energy units into its base's reactor
 (`Tweaks.Cargo.DepositHeatPerOre`, `TankBase.BankFromHold`), as much as the reactor has room for after the tank's own
-dock cooling, booked as injected too. Both exist: the load heats the tank while it is carried, and the deposit heats the
-reactor when it is put down. A full hold is 10,000, a fifth of the reactor, vented in under a second by the stock
-radiator; a full reactor takes the ore but none of its heat. Harvested ore and ore burned to restart a dark base bring
+dock cooling in the same tick, booked as injected too. Both exist: the load heats the tank while it is carried, and the
+deposit heats the reactor when it is put down. A full hold is 10,000, a fifth of the reactor, vented in under a second
+by the stock radiator when nothing else feeds it; until it is vented it takes room, so near a full reactor a deposit
+costs some cooling, relay extraction and shield recharge in the ticks after. A full reactor takes the ore but none of
+its heat. Harvested ore and ore burned to restart a dark base bring
 none. The bot goes home as soon as its load is hot
 and drives up to its core to put it down, as a player must. Hot with
 20 or more aboard, the heat warnings say to unload, and the line under the hold says CARGO HOT.
