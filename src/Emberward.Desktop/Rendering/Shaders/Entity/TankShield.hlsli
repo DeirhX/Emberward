@@ -1,11 +1,14 @@
 // ============================================================================
-// Entity/TankShield.hlsli — A tank's shield: a living film of blue over the hull, flaring when it is hit
+// Entity/TankShield.hlsli — A tank's shield, shown while it is blocking hits
 // ============================================================================
 //
-// While the shield holds, a faint bubble sits around the tank: blue flow swirling across it, a hexagonal lattice whose
-// cells shimmer and whose veins carry travelling waves, a brighter rim, all breathing slowly and thin enough that the
-// tank reads clearly beneath. The bubble shows how much shield is left: as it drains its outer edge erodes away first,
-// down to a small core at the centre (regeneration grows it back outward), and it turns orange when low.
+// Nothing is drawn while nothing hits the shield. A hit brings up a faint bubble around the tank for a moment: blue
+// flow swirling across it, a hexagonal lattice whose cells shimmer and whose veins carry travelling waves, a brighter
+// rim, all thin enough that the tank reads clearly beneath. It is drawn as a translucent plastic dome lit from the upper
+// left: a fresnel rim, a broad gloss and a sharp glint, the pattern bunching towards the rim, shading deeper on the far
+// side, and the hexagon edges raised as ridges. It fades in over a step, holds while hits keep coming and dissolves
+// after the last (`visible`, from TankShieldQuads). The bubble shows how much shield is left: as it drains its outer
+// edge erodes away first, leaving a thick lit lip, down to a small core at the centre, and it turns orange when low.
 //
 // A hit lights the veins of what is left of the bubble with a wavefront from the impact, and a red patch glows where
 // the shot landed. The hit that breaks the shield shows the whole bubble once more, flashing and collapsing to the
@@ -67,36 +70,71 @@ float4 TankShield(float2 p, float3 team, float4 params, float aa)
     float fill = params.x;
     float age = saturate(params.y);
     float hitAngle = params.z;
-    float theta = params.w * kTankShieldTau;
+    // .w packs how much of the bubble shows (whole 255ths) with the animation loop (the fraction).
+    float visible = floor(params.w) / 255.0;
+    float theta = frac(params.w) * kTankShieldTau;
     float broken = step(fill, 0.0);
     float fade = 1.0 - age;
     float r = length(p);
+    float2 outward = p / max(r, 1e-4);
 
-    float2 latticePoint = p * kTankShieldVeinScale;
+    // The bubble is a dome: its normal from the normalised radius, lit from the upper left (local +y is down). The light
+    // sways a little with the swirl (whole turns of theta, so it loops).
+    float rn = saturate(r / kTankShieldRadius);
+    float3 normal = float3(p / kTankShieldRadius * step(r, kTankShieldRadius), sqrt(max(1.0 - rn * rn, 0.0)));
+    float sway = 0.18 * sin(theta);
+    float2 lightXY = float2(-0.45 * cos(sway) + 0.55 * sin(sway), -0.55 * cos(sway) - 0.45 * sin(sway));
+    float3 lightDir = normalize(float3(lightXY, 0.70));
+    float lit = dot(normal, lightDir);
+    float3 halfway = normalize(lightDir + float3(0.0, 0.0, 1.0));
+    float nh = saturate(dot(normal, halfway));
+    float nh2 = nh * nh;
+    float nh4 = nh2 * nh2;
+    float nh8 = nh4 * nh4;
+    float nh16 = nh8 * nh8;
+    float nh64 = nh16 * nh16;
+    nh64 *= nh64;
+    float specular = nh8 * nh4 * 0.22 + nh64 * 0.9;
+    float rimFacing = 1.0 - normal.z;
+    float fresnel = rimFacing * rimFacing;
+
+    // On a curved surface the pattern bunches up towards the rim: lattice and flow are laid out by arc length.
+    float arc = asin(min(rn, 0.999)) * kTankShieldRadius * 0.6366198;
+    float2 surface = outward * lerp(r + 0.35 * kTankShieldRadius, arc * 1.35, step(r, kTankShieldRadius));
+
+    float2 latticePoint = surface * kTankShieldVeinScale;
     float veins = VeinLines(latticePoint, 0.09);
+    // The cell edges are raised ridges: their slopes face away from the cell's middle, bright where that faces the light.
+    float2 cellOffset = latticePoint - HexCellCentre(latticePoint);
+    float slope = veins * (1.0 - veins) * 4.0;
+    float bevel = dot(cellOffset / max(length(cellOffset), 1e-4), lightXY) * slope;
+
     float reach = TankShieldReach(fill, age, broken);
     float edge = TankShieldEdge(p, r, veins);
     float remaining = 1.0 - smoothstep(reach - 0.08, reach, edge);
-    // A bright fringe where the bubble is eroding; past the bubble (a full shield) there is none to see.
-    float fringeOffset = (edge - reach + 0.04) / 0.05;
-    float fringe = exp(-fringeOffset * fringeOffset) * (1.0 - smoothstep(1.0, 1.15, reach));
+    // Where the bubble is eroding it has a thick rim: a lit lip (bright where its edge faces the light) and a shadowed
+    // band just inside. Past the bubble (a full shield) there is none to see.
+    float eroding = 1.0 - smoothstep(1.0, 1.15, reach);
+    float lipOffset = (edge - reach + 0.04) / 0.05;
+    float lip = exp(-lipOffset * lipOffset) * eroding;
+    float lipLight = 0.45 + 0.9 * saturate(dot(outward, lightXY) * 0.8 + 0.4);
+    float bandOffset = (edge - reach + 0.13) / 0.045;
+    float band = exp(-bandOffset * bandOffset) * eroding;
 
     float inside = 1.0 - smoothstep(kTankShieldRadius - 0.7, kTankShieldRadius, r);
     float rim = exp(-(r - kTankShieldRadius + 0.3) * (r - kTankShieldRadius + 0.3) * 1.6);
-    // Breathing over 8 s; the rim brightens towards the bubble's edge like a film seen edge-on.
-    float breathe = 0.82 + 0.18 * sin(5.0 * theta);
-    float edgeness = saturate(r / kTankShieldRadius);
-    float fresnel = edgeness * edgeness * edgeness;
+    float breathe = 0.85 + 0.15 * sin(5.0 * theta);
 
-    // Blue flow, deep to cyan, turning orange-red as the shield runs low.
-    float flow = TankShieldFlow(p, r, theta);
+    // Blue flow, deep to cyan, turning orange-red as the shield runs low; shaded deeper on the far side of the dome.
+    float flow = TankShieldFlow(surface, r, theta);
     float lowShift = saturate(fill * 2.0);
     float3 deep = lerp(kTankShieldEmber, lerp(kTankShieldDeep, team, 0.12), lowShift);
     float3 bright = lerp(kTankShieldHot, kTankShieldCyan, lowShift);
-    float3 flowColor = lerp(deep, bright, flow * flow);
+    float shade = saturate(0.55 + 0.6 * lit);
+    float3 flowColor = lerp(deep * 0.6, lerp(deep, bright, flow * flow), shade);
     float highlight = smoothstep(0.62, 0.85, flow);
 
-    // The lattice lives: each cell shimmers on its own phase (4 s), waves run outward along the veins (2 s), and a cell
+    // The lattice lives: each cell shimmers on its own phase (4 s), waves run outward along the ridges (2 s), and a cell
     // at the peak of its shimmer sparkles.
     float cellSeed = ShieldHash(HexCellCentre(latticePoint) * 7.13);
     float shimmer = 0.5 + 0.5 * sin(10.0 * theta + cellSeed * kTankShieldTau);
@@ -106,13 +144,15 @@ float4 TankShield(float2 p, float3 team, float4 params, float aa)
     peak *= peak;
     peak *= peak;
     float sparkle = peak * peak * step(0.7, cellSeed);
-    float idleVeins = veins * (0.10 + 0.22 * wave + 0.08 * shimmer);
+    float ridges = veins * (0.08 + 0.2 * wave + 0.06 * shimmer) * shade + saturate(bevel) * 0.35;
 
     float3 tint = lerp(kTankShieldHot, lerp(kTankShieldCool, team, 0.25), lowShift);
-    float3 film = flowColor * (0.10 + 0.20 * highlight + 0.25 * fresnel) * breathe
-        + bright * (idleVeins + sparkle * 0.25) * breathe
+    float3 white = float3(1.0, 1.0, 1.0);
+    float3 film = flowColor * (0.09 + 0.18 * highlight + 0.35 * fresnel) * breathe
+        + bright * (ridges + sparkle * 0.25) * breathe
         + tint * rim * 0.22 * breathe
-        + bright * (1.0 - veins) * shimmer * 0.025;
+        + lerp(bright, white, 0.6) * specular * (0.6 + 0.4 * flow)
+        + lerp(tint, white, 0.3) * lip * lipLight * 0.7;
 
     // The impact cell is on the hull, a few cells inside the bubble: show the patch on the bubble where the shot came
     // in, or at the edge of what is left of it when the shield is low. A break marks where the bubble was hit.
@@ -126,22 +166,23 @@ float4 TankShield(float2 p, float3 team, float4 params, float aa)
     float light = (0.22 + 1.1 * front) * fade * (1.0 + 0.5 * broken);
     // A low shield's small core glows a little more, so it is seen over the hull.
     float core = 0.06 + 0.25 * (1.0 - saturate(fill * 5.0)) * (1.0 - broken);
-    float3 add = film + tint * (veins * light * 1.7 + rim * fade * 0.8 + inside * fade * core + fringe * (0.25 + fade * 0.9));
+    float3 add = film + tint * (veins * light * 1.7 + rim * fade * 0.8 + inside * fade * core + lip * fade * 0.6);
     // The break flashes the whole bubble, quickly gone.
-    add += lerp(kTankShieldHot, float3(1.0, 1.0, 1.0), 0.35) * inside * fade * fade * 0.45 * broken;
+    add += lerp(kTankShieldHot, white, 0.35) * inside * fade * fade * 0.45 * broken;
 
     // Where the shot landed: a red patch that widens and fades.
     float2 toHit = p - hit;
     float spotRadius = lerp(1.6, 4.2, age);
     float spot = exp(-dot(toHit, toHit) / (spotRadius * spotRadius)) * sqrt(fade) * hasHit * inside;
     add += kTankShieldRed * spot * 1.4;
-    add += float3(1.0, 1.0, 1.0) * spot * spot * 0.35;
+    add += white * spot * spot * 0.35;
 
-    // Premultiplied: mostly added light, with a thin film of alpha (at most about 0.12) so the flow tints the tank
-    // a little without hiding it. Only what is left of the bubble shows.
-    float alpha = (0.04 + 0.05 * flow + 0.03 * fresnel) * breathe * inside;
+    // Premultiplied: mostly added light over a thin film of alpha, thicker towards the rim like a curved shell seen
+    // edge-on (about 0.05 in the middle, 0.2 at the rim), and on the shadowed side of the ridges and of the eroding lip,
+    // which darken a little. The tank reads clearly beneath. Only what is left of the bubble shows.
+    float alpha = (0.03 + 0.03 * flow + 0.14 * fresnel + 0.10 * saturate(-bevel) + 0.14 * band) * breathe * inside;
     float3 color = add * inside + tint * rim * (0.08 + fade * 0.3) * (1.0 - inside);
-    return float4(color, alpha) * remaining;
+    return float4(color, alpha) * (remaining * visible);
 }
 
 #endif // EMBERWARD_ENTITY_TANKSHIELD_HLSLI

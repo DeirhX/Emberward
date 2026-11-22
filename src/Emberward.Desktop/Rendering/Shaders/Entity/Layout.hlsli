@@ -41,10 +41,11 @@
 //  21 shield hit  — .x = age (0 just hit, 1 gone), .y = shield strength when hit (0..1), .z = 1 for the killing hit;
 //                   color.rgb = team colour
 //  22 tank shield — .x = shield fill (0..1; the bubble erodes from its edge inward as it falls), or -1 for the hit
-//                   that broke it (TankShieldQuads.BrokenFill: the whole bubble flashes and collapses), .y = pulse age
-//                   (0 just hit, 1 or more = no pulse, the bubble at rest), .z = the angle (radians) from the tank's
-//                   centre to where the shot landed (TankShieldQuads.NoHitAngle, 10, for none), .w = the animation loop
-//                   (0..1 over TankShieldQuads.LoopSeconds); color.rgb = team colour. Drawn while the tank has shield.
+//                   that broke it (TankShieldQuads.BrokenFill: the whole bubble flashes and collapses), .y = age of
+//                   the latest hit's effects (0 just hit, 1 or more = spent), .z = the angle (radians) from the tank's
+//                   centre to where the shot landed (TankShieldQuads.NoHitAngle, 10, for none), .w = how much of the
+//                   bubble shows in whole 255ths plus the animation loop as the fraction (0..1 over
+//                   TankShieldQuads.LoopSeconds); color.rgb = team colour. Drawn only while hits are fresh.
 //  23 tank fire   — .x = fire level (0..1), .y = seconds into a 4 s animation cycle, .z = how far the smoke leans (cells per cell
 //                   of rise), .w unused; color.rgb = team colour. Drawn only while the hull burns.
 //  16 power label — .xy = packed 5x7 glyph bitmap (low 20 bits, then high 15), .z = dots per cell
