@@ -96,7 +96,7 @@ public class NestDangerTests
 
         var (rings, glyphs) = Emitted(world);
         Assert.Equal(6, rings.Count);
-        Assert.All(rings, v => Assert.Equal(danger.Radius, v.P0));
+        Assert.All(rings, v => Assert.Equal(NestDangerQuads.RingRadius, v.P0));
         Assert.All(rings, v => Assert.Equal((float)NestDangerLevel.Dormant, v.P1));
         int letters = (NestDangerQuads.Title + NestDangerQuads.Warning).Count(c => c != ' ');
         Assert.Equal(letters, glyphs);

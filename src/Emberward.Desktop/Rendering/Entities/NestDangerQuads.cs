@@ -28,8 +28,11 @@ public sealed class NestDangerQuads
     private const float RingMargin = 3f;
 
     /// <summary>A label dot, in cells, and the gap between the ring and the label and between its lines.</summary>
-    private const float DotCells = 0.5f;
-    private const float GapCells = 1.5f;
+    private const float DotCells = 0.3f;
+    private const float GapCells = 1f;
+
+    /// <summary>The drawn ring's radius, in cells: a small mark around the nest, not the distance it senses from.</summary>
+    public const float RingRadius = 6f;
 
     private NestDanger[] _dangers = [];
     private int _count;
@@ -57,12 +60,12 @@ public sealed class NestDangerQuads
         for (int i = 0; i < _count; i++)
         {
             NestDanger danger = _dangers[i];
-            float extent = danger.Radius + RingMargin;
+            float extent = RingRadius + RingMargin;
             if (quads.IsOffScreen(quads.ScreenX(danger.Centre.X), quads.ScreenY(danger.Centre.Y), extent * scale))
                 continue;
             quads.Add(EntityQuads.Centre(danger.Centre.X), EntityQuads.Centre(danger.Centre.Y), 1f, 0f,
                 -extent, extent, -extent, extent, Pink, EntityShape.KindDangerRing,
-                danger.Radius, (float)danger.Level, quads.Phase, Opacity(danger.Level));
+                RingRadius, (float)danger.Level, quads.Phase, Opacity(danger.Level));
         }
     }
 
@@ -78,7 +81,7 @@ public sealed class NestDangerQuads
         {
             NestDanger danger = _dangers[i];
             float x = EntityQuads.Centre(danger.Centre.X);
-            float y = EntityQuads.Centre(danger.Centre.Y) - danger.Radius - GapCells;
+            float y = EntityQuads.Centre(danger.Centre.Y) - RingRadius - GapCells;
             float warningTop = -line;
             float titleTop = warningTop - GapCells * 0.5f - line;
             if (quads.IsOffScreen(quads.ScreenX(danger.Centre.X), quads.ScreenY(y + titleTop * 0.5f), MathF.Max(width, -titleTop) * scale))

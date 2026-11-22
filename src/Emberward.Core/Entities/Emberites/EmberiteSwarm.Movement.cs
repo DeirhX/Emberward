@@ -111,7 +111,7 @@ public sealed partial class EmberiteSwarm
     private Tank? ValidTarget(int index)
     {
         var tanks = _tanks.Tanks;
-        return index >= 0 && index < tanks.Count && !tanks[index].IsDead ? tanks[index] : null;
+        return index >= 0 && index < tanks.Count && !tanks[index].IsDead && !tanks[index].IsDockedAtOwnBase ? tanks[index] : null;
     }
 
     /// <summary>

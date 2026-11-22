@@ -11,15 +11,15 @@ public static class LedgerLayout
     public const float PlateTop = 168.5f, PlateBottom = 192.5f;
 
     /// <summary>The rows' text lines (their ink's middle), SHIELD above HULL.</summary>
-    public const float ShieldRowY = 173.8f, HullRowY = 185f;
+    public const float ShieldRowY = 173.8f, HullRowY = 185.3f;
 
     /// <summary>The hull row's text line when the match runs no shield: alone, in the middle of the plate.</summary>
     public const float SoloRowY = 180f;
 
     /// <summary>How far below a row's text line its bar runs, and the bar's half height and outline.</summary>
-    public const float BarDrop = 5.4f, BarHalf = 0.6f, BarOutline = 0.6f;
+    public const float BarDrop = 5.9f, BarHalf = 0.6f, BarOutline = 0.6f;
 
-    public const float LabelSize = 8.5f, NumberSize = 10f;
+    public const float LabelSize = 10f, NumberSize = 11f;
 
     /// <summary>The share of a text size its capitals and digits stand (a little over most fonts', to be safe).</summary>
     public const float InkHeight = 0.75f;
