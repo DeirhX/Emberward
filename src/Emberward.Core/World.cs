@@ -527,6 +527,12 @@ public partial class World
     /// <summary>How <paramref name="tankBase"/>'s network of harvesters and relays stands as of the last tick.</summary>
     public NetworkStatus GetNetworkStatus(TankBase tankBase) => NetworkStatus.Collect(tankBase, _machines.Machines, IsBaseDark(tankBase));
 
+    /// <summary>
+    /// The nearest of <paramref name="tank"/>'s own powered relays within <paramref name="reach"/> cells, where it could
+    /// unload (<see cref="Tank.NearestDropOff"/>); null when none. Output only.
+    /// </summary>
+    public Position? NearestOreDropOff(Tank tank, int reach) => tank.NearestDropOff(_machines, reach);
+
     /// <summary>Fills <paramref name="into"/> with the coverage nodes of <paramref name="owner"/>'s network.</summary>
     public void CollectCoverageNodes(TankBase owner, List<CoverageNode> into) =>
         NetworkCoverage.CollectNodes(owner, _machines.Machines, into);

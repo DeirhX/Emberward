@@ -52,4 +52,14 @@ static const float3 kChargeBlue = float3(0.30, 0.55, 1.00);
 static const float3 kOreGold = float3(1.0, 0.76, 0.25);
 static const float3 kOreGlint = float3(1.0, 0.95, 0.72);
 
+// A faceted pyrite crystal: a diamond of half-diagonal size, turned by spin (radians). Returns its signed distance in
+// cells; the ore beam's crystals and a deposit pour's share it.
+float OreCrystalDistance(float2 q, float spin, float size)
+{
+    float c = cos(spin);
+    float s = sin(spin);
+    float2 r = float2(q.x * c - q.y * s, q.x * s + q.y * c);
+    return abs(r.x) + abs(r.y) - size;
+}
+
 #endif // EMBERWARD_ENTITY_COMMON_HLSLI

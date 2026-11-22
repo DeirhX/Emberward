@@ -5,6 +5,7 @@ using Emberward.Core;
 using Emberward.Core.Rendering;
 using Emberward.Core.Sensing;
 using Emberward.Core.Types;
+using Emberward.Desktop.Gui;
 using Emberward.Desktop.Rendering.Entities;
 
 /// <summary>One corner of an entity quad. Layout must match VSIn in EntityVs.hlsl and the SDL_GPU vertex attributes in SdlGpuBackend.</summary>
@@ -22,7 +23,8 @@ public struct EntityVertex
 
 /// <summary>
 /// Turns simulation snapshots into the entity layer's quads: radar blips, network coverage, links, the placement preview,
-/// machines, the light of tank fires, tanks, projectiles, emberites, tank fires, shields and charge labels, in that order (later ones draw on top). <see cref="EntityMotion"/> says where
+/// the core heat glows, machines, the light of tank fires, tanks, the deposit crystals, projectiles, emberites, tank
+/// fires, shields, charge labels and deposit labels, in that order (later ones draw on top). <see cref="EntityMotion"/> says where
 /// tanks and machines start and how they move through a simulation step (the vertex shader does the rest); each family's emitter in <c>Rendering/Entities</c>
 /// writes its quads. The layer reads simulation state solely for drawing.
 /// </summary>
@@ -47,8 +49,15 @@ public sealed class EntityLayerBuilder
     private readonly EmberiteQuads _emberites = new();
     private readonly NestDangerQuads _nestDangers = new();
     private readonly PowerLabelQuads _powerLabels = new();
+    private readonly DepositQuads _deposits = new();
     private TankRenderState[] _tankScratch = [];
     private MachineRenderState[] _machineScratch = [];
+
+    /// <summary>The local player's base store and how fast it grows, counted from the captured steps.</summary>
+    public OreLedgerView OreLedger { get; } = new();
+
+    /// <summary>The pyrite deposits drawn (pours, core glows, floaters, the store label).</summary>
+    public DepositQuads Deposits => _deposits;
 
     public EntityVertex[] Vertices => _quads.Vertices;
     public int VertexCount => _quads.VertexCount;
@@ -76,6 +85,8 @@ public sealed class EntityLayerBuilder
         _emberites.Capture(world);
         _nestDangers.CaptureStep(world, localSlot);
         _powerLabels.CaptureStep(world, localSlot);
+        OreLedger.CaptureStep(world, localSlot);
+        _deposits.CaptureStep(world, localSlot, OreLedger);
     }
 
     /// <summary>
@@ -101,6 +112,7 @@ public sealed class EntityLayerBuilder
         _emberites.Hold();
         _tankShields.Hold();
         _tankFires.Hold();
+        _deposits.Hold();
     }
 
     /// <summary>
@@ -132,6 +144,7 @@ public sealed class EntityLayerBuilder
             _coverage.SubmitTether(_beams, tankPositions[0]);
         _links.Submit(_beams, vision);
         _beams.Emit(_quads);
+        _deposits.EmitGlows(_quads, vision);
         if (tankPositions.Length > 0)
         {
             var (start, drift) = _motion.TankMotion(0);
@@ -140,6 +153,7 @@ public sealed class EntityLayerBuilder
         MachineQuads.Emit(_quads, _motion, turnSeconds, snapHeadings, vision);
         _tankFires.EmitLight(_quads, _motion, vision);
         TankQuads.Emit(_quads, _motion, tankPositions, turnSeconds, snapHeadings, protectedBlinkOn, vision);
+        _deposits.EmitCrystals(_quads, vision);
         _projectiles.Emit(_quads, vision);
         _emberites.Emit(_quads, vision);
         _tankFires.Emit(_quads, _motion, vision);
@@ -147,5 +161,6 @@ public sealed class EntityLayerBuilder
         _baseShields.Emit(_quads, vision);
         _powerLabels.Emit(_quads, vision, powerLabelCellSize);
         _nestDangers.EmitLabels(_quads);
+        _deposits.EmitLabels(_quads);
     }
 }

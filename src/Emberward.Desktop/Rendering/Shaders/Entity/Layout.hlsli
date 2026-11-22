@@ -63,6 +63,12 @@
 //                   phase), a spark or cinder (trail length, head radius, starting heat).
 //  26 danger ring — .x = radius (cells), .y = level (NestDangerLevel: 0 dormant, 1 awake, 2 swarming: it pulses),
 //                   .z = phase, .w = opacity; color.rgb = the ring's colour
+//  27 ore crystal — one pyrite crystal of a deposit pour: .x = age (0 leaving the hold, 1 landing), .y = glint seed
+//                   (0..1), .z = spin (radians), .w = landing brightness (0..1); color.r = 1 for ore burned to restart
+//                   a dark base (cyan), 0 for ore banked (gold)
+//  28 core heat   — a core's heat glow and deposit pulse, or a relay's flash: .x = heat (the reactor's heat store,
+//                   0..1), .y = pulse (0..1: a ring expands as it falls), .z = phase (0..1 of a 4 s cycle), .w = mode
+//                   (0 store: gold, 1 burn: cyan-white); color.r = radius (cells). Additive.
 //
 // color.rgb is the team colour (tank hull, turret), the body colour (hot shot),
 // the tint (reach area, coverage, power label) or data (radar blip, tank fire, fire particle). Every other kind owns its colours
@@ -100,6 +106,8 @@ static const float kKindTankFire = 23.0;
 static const float kKindTankFireLight = 24.0;
 static const float kKindFireParticle = 25.0;
 static const float kKindDangerRing = 26.0;
+static const float kKindOreCrystal = 27.0;
+static const float kKindCoreHeat = 28.0;
 
 // Machine flags (params.w); EntityShape's MachineFlag* constants must match.
 static const float kMachineFlagStalled = 1.0;

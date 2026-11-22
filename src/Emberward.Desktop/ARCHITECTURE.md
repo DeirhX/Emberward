@@ -106,6 +106,15 @@ Core decides what is seen; the renderer only shows it.
 - **Nest danger rings.** `NestDangerQuads` asks Core for the player's discovered nests (`World.CopyNestDangers`) each
   step and draws a thin pink ring over each (`KindDangerRing`, `DangerRing` in `Shaders/Entity/Overlays.hlsli`) under the
   machines, and its title above it with the glyph quads the charge labels use (`GlyphText`), after them.
+- **Pyrite deposits.** `DepositQuads` reads each step's `OreUnloaded` and `RestartOreBurned` (Position is the
+  receiver, Target says core or relay) and pours up to 12 crystals from the tank's hold into it (`KindOreCrystal`), a
+  crystal a step, each flying 0.45 s on a short arc; events from one tank a few steps apart join one pour. Each base
+  core in sight gets a glow (`KindCoreHeat`, `Shaders/Entity/Deposit.hlsli`) that eases toward its reactor's
+  `HeatStoreFill` and pulses as crystals land; a relay gets a small flash. Rival pours show too (in sight), but the
+  rising `+N` (and `BASE N` at the core) only for the player's side. The player's nearest powered relay in reach, out
+  of the base, carries a `BASE STORE` label with the store and its rate (`World.NearestOreDropOff`, `OreLedgerView`,
+  which counts the side's banked and harvested units over 30 s). At the core the ore beam is left out: the pour shows
+  it. Output only, a function of the captured steps: a late joiner starts with nothing in flight.
 - **Radar blips.** `Game` also asks for the player's `Radar` (`World.TrackRadar`). `RadarQuads` draws one small
   quad per contact (`KindRadarBlip`, `RadarBlip` in `Shaders/Entity/Overlays.hlsli`), first in the entity layer so
   everything else is on top: green for rock and walls, amber for metal, dim blue-green for a cave,

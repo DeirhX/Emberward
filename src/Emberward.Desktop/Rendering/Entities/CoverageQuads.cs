@@ -7,8 +7,8 @@ using Emberward.Core.Network;
 
 /// <summary>
 /// The player's network coverage (DESIGN.md §4.6): a faint field around every node, and while the tank is covered
-/// (outside a base) a cool tether from the node carrying its heat away, and while its hold unloads a stream of ore
-/// crystals to the core or relay it touches. Off network the fields brighten a little, so the way back reads at a glance.
+/// (outside a base) a cool tether from the node carrying its heat away, and while its hold unloads at a relay a stream
+/// of ore crystals to it (at the core, <see cref="DepositQuads"/> pours them in). Off network the fields brighten a little, so the way back reads at a glance.
 /// </summary>
 public sealed class CoverageQuads
 {
@@ -29,7 +29,8 @@ public sealed class CoverageQuads
         world.CollectCoverageNodes(home, _coverageNodes);
         _playerCoverage = player.IsDead ? TankCoverage.None : player.Coverage;
         _playerOffNetwork = !player.IsDead && player.IsOffNetwork;
-        _playerUnloading = player.IsUnloadingOre && !player.IsDead;
+        // At the core the deposit pour (DepositQuads) shows the ore going in; the beam stays for relays.
+        _playerUnloading = player.IsUnloadingOre && !player.IsDead && player.UnloadNode != home.Position;
         _unloadNode = player.UnloadNode;
     }
 
@@ -53,7 +54,7 @@ public sealed class CoverageQuads
     }
 
     /// <summary>
-    /// The tether, and while the hold unloads the ore stream to the core or relay the tank touches
+    /// The tether, and while the hold unloads at a relay the ore stream to the relay the tank touches
     /// (<see cref="Tank.UnloadNode"/>), handed to <paramref name="beams"/>; <paramref name="player"/> is the interpolated
     /// player tank, where they start.
     /// </summary>
