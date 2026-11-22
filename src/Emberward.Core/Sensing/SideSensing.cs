@@ -121,7 +121,7 @@ internal sealed class SideSensing(TerrainGrid terrain, MachineList machines, Tan
         {
             bool known = found is null ? emberites.TryGetDangerLevel(i, out NestDangerLevel level) : found.TryGetKnownLevel(i, out level);
             if (known)
-                destination[count++] = new NestDanger(emberites.Nests[i].Centre, Entities.Emberites.EmberiteSwarm.DangerRadius(tank.Heat), level);
+                destination[count++] = new NestDanger(emberites.Nests[i].Centre, Entities.Emberites.EmberiteSwarm.DangerRadius(emberites.Nests[i].Radius), level);
         }
         return count;
     }

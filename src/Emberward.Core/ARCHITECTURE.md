@@ -583,7 +583,7 @@ has returned the nest's own life echo this tick (a life contact on the nest's ce
 contacts back; a creature or tank beside it echoes on its own cell). It keeps what the side last learned of each
 nest (`NestDangerLevel`, or cleared), refreshed only while the centre is in sight or the nest's echo comes back, so
 the fog hides what a nest does meanwhile; a tick looks at each nest's centre once. `World.CopyNestDangers(tank)`
-lists the found nests not last seen cleared, with that level and the ring radius `EmberiteSwarm.DangerRadius(tank.Heat)`;
+lists the found nests not last seen cleared, with that level and the ring radius `EmberiteSwarm.DangerRadius(nest.Radius)`, a small ring around the nest;
 a side whose vision is not tracked (no fog) knows every nest as it is.
 
 `EmberiteSwarm` (`Entities/Emberites`) exists only when `MatchRules.Emberites` is on and is stepped as `"emberites"` after `"tanks"`.

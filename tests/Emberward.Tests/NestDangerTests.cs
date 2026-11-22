@@ -80,7 +80,7 @@ public class NestDangerTests
     }
 
     [Fact]
-    public void ANestInSight_GetsARingAtItsSenseRange_AndATitle()
+    public void ANestInSight_GetsASmallRing_AndATitle()
     {
         var (world, tank) = Arena();
         world.Emberites!.AddNest(Centre + new Offset(8, 0), radius: 4, creatures: 6);
@@ -89,21 +89,20 @@ public class NestDangerTests
 
         var danger = Assert.Single(Dangers(world, tank));
         Assert.Equal(Centre + new Offset(8, 0), danger.Centre);
-        // A cool tank is not sensed at all: the ring shows the nearest a tank is ever sensed from.
-        Assert.Equal(Tweaks.Emberites.WakeRange, danger.Radius);
-        Assert.Equal(EmberiteSwarm.DangerRadius(20f), danger.Radius);
+        // A small ring: the nest's ground plus a margin, not the distance it senses from.
+        Assert.Equal(EmberiteSwarm.DangerRadius(4), danger.Radius);
         Assert.Equal(NestDangerLevel.Dormant, danger.Level);
 
         var (rings, glyphs) = Emitted(world);
         Assert.Equal(6, rings.Count);
-        Assert.All(rings, v => Assert.Equal(NestDangerQuads.RingRadius, v.P0));
+        Assert.All(rings, v => Assert.Equal(danger.Radius, v.P0));
         Assert.All(rings, v => Assert.Equal((float)NestDangerLevel.Dormant, v.P1));
         int letters = (NestDangerQuads.Title + NestDangerQuads.Warning).Count(c => c != ' ');
         Assert.Equal(letters, glyphs);
     }
 
     [Fact]
-    public void TheRing_GrowsWithTheTanksHeat_AndPulsesWhileCreaturesAreOut()
+    public void TheRing_PulsesWhileCreaturesAreOut()
     {
         var (world, tank) = Arena();
         world.Emberites!.AddNest(Centre + new Offset(8, 0), radius: 4, creatures: 6);
@@ -111,8 +110,7 @@ public class NestDangerTests
         Tick(world, tank, Tweaks.Emberites.StirTicks + 10, heat: 80f);
 
         var danger = Assert.Single(Dangers(world, tank));
-        Assert.Equal(EmberiteSwarm.SenseRange(tank.Heat), danger.Radius);
-        Assert.True(danger.Radius > Tweaks.Emberites.WakeRange);
+        Assert.Equal(EmberiteSwarm.DangerRadius(4), danger.Radius);
         Assert.Equal(NestDangerLevel.Swarming, danger.Level);
     }
 

@@ -6,8 +6,7 @@ using Emberward.Core.Types;
 
 /// <summary>
 /// A thin pink danger ring over each nest the player's side has discovered and that still has creatures, at the
-/// distance from which the nest senses the player's tank now, with a title above it. Core answers which nests and how
-/// far (<see cref="World.CopyNestDangers"/>); this only draws. A dormant nest's ring is faint, an awake one's full, and
+/// nest's own ground plus a margin, with a title above it. Core answers which nests and how big (<see cref="World.CopyNestDangers"/>); this only draws. A dormant nest's ring is faint, an awake one's full, and
 /// one whose creatures are out pulses. Drawn whether or not the nest is in sight: a discovered nest stays marked.
 /// </summary>
 public sealed class NestDangerQuads
@@ -30,9 +29,6 @@ public sealed class NestDangerQuads
     /// <summary>A label dot, in cells, and the gap between the ring and the label and between its lines.</summary>
     private const float DotCells = 0.3f;
     private const float GapCells = 1f;
-
-    /// <summary>The drawn ring's radius, in cells: a small mark around the nest, not the distance it senses from.</summary>
-    public const float RingRadius = 6f;
 
     private NestDanger[] _dangers = [];
     private int _count;
@@ -60,12 +56,12 @@ public sealed class NestDangerQuads
         for (int i = 0; i < _count; i++)
         {
             NestDanger danger = _dangers[i];
-            float extent = RingRadius + RingMargin;
+            float extent = danger.Radius + RingMargin;
             if (quads.IsOffScreen(quads.ScreenX(danger.Centre.X), quads.ScreenY(danger.Centre.Y), extent * scale))
                 continue;
             quads.Add(EntityQuads.Centre(danger.Centre.X), EntityQuads.Centre(danger.Centre.Y), 1f, 0f,
                 -extent, extent, -extent, extent, Pink, EntityShape.KindDangerRing,
-                RingRadius, (float)danger.Level, quads.Phase, Opacity(danger.Level));
+                danger.Radius, (float)danger.Level, quads.Phase, Opacity(danger.Level));
         }
     }
 
@@ -81,7 +77,7 @@ public sealed class NestDangerQuads
         {
             NestDanger danger = _dangers[i];
             float x = EntityQuads.Centre(danger.Centre.X);
-            float y = EntityQuads.Centre(danger.Centre.Y) - RingRadius - GapCells;
+            float y = EntityQuads.Centre(danger.Centre.Y) - danger.Radius - GapCells;
             float warningTop = -line;
             float titleTop = warningTop - GapCells * 0.5f - line;
             if (quads.IsOffScreen(quads.ScreenX(danger.Centre.X), quads.ScreenY(y + titleTop * 0.5f), MathF.Max(width, -titleTop) * scale))

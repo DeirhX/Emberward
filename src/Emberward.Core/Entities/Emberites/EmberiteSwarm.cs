@@ -189,12 +189,8 @@ public sealed partial class EmberiteSwarm
         return Tweaks.Emberites.HuntLeashMinCells + t * (Tweaks.Emberites.HuntLeashCells - Tweaks.Emberites.HuntLeashMinCells);
     }
 
-    /// <summary>
-    /// The radius of a nest's danger ring for a tank at <paramref name="heat"/>: how far the nest senses it from
-    /// (<see cref="SenseRange"/>), and never less than <see cref="Tweaks.Emberites.WakeRange"/>, the nearest it senses
-    /// a tank at all, so that a tank too cool to be sensed still sees where warming up would wake it.
-    /// </summary>
-    public static float DangerRadius(float heat) => Math.Max(Tweaks.Emberites.WakeRange, SenseRange(heat));
+    /// <summary>The radius of a nest's danger ring: its ground plus a margin, a small mark around the nest.</summary>
+    public static float DangerRadius(int nestRadius) => nestRadius + 2f;
 
     /// <summary>How dangerous nest <paramref name="index"/> is now; false for a cleared nest, which is no danger.</summary>
     public bool TryGetDangerLevel(int index, out NestDangerLevel level)

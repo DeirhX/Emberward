@@ -93,14 +93,14 @@ public sealed partial class EmberiteSwarm
         float range = Tweaks.Emberites.BiteRange;
         if (dx * dx + dy * dy <= range * range)
         {
-            if (emberite.Charge > 0.0 && !tank.IsDockedAtOwnBase && tank.SpawnProtectionTicks == 0)
+            if (emberite.Charge > 0.0 && tank.SpawnProtectionTicks == 0)
             {
                 Bite(ref emberite, tank);
                 SeekHeat(ref emberite);
             }
             else
             {
-                // Waiting at the tank (a base shields it, or it has just respawned): hold still.
+                // Waiting at the tank (it has no charge, or has just respawned): hold still.
                 emberite.Velocity = default;
             }
             return;
