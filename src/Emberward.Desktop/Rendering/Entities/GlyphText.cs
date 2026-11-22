@@ -5,7 +5,7 @@ using Emberward.Core.Types;
 /// <summary>
 /// Short lines of text drawn in the world as entity quads: one <see cref="EntityShape.KindPowerLabel"/> quad per glyph of
 /// a 5x7 bitmap alphabet, packed into the quad's parameters (<c>PowerLabel.hlsli</c> unpacks it). The charge labels and
-/// the nest danger labels use it.
+/// the nest danger labels and the pyrite deposit labels (DepositQuads) use it.
 /// </summary>
 internal static class GlyphText
 {
@@ -68,6 +68,7 @@ internal static class GlyphText
         'I' => 0b01110_00100_00100_00100_00100_00100_01110UL,
         'M' => 0b10001_11011_10101_10101_10001_10001_10001UL,
         'N' => 0b10001_11001_10101_10011_10001_10001_10001UL,
+        'O' => 0b01110_10001_10001_10001_10001_10001_01110UL,
         'R' => 0b11110_10001_10001_11110_10100_10010_10001UL,
         'S' => 0b01111_10000_10000_01110_00001_00001_11110UL,
         'T' => 0b11111_00100_00100_00100_00100_00100_00100UL,

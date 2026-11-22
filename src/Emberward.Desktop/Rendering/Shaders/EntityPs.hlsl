@@ -27,6 +27,7 @@
 #include "Entity/TankShield.hlsli"
 #include "Entity/TankFire.hlsli"
 #include "Entity/Emberites.hlsli"
+#include "Entity/Deposit.hlsli"
 
 float4 main(PSIn input) : SV_Target
 {
@@ -91,7 +92,11 @@ float4 main(PSIn input) : SV_Target
         result = TankFireLight(p, input.params, input.color.r);
     else if (kind < kKindFireParticle + 0.5)
         result = FireParticle(p, input.params, input.color.rgb, aa);
-    else // kKindDangerRing
+    else if (kind < kKindDangerRing + 0.5)
         result = DangerRing(p, input.color.rgb, input.params, aa);
+    else if (kind < kKindOreCrystal + 0.5)
+        result = OreCrystal(p, input.color.rgb, input.params, aa);
+    else // kKindCoreHeat
+        result = CoreHeat(p, input.color.rgb, input.params);
     return result;
 }

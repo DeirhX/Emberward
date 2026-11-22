@@ -460,7 +460,7 @@ public class Tank
     public bool TouchesCore(TankBase tankBase) => TankSpriteShape.ReachesDisc(Direction, Position, tankBase.Position,
         Tweaks.Keep.CoreSize + 2 * Tweaks.Cargo.ContactReach);
 
-    [NotSaved("scratch: TouchedRelay fills it before it reads it")]
+    [NotSaved("scratch: TouchedRelay and NearestDropOff fill it before they read it")]
     private readonly List<Machine> _nearMachines = new();
 
     /// <summary>
@@ -481,6 +481,30 @@ public class Tank
                 TankSpriteShape.OverlapsSquare(Direction, Position, machine.Position, half))
                 return machine;
         return null;
+    }
+
+    /// <summary>
+    /// Where the nearest of its own base's standing, powered drop-off points (the relays <see cref="TouchedRelay"/> can
+    /// pick) stands within <paramref name="reach"/> cells of the tank along both axes; the first in list order on a tie;
+    /// null when there is none. Output only: the HUD labels it with the base store, which every relay shares.
+    /// </summary>
+    public Position? NearestDropOff(MachineList? machines, int reach)
+    {
+        if (machines == null || Base == null || IsDead)
+            return null;
+        machines.CollectNear(Position, reach, _nearMachines);
+        Position? nearest = null;
+        long best = long.MaxValue;
+        foreach (var machine in _nearMachines)
+        {
+            if (!machine.StandsFor(Base) || !machine.Behavior.TakesOre || machine.LinkPoint is not { IsPowered: true, Hops: >= 0 })
+                continue;
+            long dx = machine.Position.X - Position.X, dy = machine.Position.Y - Position.Y;
+            long distance = dx * dx + dy * dy;
+            if (distance < best)
+                (best, nearest) = (distance, machine.Position);
+        }
+        return nearest;
     }
 
     // Unload rate credit, in units times ticks per second: a unit moves each time it reaches TargetFps.

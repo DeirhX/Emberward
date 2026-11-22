@@ -132,9 +132,7 @@ float4 OreBeam(float2 p, float4 params, float aa)
     float cell = floor(along / spacing);
     float2 q = float2((frac(along / spacing) - 0.5) * spacing, p.y);
     float spin = phase * 2.5 + cell * 1.7;
-    float c = cos(spin), s = sin(spin);
-    q = float2(q.x * c - q.y * s, q.x * s + q.y * c);
-    float diamond = abs(q.x) + abs(q.y) - 0.42;
+    float diamond = OreCrystalDistance(q, spin, 0.42);
     float glint = step(0.8, BeamHash(cell + 0.31));
     float3 crystal = lerp(kOreGold, kOreGlint, glint);
     Over(result, crystal, FillAlpha(diamond, aa) * endFade * flow);
