@@ -37,6 +37,12 @@ public static class HullStatuses
     /// <summary>Below this share of its health the hull is melting.</summary>
     public const float MeltingHullFraction = 0.05f;
 
+    /// <summary>
+    /// While the shield is empty, a fire at or under this level still reads SHIELD DOWN (the empty shield is the news);
+    /// above it, HULL BREACH.
+    /// </summary>
+    public const float BreachFireLevel = 0.2f;
+
     private static readonly uint Slate = HudPalette.Rgba(138, 168, 194);
     private static readonly uint Breach = HudPalette.Rgba(255, 106, 16);
     private static readonly uint SlagGrey = HudPalette.Rgba(140, 134, 128);
@@ -49,12 +55,14 @@ public static class HullStatuses
     /// <summary>
     /// The plate's word, worst first: SLAG when dead, MELTING under <see cref="MeltingHullFraction"/> of the hull,
     /// HULL BREACH while burning, SHIELD DOWN with an empty shield, else SHIELDED (HULL with no shield in the match).
+    /// An empty shield on a hull that has only just caught (fire up to <see cref="BreachFireLevel"/>) reads SHIELD
+    /// DOWN, so the empty shield is named before the breach takes over.
     /// </summary>
     public static HullStatusWord Of(bool dead, bool shieldActive, int shield, float fireLevel, float hullFraction)
     {
         var status = dead ? HullStatus.Slag
             : hullFraction < MeltingHullFraction ? HullStatus.Melting
-            : fireLevel > 0f ? HullStatus.HullBreach
+            : fireLevel > BreachFireLevel || (fireLevel > 0f && (!shieldActive || shield > 0)) ? HullStatus.HullBreach
             : !shieldActive ? HullStatus.Hull
             : shield <= 0 ? HullStatus.ShieldDown
             : HullStatus.Shielded;

@@ -94,6 +94,11 @@ public class HullPlateTests
     [InlineData(false, true, 0, 0f, 0.9f, HullStatus.ShieldDown)]
     [InlineData(false, true, 0, 0.3f, 0.3f, HullStatus.HullBreach)]
     [InlineData(false, true, 25, 0.3f, 0.3f, HullStatus.HullBreach)]
+    [InlineData(false, true, 0, 0.1f, 0.67f, HullStatus.ShieldDown)]
+    [InlineData(false, true, 0, 0.2f, 0.6f, HullStatus.ShieldDown)]
+    [InlineData(false, true, 0, 0.21f, 0.59f, HullStatus.HullBreach)]
+    [InlineData(false, true, 25, 0.1f, 0.67f, HullStatus.HullBreach)]
+    [InlineData(false, false, 0, 0.1f, 0.67f, HullStatus.HullBreach)]
     [InlineData(false, true, 0, 0.9f, 0.04f, HullStatus.Melting)]
     [InlineData(false, true, 0, 0f, 0.049f, HullStatus.Melting)]
     [InlineData(false, true, 0, 0f, 0.05f, HullStatus.ShieldDown)]
@@ -118,5 +123,26 @@ public class HullPlateTests
         var melting = words[3];
         Assert.NotEqual(melting.ColorAt(0f), melting.ColorAt(0.3f));
         Assert.Equal(HudPalette.Shield, words[0].Color);
+    }
+
+    [Fact]
+    public void TheLedgerRows_NumbersBarsAndOutlines_NeitherOverlapNorLeaveThePlate()
+    {
+        // Top to bottom: the SHIELD row's text, its bar, the HULL row's text, its bar; and the lone hull row of a match
+        // with no shield.
+        (float Top, float Bottom)[] stacked =
+        [
+            LedgerLayout.Text(LedgerLayout.ShieldRowY), LedgerLayout.Bar(LedgerLayout.ShieldRowY),
+            LedgerLayout.Text(LedgerLayout.HullRowY), LedgerLayout.Bar(LedgerLayout.HullRowY),
+        ];
+        (float Top, float Bottom)[] solo = [LedgerLayout.Text(LedgerLayout.SoloRowY), LedgerLayout.Bar(LedgerLayout.SoloRowY)];
+        foreach (var rows in new[] { stacked, solo })
+        {
+            Assert.True(rows[0].Top >= LedgerLayout.PlateTop, $"the top row starts at {rows[0].Top}, above the plate");
+            Assert.True(rows[^1].Bottom <= LedgerLayout.PlateBottom, $"the last bar ends at {rows[^1].Bottom}, below the plate");
+            for (int i = 1; i < rows.Length; i++)
+                Assert.True(rows[i].Top >= rows[i - 1].Bottom, $"rectangle {i} ({rows[i].Top}) overlaps the one above ({rows[i - 1].Bottom})");
+        }
+        Assert.True(LedgerLayout.LabelSize <= LedgerLayout.NumberSize);
     }
 }

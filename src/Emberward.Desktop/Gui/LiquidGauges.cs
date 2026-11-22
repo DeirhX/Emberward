@@ -23,6 +23,11 @@ public sealed class LiquidGauges(HudLayout layout)
 
     private float _shownShieldFill = -1f;
 
+    // Reused each frame, so drawing the crystal allocates nothing.
+    private readonly Vector2[] _poly = new Vector2[ShieldOutline.Length];
+    private readonly Vector2[] _inner = new Vector2[ShieldOutline.Length];
+    private readonly Vector2[] _ring = new Vector2[4];
+
     /// <param name="fill">What the crystal shows, 0 to 1: the shield (cyan crystal) when the match runs one, else the hull.</param>
     /// <param name="low">Whether that level is low enough to pulse red.</param>
     public void Draw(ImDrawListPtr dl, Tank player, float shieldPanelX, float time, float fill, bool low)
@@ -35,7 +40,7 @@ public sealed class LiquidGauges(HudLayout layout)
 
         // Shield crystal.
         var o = new Vector2(shieldPanelX, 0f);
-        var poly = new Vector2[ShieldOutline.Length];
+        var poly = _poly;
         for (int i = 0; i < poly.Length; i++)
         {
             poly[i] = layout.At(o + ShieldOutline[i]);
@@ -47,7 +52,7 @@ public sealed class LiquidGauges(HudLayout layout)
             centre += point;
         centre /= poly.Length;
         float shrink = MathF.Sqrt(Math.Clamp(_shownShieldFill, 0f, 1f));
-        var inner = new Vector2[poly.Length];
+        var inner = _inner;
         for (int i = 0; i < poly.Length; i++)
             inner[i] = centre + (poly[i] - centre) * shrink;
 
@@ -58,7 +63,11 @@ public sealed class LiquidGauges(HudLayout layout)
         for (int i = 0; i < poly.Length; i++)
         {
             int n = (i + 1) % poly.Length;
-            var ring = new[] { poly[i], poly[n], inner[n], inner[i] };
+            var ring = _ring;
+            ring[0] = poly[i];
+            ring[1] = poly[n];
+            ring[2] = inner[n];
+            ring[3] = inner[i];
             dl.AddConvexPolyFilled(ref ring[0], ring.Length, 0xC8080808u);          // empty part
         }
         if (!player.IsDead)

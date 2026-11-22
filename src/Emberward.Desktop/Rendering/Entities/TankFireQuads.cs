@@ -70,6 +70,7 @@ public sealed class TankFireQuads
     private bool[] _alive = [];
     private long[] _diedStep = [];          // the capture a tank was seen to die at (0: no death glow drawn)
     private float[] _deathGlow = [];        // its core's glow just before it died
+    private float[] _deathLevel = [];       // and its fire level, which the smoke and embers then in the air keep
     private Position[] _deathAt = [];
     private float[] _deathHeading = [];
     private int _count;
@@ -131,6 +132,7 @@ public sealed class TankFireQuads
             Array.Resize(ref _alive, count);
             Array.Resize(ref _diedStep, count);
             Array.Resize(ref _deathGlow, count);
+            Array.Resize(ref _deathLevel, count);
             Array.Resize(ref _deathAt, count);
             Array.Resize(ref _deathHeading, count);
             for (int i = old; i < count; i++)
@@ -148,20 +150,22 @@ public sealed class TankFireQuads
 
     /// <summary>
     /// Records tank <paramref name="slot"/>'s position and fire level (0: not burning) after this step, with its hull
-    /// and shield fill (0 to 1) and whether it is dead. The drawn values follow these; a new, respawned or dead tank's
-    /// are taken at once. A tank seen alive and then dead starts its death glow here.
+    /// and shield fill (0 to 1) and whether it is dead. The drawn values follow these (a dead tank's fire dies down the
+    /// same way); a new or respawned tank's are taken at once. A tank seen alive and then dead where it was starts its
+    /// death glow here (a slot that jumped holds another tank, or a respawn, and starts none).
     /// </summary>
     public void CaptureTank(int slot, Position position, float level, float hull = 1f, float shieldFill = 0f, bool dead = false)
     {
-        if (dead && _trailKnown[slot] && _alive[slot])
+        bool continuous = Advance(slot, position);
+        if (dead && continuous && _alive[slot])
         {
             _diedStep[slot] = _steps;
             _deathAt[slot] = position;
             _deathGlow[slot] = CoreGlow(slot);
+            _deathLevel[slot] = _levels[slot];
         }
         _alive[slot] = !dead;
-        bool fresh = !Advance(slot, position) || dead;
-        float follow = fresh ? 1f : FireOnset.StepFollow;
+        float follow = continuous ? FireOnset.StepFollow : 1f;
         _levels[slot] += (Math.Clamp(level, 0f, 1f) - _levels[slot]) * follow;
         if (_levels[slot] < 0.001f)
             _levels[slot] = 0f;     // a fire put out ends, rather than burning on at a vanishing level
@@ -172,6 +176,9 @@ public sealed class TankFireQuads
 
     /// <summary>The fire level tank <paramref name="slot"/> is drawn at (following Core's).</summary>
     public float DrawnLevel(int slot) => _levels[slot];
+
+    /// <summary>Every tank's drawn fire level, indexed like the world's tank list.</summary>
+    public ReadOnlySpan<float> DrawnLevels => _levels.AsSpan(0, _count);
 
     // Adds the position to the trail; false when the trail started again (a new tank, or a respawn jump).
     private bool Advance(int slot, Position position)
@@ -279,8 +286,10 @@ public sealed class TankFireQuads
                 float heading = MathF.IEEERemainder(motion.HullHeading(i) - MathF.Atan2(axisY, axisX), MathF.Tau);
                 // The core's glow reaches 6 cells round it, and a sagging core's drips run further below.
                 float below = _hull[i] < SagHullFraction ? 8f : 6.5f;
+                // A dead tank's core is the death glow now; its flames and soot die down here.
+                float core = tanks[i].IsDead ? 0f : CoreGlow(i);
                 quads.Add(EntityQuads.Centre(start.X), EntityQuads.Centre(start.Y), axisX, axisY, -6.5f, 6.5f, -14f, below,
-                    _hull[i], CoreGlow(i), FireOnset.Soot(level), EntityShape.KindTankFire, FireOnset.Flames(level), t,
+                    _hull[i], core, FireOnset.Soot(level), EntityShape.KindTankFire, FireOnset.Flames(level), t,
                     Seed(i), heading, drift);
             }
 
@@ -355,8 +364,9 @@ public sealed class TankFireQuads
         return _clock;
     }
 
+    // A dead tank's fire still dies down where it fell, and its smoke and embers drift off as the level falls.
     private static bool IsDrawn(in TankRenderState tank, float level, VisionMap? vision) =>
-        level > 0f && !tank.IsDead && Sight.Sees(vision, tank.Position);
+        level > 0f && Sight.Sees(vision, tank.Position);
 
     private void LeanInto(int slot, PositionF drift, float follow)
     {
@@ -375,10 +385,14 @@ public sealed class TankFireQuads
     /// One kind of particle for tank <paramref name="slot"/>. Particle k of n is on a loop of its life L, at age
     /// <c>frac(clock / L + k / n)</c>, the clock being the steps captured plus the frame's progress through the next;
     /// it was born where the tank was <c>age * L</c> ago and has risen since. It is in the air in this life when its
-    /// hash is under the level's share, and fades in as the share passes the hash.
+    /// hash is under the level's share, and fades in as the share passes the hash. Once the tank has died, those born
+    /// before live out their lives at the level it died at, and no more are born.
     /// </summary>
     private void EmitParticles(EntityQuads quads, VisionMap? vision, int slot, float level, double clock, bool smoke)
     {
+        long died = _alive[slot] ? 0 : _diedStep[slot];
+        if (died != 0)
+            level = _deathLevel[slot];
         float kind = smoke ? ParticleSmoke : ParticleEmber;
         int count = smoke ? MaxSmoke : MaxEmbers;
         float share = smoke ? FireOnset.SmokeShare(level) : FireOnset.EmberShare(level);
@@ -396,6 +410,8 @@ public sealed class TankFireQuads
             double cycleStart = Math.Floor(loop);
             float age = (float)(loop - cycleStart);
             int cycle = unchecked((int)(long)cycleStart);
+            if (died != 0 && clock - (age * lifeSteps) >= died)
+                continue;
             float shown = Math.Clamp((share - Hash(slot, k, cycle, smoke ? 71 : 83)) * ShareFade, 0f, 1f);
             if (shown <= 0f)
                 continue;

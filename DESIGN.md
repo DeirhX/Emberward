@@ -209,10 +209,13 @@ The tank lives in a band around 0. Both ends hurt, and the world has places at b
   shimmer, then the dull core, its soot, the flames, smoke and last embers; particles fade in one by one rather than
   in batches), the drawn fire follows a sudden hit or repair over about a third of a second, and it eases out the same
   way when the hull is repaired or the shield comes back. A tank that dies has its hot core flare from yellow to
-  white-hot over 0.3 s and fade over 1.5 s: a soft glow with no edge. It crackles, fading in as it catches, higher as
+  white-hot over 0.3 s and fade over 1.5 s: a soft glow with no edge; its flames, light and crackle die down over the
+  same third of a second, and the smoke and embers already in the air live out their lives. It crackles, fading in as it catches, higher as
   it grows and sizzling higher still once the core sags; the HUD's hull number eases from its neutral colour onto the
   heat ramp between 75% and 60%, and the HUD's
-  crystal shows the shield, the number under it the hull, and the plate reads FIRE ABOARD while it burns.
+  crystal shows the shield, the number under it the hull, and the plate names the worst state: SLAG, MELTING (under
+  5%), HULL BREACH while it burns, except that an empty shield on a hull only just alight (fire level up to 0.2)
+  still reads SHIELD DOWN, then SHIELD DOWN and SHIELDED.
   **A hit on a shield** is seen and heard: its own zap (and a shatter when it breaks), a pulse that lights the veins of
   the whole shield, and a red patch where the shot landed; a base's gate shield does the same.
 - **Below 0 the tank is chilled.** It slows down, linearly to about a third of its speed at -40, and below -25 it

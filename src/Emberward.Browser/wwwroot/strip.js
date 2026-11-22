@@ -32,7 +32,11 @@ const TEMP = { x: HEAT_X + 170, title: 151.5, readout: 179, right: HEAT_X + 239 
     SHIELD = { x: SHIELD_X + 80.5, title: 153.5, readout: 180 },
     MATERIALS = { x: MATERIALS_X + 120, title: 154, readout: 184 };
 // HudStrip.DrawLedger: SHIELD above HULL in the readout plate, a label left, a number right, a hairline bar under each.
-const LEDGER = { left: SHIELD_X + 19, right: SHIELD_X + 140, shieldY: 174, hullY: 185.5, barDrop: 5.6, label: 10.5, number: 13 };
+// LedgerLayout.cs: the SHIELD/HULL rows, laid out so no number, bar or outline overlaps another or leaves the plate.
+const LEDGER = {
+    left: SHIELD_X + 19, right: SHIELD_X + 140, shieldY: 173.8, hullY: 185, soloY: 180,
+    barDrop: 5.4, barHalf: 0.6, barOutline: 0.6, label: 8.5, number: 10,
+};
 // HudPalette: the shield's cyan, an empty shield's slate, the hull label's warm colour (ABGR).
 const SHIELD_CYAN = 0xffffe0a0,
     SHIELD_SLATE = 0xff997f5f,
@@ -525,11 +529,11 @@ export class StripView {
             const track = abgr(((0x70 << 24) | (SHIELD_SLATE & 0xffffff)) >>> 0);
             ledgerRow(ctx, LEDGER.shieldY, "SHIELD", color, String(plate.shield), color, p.dead ? 0 : p.shieldFill, color, track);
         } else {
-            hullY = SHIELD.readout;
+            hullY = LEDGER.soloY;
         }
         const hull = p.dead ? 0 : p.hull;
         ledgerRow(ctx, hullY, "HULL", abgr(HULL_NEUTRAL), String(p.health), plate.hullColor, hull, plate.hullColor,
-            plate.glowRim + "90", abgr(0x30106aff));
+            plate.glowStops[plate.glowStops.length - 1] + "90", abgr(0x30106aff));
     }
 
     // LiquidGauges.Draw: the shield crystal, dark where it has emptied from its edge inward, with the tank's hot
@@ -562,8 +566,12 @@ export class StripView {
             const r = Math.max(...SHIELD_OUTLINE.map(([x, y]) => Math.hypot(x - cx, y - cy)));
             const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
             const alpha = (a) => Math.round(Math.min(1, Math.max(0, a)) * 255).toString(16).padStart(2, "0");
-            glow.addColorStop(0, plate.glowCentre + alpha(plate.glow));
-            glow.addColorStop(1, plate.glowRim + alpha(plate.glow * 0.2));
+            // Every stop on the ramp, as the desktop's bands: the colour cools and the glow fades toward the rim.
+            const stops = plate.glowStops;
+            stops.forEach((colour, i) => {
+                const at = i / (stops.length - 1);
+                glow.addColorStop(at, colour + alpha(plate.glow * (1 - 0.8 * at)));
+            });
             polygon(ctx, SHIELD_OUTLINE);
             ring(ctx, inner);
             ctx.fillStyle = glow;
@@ -670,13 +678,14 @@ function stripText(ctx, text, cx, cy, size, color, glow, align = "center") {
 
 // HudStrip.DrawLedgerRow: a label left, a number right, and a hairline bar beneath, filled `fill` of the way.
 function ledgerRow(ctx, y, label, labelColor, number, numberColor, fill, barColor, trackColor, numberGlow) {
-    stripText(ctx, label, LEDGER.left, y + 0.5, LEDGER.label, labelColor, null, "left");
+    stripText(ctx, label, LEDGER.left, y, LEDGER.label, labelColor, null, "left");
     stripText(ctx, number, LEDGER.right, y, LEDGER.number, numberColor, numberGlow, "right");
     const barY = y + LEDGER.barDrop,
-        half = 0.75,
+        half = LEDGER.barHalf,
+        edge = LEDGER.barOutline,
         width = LEDGER.right - LEDGER.left;
     ctx.fillStyle = abgr(0xc0000000);
-    ctx.fillRect(LEDGER.left - 1, barY - half - 1, width + 2, 2 * half + 2);
+    ctx.fillRect(LEDGER.left - edge, barY - half - edge, width + 2 * edge, 2 * (half + edge));
     ctx.fillStyle = trackColor;
     ctx.fillRect(LEDGER.left, barY - half, width, 2 * half);
     const f = Math.min(1, Math.max(0, fill));

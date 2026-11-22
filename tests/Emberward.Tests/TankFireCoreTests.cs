@@ -270,8 +270,9 @@ public class TankFireCoreTests
         Assert.True(flames.R is > 0f and < 0.75f);
     }
 
+    // The death glow: a core's glow with no flames and no soot (a dying tank's own fire quad has no core glow).
     private static EntityVertex DeathQuad(EntityQuads quads) =>
-        Quads(quads, EntityShape.KindTankFire).Single(v => v.P0 == 0f && v.B == 0f);
+        Quads(quads, EntityShape.KindTankFire).Single(v => v.P0 == 0f && v.B == 0f && v.G > 0f);
 
     [Fact]
     public void TheDeathGlow_FlaresFromYellowToWhite_ThenFadesSmoothly()
@@ -303,21 +304,78 @@ public class TankFireCoreTests
         var (fire, motion) = Died(1);
         var quads = Draw(fire, motion);
         EntityVertex glow = DeathQuad(quads);
-        Assert.Single(Quads(quads, EntityShape.KindTankFire));
         Assert.Equal(0f, glow.P0);              // no flames
         Assert.Equal(0f, glow.B);               // no soot ring, no crust: nothing with an edge
         Assert.Equal(0.05f, glow.R, 3);         // yellow
         Assert.Equal(FireOnset.CoreGlow(LevelAt(0.1f)), glow.G, 3);   // from the glow it had
         // The quad reaches past the glow's soft falloff (1.6 times the core's 3.5 cells, off the hull's centre).
         Assert.True(MaxLocalY(quads, EntityShape.KindTankFire) >= (1.6f * 3.5f) + 0.5f);
-        Assert.Single(Quads(quads, EntityShape.KindTankFireLight));
-        Assert.Empty(Quads(quads, EntityShape.KindFireParticle));
 
         int fps = Tweaks.Perf.TargetFps;
         (fire, motion) = Died(1 + (int)(TankFireQuads.DeathFlareSeconds * fps));
         Assert.Equal(0f, DeathQuad(Draw(fire, motion)).R, 3);       // white-hot
 
         (fire, motion) = Died(1 + (int)MathF.Ceiling(TankFireQuads.DeathSeconds * fps));
+        Assert.DoesNotContain(Quads(Draw(fire, motion), EntityShape.KindTankFire), v => v.G > 0f);
+    }
+
+    [Fact]
+    public void OnTheStepATankDies_ItsFireDiesDown_AndItsSmokeLivesOut()
+    {
+        var (alive, aliveMotion) = Died(0);
+        var before = Draw(alive, aliveMotion);
+        float levelBefore = alive.DrawnLevel(0);
+        int particlesBefore = Quads(before, EntityShape.KindFireParticle).Count;
+
+        var (fire, motion) = Died(1);
+        var quads = Draw(fire, motion);
+        // The flames and the light pool are still there, easing out; the core has become the death glow.
+        EntityVertex flames = Quads(quads, EntityShape.KindTankFire).Single(v => v.P0 > 0f);
+        Assert.Equal(0f, flames.G);
+        Assert.InRange(fire.DrawnLevel(0), 0.8f * levelBefore, levelBefore);
+        Assert.Equal(2, Quads(quads, EntityShape.KindTankFireLight).Count);
+        // The smoke and embers already in the air stay (a step's worth of births fewer at most).
+        int particles = Quads(quads, EntityShape.KindFireParticle).Count;
+        Assert.InRange(particles, particlesBefore - 4, particlesBefore);
+
+        // Then they thin out as their lives end, none newly born, and the fire goes out.
+        int fps = Tweaks.Perf.TargetFps;
+        (fire, motion) = Died(1 + fps);
+        Assert.True(Quads(Draw(fire, motion), EntityShape.KindFireParticle).Count < particles);
+        (fire, motion) = Died(4 * fps);
+        Assert.Equal(0, Draw(fire, motion).VertexCount);
+    }
+
+    [Fact]
+    public void TheDeathGlow_HoldsStill_WhileTheWorldIsPaused()
+    {
+        var (fire, motion) = Died(3);
+        var quads = new EntityQuads();
+        quads.Begin(new RenderView(new Size(1600, 1200), new Size(400, 300), new Position(0, 0), 4), 1.3f, 0.5f);
+        fire.Emit(quads, motion, null, 1f / 60f, snap: false);
+        float glow = DeathQuad(quads).G;
+
+        fire.Hold();
+        for (int frame = 0; frame < 30; frame++)
+        {
+            quads.Begin(new RenderView(new Size(1600, 1200), new Size(400, 300), new Position(0, 0), 4), 1.3f + frame,
+                frame % 2 == 0 ? 1f : 0f);
+            fire.Emit(quads, motion, null, 1f / 60f, snap: false);
+            Assert.Equal(glow, DeathQuad(quads).G);
+        }
+    }
+
+    [Fact]
+    public void ASlotThatJumps_ToADeadTank_StartsNoDeathGlow()
+    {
+        var fire = new TankFireQuads();
+        var motion = new EntityMotion();
+        Capture(fire, motion, 4, [0.1f], [0f], [false]);
+        // The list was reordered: slot 0 now holds a dead tank far from where its last tank was.
+        motion.CaptureTanks([Tank(300, 250, dead: true)]);
+        fire.BeginCapture(1);
+        fire.CaptureTank(0, new Position(300, 250), 0f, 0f, 0f, dead: true);
+
         Assert.Equal(0, Draw(fire, motion).VertexCount);
     }
 

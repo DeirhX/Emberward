@@ -22,10 +22,9 @@ public sealed class HudStrip
     private const float ReadoutSize = 22f;
 
     // The SHIELD/HULL readout plate holds two stacked rows, SHIELD above HULL, each a label on the left, its number on
-    // the right and a hairline bar under both (art pixels, measured on the plate: 168.5 to 192.5 high).
+    // the right and a hairline bar under both (art pixels; LedgerLayout places them).
     private const float LedgerLeft = ShieldX + 19f, LedgerRight = ShieldX + 140f;
-    private const float ShieldRowY = 174f, HullRowY = 185.5f, BarDrop = 5.6f;
-    private const float LedgerLabelSize = 10.5f, LedgerNumberSize = 13f, StatusWordSize = 17f;
+    private const float StatusWordSize = 17f;
 
     // The ore line, drawn on the narrow plate beneath the hold window (art pixels): the pale gold of the Pyrite in
     // the hold (tools/hud/make_hold_pyrite.py), deep orange once the hold is full, bright green while it unloads.
@@ -181,18 +180,18 @@ public sealed class HudStrip
     private void DrawLedger(ImDrawListPtr dl, Tank player, in TankShieldView shield)
     {
         var inv = System.Globalization.CultureInfo.InvariantCulture;
-        float hullRow = HullRowY;
+        float hullRow = LedgerLayout.HullRowY;
         if (shield.Active)
         {
             int points = player.IsDead ? 0 : Math.Max(0, shield.Shield);
             float fill = player.IsDead ? 0f : shield.ShieldFill;
             uint color = points > 0 ? HudPalette.Shield : HudPalette.ShieldEmpty;
-            DrawLedgerRow(dl, ShieldRowY, "SHIELD", color, points.ToString(inv), color, fill, color,
+            DrawLedgerRow(dl, LedgerLayout.ShieldRowY, "SHIELD", color, points.ToString(inv), color, fill, color,
                 HudTheme.WithAlphaByte(HudPalette.ShieldEmpty, 0x70));
         }
         else
         {
-            hullRow = ShieldPlate.ReadoutY;
+            hullRow = LedgerLayout.SoloRowY;
         }
 
         int health = Math.Max(0, player.Reactor.Health);
@@ -207,12 +206,12 @@ public sealed class HudStrip
     private void DrawLedgerRow(ImDrawListPtr dl, float y, string label, uint labelColor, string number, uint numberColor,
         float fill, uint barColor, uint trackColor, uint numberGlow = 0)
     {
-        DrawStripText(dl, label, LedgerLeft, y + 0.5f, LedgerLabelSize, labelColor, align: 0f);
-        DrawStripText(dl, number, LedgerRight, y, LedgerNumberSize, numberColor, numberGlow, align: 1f);
+        DrawStripText(dl, label, LedgerLeft, y, LedgerLayout.LabelSize, labelColor, align: 0f);
+        DrawStripText(dl, number, LedgerRight, y, LedgerLayout.NumberSize, numberColor, numberGlow, align: 1f);
 
         // A hairline bar: a dark outline, the track, and the filled part from the left.
-        float barY = y + BarDrop, half = 0.75f;
-        dl.AddRectFilled(At(LedgerLeft - 1f, barY - half - 1f), At(LedgerRight + 1f, barY + half + 1f), 0xC0000000u);
+        float barY = y + LedgerLayout.BarDrop, half = LedgerLayout.BarHalf, edge = LedgerLayout.BarOutline;
+        dl.AddRectFilled(At(LedgerLeft - edge, barY - half - edge), At(LedgerRight + edge, barY + half + edge), 0xC0000000u);
         dl.AddRectFilled(At(LedgerLeft, barY - half), At(LedgerRight, barY + half), trackColor);
         float f = Math.Clamp(fill, 0f, 1f);
         if (f > 0f)

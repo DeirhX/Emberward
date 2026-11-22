@@ -110,9 +110,24 @@ public static class BrowserFrameBuilder
         return new HullPlate(word.Text, HudPalette.Hex(word.Color), HudPalette.Hex(word.FlashColor),
             player.IsDead ? 0 : Math.Max(0, shield.Shield),
             HudPalette.Hex(player.IsDead ? HudPalette.TextDim : HudPalette.HullHeat(hull)),
-            HudPalette.Hex(HudPalette.HullEmber(Math.Min(hull, HudPalette.HullHeatStart))),
-            HudPalette.Hex(HudPalette.HullEmber(HudPalette.HullHeatStart)),
+            GlowStops(Math.Min(hull, HudPalette.HullHeatStart)),
             player.IsDead ? 0f : HudPalette.HullGlowStrength(hull));
+    }
+
+    /// <summary>How many colour stops the crystal's hot centre has, from its middle to its outline.</summary>
+    public const int HullGlowStops = 5;
+
+    // The hot centre's colours from the middle (the hull's own heat) to the outline (the ramp's dull red), as the
+    // desktop's LiquidGauges bands take them.
+    private static string[] GlowStops(float heat)
+    {
+        var stops = new string[HullGlowStops];
+        for (int i = 0; i < stops.Length; i++)
+        {
+            float mid = i / (float)(stops.Length - 1);
+            stops[i] = HudPalette.Hex(HudPalette.HullEmber(heat + ((HudPalette.HullHeatStart - heat) * mid)));
+        }
+        return stops;
     }
 
     /// <summary>The heat dial as the desktop's <c>HeatGauge</c> colours it.</summary>

@@ -71,10 +71,11 @@ public sealed record PlayerStatus(
 /// second with <paramref name="WordFlashColor"/> when the two differ.</param>
 /// <param name="Shield">The shield's points (0 once dead).</param>
 /// <param name="HullColor">The hull number's and bar's colour (<c>HudPalette.HullHeat</c>; dim once dead).</param>
-/// <param name="GlowCentre">The crystal's hot centre, from <paramref name="GlowCentre"/> in the middle to
-/// <paramref name="GlowRim"/> at the outline, at strength <paramref name="Glow"/> (0 to 1; 0 once dead).</param>
+/// <param name="GlowStops">The crystal's hot centre: its colours on the heat ramp at even steps from the middle (first)
+/// to the outline (last), as the desktop's bands take them, at strength <paramref name="Glow"/> (0 to 1; 0 once dead),
+/// fading to a fifth of it at the outline.</param>
 public sealed record HullPlate(string Word, string WordColor, string WordFlashColor, int Shield, string HullColor,
-    string GlowCentre, string GlowRim, float Glow);
+    string[] GlowStops, float Glow);
 
 /// <param name="KeyLabel">The key that builds it, as the desktop writes it (<c>MachinePresentation.KeyLabel</c>).</param>
 /// <param name="Slot">The machine's column in the desktop's BUILD STRUCTURES panel.</param>

@@ -68,6 +68,9 @@ public sealed class SoundDirector
     private bool _runningHot, _lowShield;
     private int _nextWarningStep, _lastWarningStep = -1000, _lastWarningRank;
 
+    // The world last heard: a new match (or a late join's copy) starts each tank's fire from silence.
+    private WeakReference<World>? _world;
+
     /// <param name="log">Where to describe each sound started and each loop turned on or off, or null.</param>
     public SoundDirector(ISoundSink sink, Action<string>? log = null)
     {
@@ -94,6 +97,12 @@ public sealed class SoundDirector
     public void AfterStep(World world, int localSlot)
     {
         ArgumentNullException.ThrowIfNull(world);
+        if (_world == null || !_world.TryGetTarget(out World? last) || !ReferenceEquals(last, world))
+        {
+            for (int i = 0; i < _tanks.Length; i++)
+                _tanks[i].Fire = 0f;
+            _world = new WeakReference<World>(world);
+        }
         _step++;
         _terrain = world.Terrain;
         _localSlot = localSlot;
@@ -235,7 +244,8 @@ public sealed class SoundDirector
         _sink.SetLoop(track.TorchLoop, torchOn ? gain * AudioTweaks.TorchGain : 0f, pan, 1f, muffle);
         _sink.SetLoop(track.TreadLoop, treadOn ? gain * AudioTweaks.TreadGain : 0f, pan,
             (1f - 0.05f * index) * approachRate, muffle);
-        track.Fire = dead ? 0f : track.Fire + ((tank.FireLevel - track.Fire) * FireOnset.StepFollow);
+        // A dead tank's fire dies down too, as the drawn one does.
+        track.Fire += ((dead ? 0f : tank.FireLevel) - track.Fire) * FireOnset.StepFollow;
         if (track.Fire < 0.001f)
             track.Fire = 0f;
         float fire = track.Fire;

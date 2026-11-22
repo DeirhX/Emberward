@@ -75,7 +75,8 @@ public partial class Game
             int tankHeatGlowCount = 0;
             DrawProfile.Measure(ref _drawProfile.ScreenTankGlowBuild, () =>
                 tankHeatGlowCount = _terrainAuxBuilder.BuildGpuTankHeatGlowData(
-                    _world.TankList.Tanks, _entityLayer.TankPositions(stepProgress), renderView, _gpuTankHeatGlow, _vision));
+                    _world.TankList.Tanks, _entityLayer.TankPositions(stepProgress), renderView, _gpuTankHeatGlow, _vision,
+                    _entityLayer.TankFireLevels));
 
             _drawProfile.ScreenHiResEntities += hiResWatch.Elapsed;
 
