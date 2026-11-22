@@ -6,6 +6,7 @@ using Emberward.Core.Config;
 using Emberward.Core.Entities.Bases;
 using Emberward.Core.Entities.Projectiles;
 using Emberward.Core.Entities.Tanks;
+using Emberward.Core.Input;
 using Emberward.Core.Match;
 using Emberward.Core.Terrain;
 using Emberward.Core.Types;
@@ -146,7 +147,8 @@ public class BotLoiterTests
 
         // The base is 25 cells from the west edge: a post there would be off the map, so the next nearest is taken.
         var fromWest = BotLoiter.Post(target.Position + new Offset(-24, 4), target, world.Terrain);
-        Assert.True(world.Terrain.IsInside(fromWest));
+        Assert.NotNull(fromWest);
+        Assert.True(world.Terrain.IsInside(fromWest.Value));
         Assert.NotEqual(target.Position + new Offset(-BotLoiter.PostDistance, 0), fromWest);
     }
 
@@ -187,7 +189,7 @@ public class BotLoiterTests
         Assert.True(enemy.IsDockedAtOwnBase);
         Assert.True(ai.IsWaiting, "past the grace a base it cannot break is still waited outside");
         Assert.False(fired, "nor is it fired on from the post once the grace is over");
-        Assert.True(BotLoiter.IsAtPost(bot.Position, BotLoiter.Post(bot.Position, enemy.Base!, world.Terrain)),
+        Assert.True(BotLoiter.IsAtPost(bot.Position, BotLoiter.Post(bot.Position, enemy.Base!, world.Terrain)!.Value),
             $"the bot should stand at its post: {bot.Position - enemy.Base!.Position} from the base's centre");
     }
 
@@ -239,5 +241,90 @@ public class BotLoiterTests
         Assert.Equal(hull, bot.Reactor.Health);
         world.Advance(i => i == 1 ? ai.GetInput(bot, enemy, world) : default);
         Assert.False(ai.IsWaiting, "fire the shield absorbed is still fire");
+    }
+    [Fact]
+    public void APostInRockOrAWall_IsPassedOver_AndWithNoPostLeftTheBotDoesNotWait()
+    {
+        var world = CreateWorld(width: 160);
+        var target = world.TankBases.Bases[0];
+        var from = target.Position + new Offset(60, 3);
+        var east = target.Position + new Offset(BotLoiter.PostDistance, BotLoiter.PostSideStep);
+        Assert.Equal(east, BotLoiter.Post(from, target, world.Terrain));
+
+        // Rock over the nearest post: the next nearest, across the gate, is taken.
+        Fill(world, east, TerrainPixel.Rock);
+        Assert.False(BotLoiter.CanStandAt(east, world.Terrain));
+        Assert.Equal(target.Position + new Offset(BotLoiter.PostDistance, -BotLoiter.PostSideStep),
+            BotLoiter.Post(from, target, world.Terrain));
+
+        // Rock over every post: there is nowhere to wait.
+        foreach (var gate in BaseLayout.GateDirections)
+            foreach (int side in new[] { 1, -1 })
+                Fill(world, target.Position + new Offset(gate.X * BotLoiter.PostDistance + gate.Y * side * BotLoiter.PostSideStep,
+                    gate.Y * BotLoiter.PostDistance + gate.X * side * BotLoiter.PostSideStep), TerrainPixel.Rock);
+        Assert.Null(BotLoiter.Post(from, target, world.Terrain));
+
+        var (enemy, bot) = (world.TankList.Tanks[0], world.TankList.Tanks[1]);
+        var (_, waited) = Run(world, new BotTankAI(9), 40 * Fps);
+        Assert.True(enemy.IsDockedAtOwnBase);
+        Assert.False(world.CanBreakBase(bot, enemy.Base!));
+        Assert.False(waited, "with no post a tank can stand at, the bot should not wait (and jitter) at the base");
+    }
+
+    /// <summary>Writes <paramref name="pixel"/> over the square a tank at <paramref name="centre"/> would stand on, and round it.</summary>
+    private static void Fill(World world, Position centre, TerrainPixel pixel)
+    {
+        int reach = TankSpriteShape.Radius + 1;
+        for (int dy = -reach; dy <= reach; dy++)
+            for (int dx = -reach; dx <= reach; dx++)
+                if (world.Terrain.IsInside(centre + new Offset(dx, dy)))
+                    world.Terrain.SetPixel(centre + new Offset(dx, dy), pixel);
+    }
+
+    [Fact]
+    public void BoxedInOnTheWayToItsPost_TheBotNeverTorchesWhileWaiting_AndGivesUp()
+    {
+        var world = CreateWorld(width: 160);
+        var (enemy, bot) = (world.TankList.Tanks[0], world.TankList.Tanks[1]);
+        var ai = new BotTankAI(9);
+        ControllerOutput Step()
+        {
+            ControllerOutput output = default;
+            world.Advance(i => i == 1 ? output = ai.GetInput(bot, enemy, world) : default);
+            enemy.Heat = 0f;
+            return output;
+        }
+
+        // On its way to its post, out of its own base, the bot is walled in by rock: it cannot get out without torching,
+        // which it does not do near the gate, not even in the manoeuvres that try to get it unstuck.
+        for (int tick = 0; tick < 30 * Fps && !(ai.IsWaiting && !bot.Base!.IsInside(bot.Position) &&
+            bot.Position.X < bot.Base.Position.X - Half - 10); tick++)
+            Step();
+        Assert.True(ai.IsWaiting);
+        var boxed = bot.Position;
+        // Rock right up to the hull, the cells every facing of it covers: any step or turn runs into it.
+        int inner = TankSpriteShape.Radius;
+        int[] facings = [0, 1, 2, 3, 5, 6, 7, 8];
+        for (int dy = -inner - 3; dy <= inner + 3; dy++)
+            for (int dx = -inner - 3; dx <= inner + 3; dx++)
+            {
+                var cell = boxed + new Offset(dx, dy);
+                if (world.Terrain.IsInside(cell) && !facings.All(f => TankSpriteShape.Contains(f, boxed, cell)))
+                    world.Terrain.SetPixel(cell, TerrainPixel.Rock);
+            }
+
+        bool fired = false, gaveUp = false;
+        for (int tick = 0; tick < (Tweaks.Bot.LoiterApproachSeconds + 5) * Fps && !gaveUp; tick++)
+        {
+            bool wasWaiting = ai.IsWaiting;
+            var output = Step();
+            fired |= output.ShootPrimary && wasWaiting && ai.IsWaiting;
+            gaveUp = !ai.IsWaiting;
+        }
+
+        Assert.False(fired, "on the way to its post the bot should hold its fire, torch included");
+        Assert.True(gaveUp, "a bot that gets no nearer its post should give up waiting there");
+        Assert.True(Math.Abs(bot.Position.X - boxed.X) <= inner && Math.Abs(bot.Position.Y - boxed.Y) <= inner,
+            "the rock should have held it");
     }
 }

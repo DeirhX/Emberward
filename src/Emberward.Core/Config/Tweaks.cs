@@ -644,7 +644,7 @@ public static partial class Tweaks
     /// <c>Tank.HeatBudgetCapacity</c> (the safe heat range plus a full coolant charge), so a pre-cooled tank has more
     /// room before it heads home than a warm one.
     /// </summary>
-    public static class Bot
+    public static partial class Bot
     {
         // Roaming ends and the bot heads home when its heat budget falls below this share (heat above 70 of 100).
         public const float ReturnHeatBudgetFraction = 0.20f;
@@ -655,13 +655,7 @@ public static partial class Tweaks
         // for RechargeStallFrames (the base's reservoir is full), it leaves once it has at least this share.
         public const float RechargeStalledMinHeatBudgetFraction = 0.60f;
         public const int RechargeStallFrames = Perf.TargetFps;
-        // How long a bot reckons it can keep firing at a base in one outing (World.CanBreakBase). 76,800 damage falls
-        // short of a sound keep with its store behind it (60,000 shield, 28,800 bought back, 8,880 core with repairs):
-        // a lone bot lays siege to a worn, dark or unshielded base and waits outside a sound one.
-        public const int SiegeWindowSeconds = 60;
-        // While its enemy sits docked in a base it cannot break, the bot waits this many cells out from the wall, beside
-        // the gate nearest it (out of the gate's line of fire), and holds its fire (BotLoiter).
-        public const int LoiterCellsOutsideWall = 12;
+        // Siege and waiting outside a base: Tweaks.BotSiege.cs.
         // A bot that stays within StuckRadiusCells of one spot for StuckWindowSeconds, other than fighting in sight,
         // waiting outside a base or recharging at home, is going nowhere: it drops what it was after and heads for a
         // new place DetourCells away for up to DetourSeconds (BotStuckWatch).
