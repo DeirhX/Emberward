@@ -6,8 +6,8 @@ using Emberward.Core.Config;
 /// How each part of a hull fire comes in as the fire level (<see cref="Emberward.Core.Entities.Tanks.Tank.FireLevel"/>:
 /// 0 at the ignition threshold, 75% hull, to 1 at an empty hull) rises from zero: every part eases in from nothing, in
 /// turn, so that nothing pops in when a hull starts to burn and nothing pops out when it is repaired. First the light
-/// on the ground and the heat shimmer, then the dull core's glow, then its soot and crust, then the flames, then smoke,
-/// and last the embers. The renderer, the heat haze and the fire loop all read these.
+/// on the ground and the heat shimmer, then the dull core's glow, then its soot and crust, then the flame licks, then
+/// smoke, and last the sparks and cinders. The renderer, the heat haze and the fire loop all read these.
 /// </summary>
 public static class FireOnset
 {
@@ -35,6 +35,9 @@ public static class FireOnset
 
     /// <summary>The level the flames are drawn at: none until the core shows, full from a level of 0.3.</summary>
     public static float Flames(float level) => level * Ease(0.08f, 0.3f, level);
+
+    /// <summary>The share of a tank's flame-lick slots in the air: the licks come in with the flames.</summary>
+    public static float FlameShare(float level) => Ease(0.08f, 0.3f, level) * (0.3f + (0.7f * Math.Min(level, 1f)));
 
     /// <summary>The share of a tank's smoke slots in the air.</summary>
     public static float SmokeShare(float level) => Ease(0.12f, 0.4f, level) * (0.3f + (0.7f * Math.Min(level, 1f)));
