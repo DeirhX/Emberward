@@ -48,10 +48,12 @@ static const float2 kTankShieldLightXY = float2(-0.63324, -0.77396);
 // the vein lattice) and `reach` is the cutoff. The cutoff's radius grows with the square root of the fill, so the area
 // left falls roughly in step with the fill (a little over half the bubble at half fill): the outer edge goes first and a
 // core at the centre last. Any shield at all keeps a core a couple of cells across, so the last sliver still reads.
+// A full shield reaches 1.19, past the furthest edge on the dome (1 + 0.08 of noise) plus the 0.08 cutoff band, so a
+// near-full bubble is not nibbled at its rim.
 // A broken shield (fill 0: a pulse is drawn only for a hit, so an empty shield was just broken) has its whole bubble at the hit, shrinking to nothing as the pulse ages.
 float TankShieldReach(float fill, float age, float broken)
 {
-    float left = max(sqrt(saturate(fill)) * 1.3 - 0.16, 0.3);
+    float left = max(sqrt(saturate(fill)) * 1.35 - 0.16, 0.3);
     return lerp(left, lerp(1.14, -0.2, age), broken);
 }
 
@@ -137,11 +139,12 @@ float4 TankShield(float2 p, float3 team, float4 params, float aa)
     float band = exp(-bandOffset * bandOffset) * eroding;
 
     // A crisp silhouette, anti-aliased over a pixel, with a thin bright outline just inside it (at least a pixel wide),
-    // and a faint glow just outside.
+    // and a faint glow just outside. `outline` is also 1 past the silhouette; the colour and alpha are both multiplied by
+    // `inside` once, at the end.
     float inset = kTankShieldRadius - r;
     float inside = saturate(inset / aa + 0.5);
     float outlineWidth = max(0.28, 1.5 * aa);
-    float outline = inside * (1.0 - smoothstep(outlineWidth, outlineWidth + aa, inset));
+    float outline = 1.0 - smoothstep(outlineWidth, outlineWidth + aa, inset);
     float halo = exp(-inset * inset * 1.6) * (1.0 - inside);
     float breathe = 0.85 + 0.15 * sin(5.0 * theta);
 
@@ -192,14 +195,17 @@ float4 TankShield(float2 p, float3 team, float4 params, float aa)
     // The coat, over everything in the shell. The rim reflects a pale sky, brighter on the side facing the light and
     // flaring with a hit; light focused through the bubble lands as a faint arc just inside the far (lower right) edge,
     // widest opposite the light; the gloss and the hot spot are the light's reflection; the outline is the shell seen
-    // end-on at the silhouette.
+    // end-on at the silhouette. Within the outline its light replaces the rim's rather than adding to it, so the lit
+    // edge peaks near 1.1 (rim at most 0.55 x 1.1 x 1.35 just inside the outline, the outline at most 1.1) instead of
+    // clipping to a flat white band.
     float rimSide = 0.75 + 0.35 * towardLight;
-    add += lerp(tint, white, 0.35) * (rimHot * 0.9 + fresnel * 0.3) * rimSide * (1.0 + 0.8 * fade);
+    float3 rimLight = lerp(tint, white, 0.35) * ((rimHot * 0.55 + fresnel * 0.2) * rimSide * (1.0 + 0.35 * fade));
+    float3 outlineLight = lerp(tint, white, 0.55) * (0.7 + 0.15 * saturate(towardLight + 0.5) + 0.25 * fade);
+    add += lerp(rimLight, outlineLight, outline);
     float causticOffset = (rn - 0.82) / (0.035 + 0.035 * away);
     float caustic = exp(-causticOffset * causticOffset) * smoothstep(0.25, 0.9, away);
     add += lerp(bright, white, 0.45) * caustic * (0.45 + 0.08 * sin(3.0 * theta));
     add += lerp(bright, white, 0.6) * gloss * 0.45 + white * hotSpot * 0.95;
-    add += lerp(tint, white, 0.55) * outline * (0.55 + 0.25 * saturate(towardLight + 0.5) + 0.4 * fade);
 
     // The far side of the shell looks thicker: a darker, deeper blue gathers in its lower inside towards the rim. Its
     // alpha (below) dims the ground there and its colour tints it, so the lit upper left stands out against it.
@@ -217,11 +223,12 @@ float4 TankShield(float2 p, float3 team, float4 params, float aa)
     add += white * spot * spot * 0.35;
 
     // Premultiplied: mostly added light over a thin film of alpha. The middle stays nearly clear (about 0.05) so the
-    // tank reads beneath; the coat grows more opaque towards the rim, as a curved shell does edge-on (to about 0.6 at the
-    // outline), on the thick far side, under the hot spot (so it reads white over hot ground too), and on the shadowed
-    // side of the ridges and of the eroding lip. Only what is left of the bubble shows.
+    // tank reads beneath; the coat grows more opaque towards the rim, as a curved shell does edge-on, and on the thick
+    // far side, capped at 0.6 so the ground still shows through the outline (about 0.65 there with the film). The hot
+    // spot adds a little (0.15: it sits over the hull, which must stay readable), as do the shadowed side of the ridges
+    // and of the eroding lip. Only what is left of the bubble shows.
     float alpha = (0.03 + 0.025 * flow + 0.10 * saturate(-bevel) + 0.14 * band) * breathe
-        + 0.28 * fresnel + 0.26 * thickness + 0.25 * outline + 0.3 * hotSpot;
+        + min(0.28 * fresnel + 0.26 * thickness + 0.25 * outline, 0.6) + 0.15 * hotSpot;
     float3 color = add * inside + tint * halo * (0.08 + fade * 0.3);
     return float4(color, saturate(alpha) * inside) * (remaining * visible);
 }
