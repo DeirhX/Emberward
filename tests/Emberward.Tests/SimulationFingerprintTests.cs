@@ -26,6 +26,7 @@ public class SimulationFingerprintTests
     private const ulong ExpectedEnemyMachinesShotToPieces = 0x9AD33135699B9C28UL;
     private const ulong ExpectedBotVsBot = 0xAB2E228FDA917209UL;
     private const ulong ExpectedShieldedBotVsBot = 0x7D0CD48039797C48UL;
+    private const ulong ExpectedTankBanksAtCore = 0x969707C1821E53C6UL;
 
     /// <summary>
     /// A recorded run: the world as set up, the bots in it (null for a slot the script drives), how many frames it
@@ -113,6 +114,26 @@ public class SimulationFingerprintTests
                 AimDirection = new DirectionF(0, s.DirY),
             },
             () => RelayHeatTests.CreateScenario().World);
+    }
+
+    /// <summary>A tank with a full hold against its core: the bank, its deposit heat in the reactor and the venting.</summary>
+    internal static Scenario TankBanksAtCore()
+    {
+        var s = RelayHeatTests.CreateScenario();
+        s.Tank.Position = TestHelpers.AgainstCore(s.Base);
+        s.Tank.Hold.Ore = Tweaks.Ore.TankHold;
+        return new(s.World, [null, null], 120, (_, _) => TestSimulation.Idle, () => RelayHeatTests.CreateScenario().World);
+    }
+
+    [Fact]
+    public void TankBanksAtCore_MatchesRecordedFingerprint()
+    {
+        var run = TankBanksAtCore();
+        var tank = run.World.TankList.Tanks[0];
+        run.Play(0, run.Frames);
+
+        Assert.Equal(0, tank.OreHeld);
+        AssertFingerprint(ExpectedTankBanksAtCore, run.World);
     }
 
     [Fact]

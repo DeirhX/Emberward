@@ -119,6 +119,36 @@ public class DepositHeatTests
         Assert.Equal(banked * (double)Tweaks.Cargo.DepositHeatPerOre, injected, 6);
     }
 
+    /// <summary>
+    /// The dock pump comes before the bank: with less reactor room than the pump and the deposit want together, the
+    /// hot tank cools exactly as much as without deposit heat, and the deposit gets only what the pump left.
+    /// </summary>
+    [Fact]
+    public void ThePumpComesBeforeTheBank_SoTheDepositTakesOnlyTheRoomLeft()
+    {
+        int ore = Tweaks.Base.HomeAbsorbOre;
+        var hot = AgainstCore(ore, settings: null);
+        var plain = AgainstCore(ore, NoDepositHeat);
+        const int roomUnits = 4;   // 2,000 energy: less than the 2,500 the deposit alone brings
+        foreach (var s in new[] { hot, plain })
+        {
+            TankHeatTestHelpers.SetTankHeat(s.Tank, 80f);
+            s.Base.Reactor.Add(new ReactorState(s.Base.Reactor.HeatCapacity, 0));
+            s.Base.Reactor.Exhaust(new ReactorState(roomUnits, 0));
+        }
+        double room = hot.Base.ReactorRoomEnergy;
+        Assert.True(room < ore * (double)Tweaks.Cargo.DepositHeatPerOre);
+
+        var (injected, _) = Compare(hot, plain, ticks: 1);
+
+        Assert.Equal(plain.Tank.Heat, hot.Tank.Heat);
+        Assert.True(plain.Tank.Heat < 80f, "the pump cooled the tank");
+        Assert.Equal(0, hot.Tank.OreHeld);
+        // The deposit filled what the cooling left, and no more: less than it brings.
+        Assert.InRange(injected, 0.0, room);
+        Assert.True(injected < ore * (double)Tweaks.Cargo.DepositHeatPerOre);
+    }
+
     [Fact]
     public void TheDefault_IsTheTweak() =>
         Assert.Equal(Tweaks.Cargo.DepositHeatPerOre, SimulationSettings.FromTweaks().BaseDepositHeatPerOre);

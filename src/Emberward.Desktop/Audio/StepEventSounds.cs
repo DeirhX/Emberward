@@ -66,7 +66,11 @@ public static class StepEventSounds
         _ => CueFor(e.Kind, e.Machine),
     };
 
-    /// <summary>A deposit's gain for the first event of its pour: 0.6 to 1 of <see cref="AudioTweaks.DepositGain"/>.</summary>
+    /// <summary>
+    /// A deposit's gain for a pour of <paramref name="units"/>: 0.6 to 1 of <see cref="AudioTweaks.DepositGain"/>. The
+    /// director passes the whole pour (the first event's units and what the hold still has to bank), since a bank's
+    /// first event carries only a tick's worth.
+    /// </summary>
     public static float DepositGain(int units) => AudioTweaks.DepositGain * (0.6f + 0.4f * Math.Min(units, 40) / 40f);
 
     public static StepEventCue? CueFor(StepEventKind kind, MachineType machine) => kind switch
