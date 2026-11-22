@@ -199,7 +199,7 @@ public class BotTankAI
             TwitchMode.ExitBaseDown => DoExit(tank, world, exitY: 1, relX, relY),
             TwitchMode.Twitch => DoTwitch(tank, enemy, world),
             TwitchMode.Return => DoReturn(tank, world, relX, relY),
-            TwitchMode.Recharge => DoRecharge(tank, relX, relY),
+            TwitchMode.Recharge => DoRecharge(tank, world, relX, relY),
             _ => default,
         };
     }
@@ -298,7 +298,9 @@ public class BotTankAI
     private ControllerOutput DoTwitch(Tank tank, Tank? enemy, World world)
     {
         var profile = _profiles.Active;
-        bool hurtOrHot = _returnCooldownFrames <= 0 && (tank.Reactor.Health < ReturnBelowHealth || NeedsToCool(tank));
+        // A hot load (DESIGN.md §6.3) sends it home to the core before the heat does.
+        bool hurtOrHot = _returnCooldownFrames <= 0 &&
+            (tank.Reactor.Health < ReturnBelowHealth || NeedsToCool(tank) || tank.IsCargoHot);
         if (hurtOrHot && tank.CanRecall && tank.OreHeld == 0)
             return new ControllerOutput { Recall = true };
         if (hurtOrHot || IsInsideOwnBase(tank))
@@ -447,9 +449,10 @@ public class BotTankAI
         return new ControllerOutput { MoveSpeed = new Offset(sx, sy) };
     }
 
-    private ControllerOutput DoRecharge(Tank tank, int relX, int relY)
+    private ControllerOutput DoRecharge(Tank tank, World world, int relX, int relY)
     {
-        if (tank.Reactor.Health >= Tweaks.Tank.InitialHealth && IsRecharged(tank))
+        bool unload = HasOreForCore(tank, world);
+        if (!unload && tank.Reactor.Health >= Tweaks.Tank.InitialHealth && IsRecharged(tank))
         {
             SetMode(TwitchMode.Start);
             _rechargeLowestHeat = float.MaxValue;
@@ -457,12 +460,24 @@ public class BotTankAI
             return default;
         }
 
-        // It waits in the courtyard on the side it came in by, in the lane round the keep: the middle is the core.
+        // It waits in the courtyard on the side it came in by, in the lane round the keep; with ore aboard it drives on
+        // up to the core and touches it, which banks the hold (or burns it to restart a dark base, DESIGN.md §6.3).
         bool alongY = Math.Abs(relY) >= Math.Abs(relX);
-        int dockX = alongY ? 0 : Math.Sign(relX) * BaseLayout.Lane;
-        int dockY = alongY ? (relY < 0 ? -1 : 1) * BaseLayout.Lane : 0;
+        int stand = unload ? AgainstCore : BaseLayout.Lane;
+        int dockX = alongY ? 0 : Math.Sign(relX) * stand;
+        int dockY = alongY ? (relY < 0 ? -1 : 1) * stand : 0;
         return new ControllerOutput { MoveSpeed = new Offset(Math.Sign(dockX - relX), Math.Sign(dockY - relY)) };
     }
+
+    /// <summary>Cells from the base's centre where the tank stands against its core, touching it: the core's half, the tank's and one between.</summary>
+    private const int AgainstCore = BaseLayout.CoreHalf + TankSpriteShape.Radius + 1;
+
+    /// <summary>
+    /// Whether the bot carries ore the core would take: the store has room, or the base is dark and burns it. (The
+    /// tank's own <see cref="Tank.CoreDropOff"/> is the same answer, but only once it has been inside the walls a tick.)
+    /// </summary>
+    private static bool HasOreForCore(Tank tank, World world) =>
+        tank.OreHeld > 0 && tank.Base is { IsDestroyed: false } home && (world.IsBaseDark(home) || !home.Store.IsFull);
 
     /// <summary>Room left before the tank overheats, as a share of a fully cooled tank's room.</summary>
     private static float HeatBudgetFraction(Tank tank) => tank.HeatBudget / Tank.HeatBudgetCapacity;

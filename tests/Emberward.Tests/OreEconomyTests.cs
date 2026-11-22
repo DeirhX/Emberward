@@ -150,6 +150,60 @@ public class OreEconomyTests
         Assert.Equal(held, s.Tank.OreHeld);
     }
 
+    /// <summary>Diagonally beside a relay, the hull's corner within reach of the relay's corner, it unloads too.</summary>
+    [Fact]
+    public void DiagonallyBesideARelay_Unloads()
+    {
+        var s = TankAtRelay(ore: 10);
+        int touching = TankSpriteShape.Radius + Tweaks.Machine.BoundingBoxHalfSize + Tweaks.Cargo.ContactReach - 1;
+        s.Tank.Direction = TankSpriteShape.DirectionOf(new Offset(1, 0));
+        s.Tank.Position = s.RelayPos + new Offset(-touching, -s.DirY * touching);
+        Advance(s.World, Tweaks.Perf.TargetFps);
+        Assert.True(s.Tank.IsUnloadingOre);
+        Assert.Equal(s.RelayPos, s.Tank.UnloadNode);
+        Assert.True(s.Tank.OreHeld < 10);
+    }
+
+    /// <summary>Another side's relay is no drop-off: touching it unloads nothing.</summary>
+    [Fact]
+    public void TouchingAnotherSidesRelay_UnloadsNothing()
+    {
+        var s = RelayHeatTests.CreateScenario();
+        var rival = s.World.TankList.Tanks[1];
+        var relay = new Machine(s.RelayPos, MachineType.Relay, rival.Color);
+        s.World.Machines.Add(relay);
+        s.World.PlantMachine(relay, rival.Base);
+        Advance(s.World, 12);
+        s.Tank.Position = s.RelayPos;
+        s.Tank.Hold.Ore = 10;
+
+        var events = Advance(s.World, Tweaks.Perf.TargetFps * 2);
+
+        Assert.Equal(10, s.Tank.OreHeld);
+        Assert.False(s.Tank.IsUnloadingOre);
+        Assert.DoesNotContain(events, e => e.Kind == StepEventKind.OreUnloaded);
+    }
+
+    /// <summary>A dark base takes nothing at its relays: there the hold burns only at the core.</summary>
+    [Fact]
+    public void AtARelayOfADarkBase_NothingUnloads()
+    {
+        var s = RelayHeatTests.CreateScenario(energyNetwork: true);
+        RelayHeatTests.PlantRelay(s);
+        Advance(s.World, 12);
+        s.Base.DrawCharge(s.Base.Charge);
+        Advance(s.World, 1);
+        Assert.True(s.World.IsBaseDark(s.Base));
+        s.Tank.Position = s.RelayPos;
+        s.Tank.Hold.Ore = 10;
+
+        Advance(s.World, Tweaks.Perf.TargetFps * 2);
+
+        Assert.True(s.World.IsBaseDark(s.Base));
+        Assert.Equal(10, s.Tank.OreHeld);
+        Assert.False(s.Tank.IsUnloadingOre);
+    }
+
     [Fact]
     public void UnloadedOre_TravelsHomeAlongTheLinks()
     {

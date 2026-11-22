@@ -117,8 +117,8 @@ Core decides what is seen; the renderer only shows it.
   and fades out at `Radar.PulseRange`, which the upgrade lengthens.
 - **Ore on the network.** Links carry two beams: heat home (orange, `KindLink`) and ore home (`KindOreBeam`, `OreBeam` in `Shaders/Entity/Beams.hlsli`: gold crystals with a pale
   glint, tumbling toward the base). `LinkQuads` draws the ore beam from `LinkRenderState.OreFlow`, which Core keeps up
-  for a moment after each unit passes (`Link.OreFlowTicks`), and `CoverageQuads` draws one from the tank to its
-  covering node beside the tether while `Tank.IsUnloadingOre`.
+  for a moment after each unit passes (`Link.OreFlowTicks`), and `CoverageQuads` draws one from the tank to the
+  core or relay it touches (`Tank.UnloadNode`) while `Tank.IsUnloadingOre`.
 
 ## Whole-screen effects
 

@@ -372,7 +372,14 @@ A base must not fall to a tank that drives up and shoots it. It is a keep (`Base
 - **Nothing stands round the core.** The floor runs from every gate to the core, so the owner drives straight up to it
   and touches it to unload (§6.3). The baffle plates that once hid the core from every line through a gate are gone:
   they also kept the owner's tank from reaching it. The gate shield is now the only thing that keeps enemy shells and
-  tanks off the core; once it falls, a shot through an open gate reaches it.
+  tanks off the core; once it falls, a shot through an open gate reaches it. What that costs the defence:
+  - a broken (or never charged) gate shield exposes the core from outside the walls: an attacker in line with an open
+    gate hits it from up to its range away, without driving in (the bot does exactly that);
+  - without the energy rule the gates never shut, so the core is open to fire through them all match;
+  - a fight inside the courtyard lands the shells that miss on the core: defending in your own base wears it down;
+  - the courtyard corners are no longer the only firing positions, so a turret behind a gate covers less of what
+    matters. The gate shield, its recharge from charge, and the core's armour and regeneration are now the whole
+    defence; whether that is enough is untested in play.
 - **The courtyard** between the core and the wall is the dock: the tank spawns there, just inside the gate that
   faces into the map (a base backs onto the border, §6.7), and cooling, repair and upgrades work anywhere inside the
   walls. Unloading needs the core itself.
@@ -699,13 +706,14 @@ what the off-network clock adds. From 20 every further unit adds 3.5 degrees a s
 insulated hold (§4.8) moves the start later and scales the line down, so its full hold is as hot as the stock one at 40.
 Ground soaks up a hot tank's heat fast, so in play 20 barely shows, 30 is a serious climb (in a tunnel about 50 degrees
 after 5 seconds; in the open past 100 in about 5), and 40 is an emergency: past 100 in about 2 seconds in the open and
-4 in a tunnel, on the network or off it. The heat is the ore's own energy, booked as injected in the ledger. Hot with
+4 in a tunnel, on the network or off it. The heat is the ore's own energy, booked as injected in the ledger. The bot goes home as soon as its load is hot
+and drives up to its core to put it down, as a player must. Hot with
 20 or more aboard, the heat warnings say to unload, and the line under the hold says CARGO HOT.
 When the tank dies its hold spills back into the ground as plain ore in the nearest open or dirt cells around the wreck,
 never under another tank or a machine (ore blocks links, so it would cut a relay); what does not fit within a few cells
 is lost. Torching rock no longer yields anything. The MATERIALS panel shows a pile of Pyrite growing inside the
 hold and the exact ore count against capacity. Beneath the hold window it says ORE, CARGO HOT with 20 or more
-aboard, TO CORE inside the own base with ore aboard, and while the hold empties a blinking UNLOADING with down
+aboard, TO CORE inside the own base with ore aboard (BURN AT CORE while the base is dark; nothing while its store is full), and while the hold empties a blinking UNLOADING with down
 arrows. The base panel also shows the store.
 
 ### 6.4 Structures and the ore economy *(Prototype)*

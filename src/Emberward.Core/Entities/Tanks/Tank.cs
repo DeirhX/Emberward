@@ -12,6 +12,17 @@ using Emberward.Core.Entities.Machines;
 using Emberward.Core.Network;
 using Emberward.Core.Entities.Bases;
 
+/// <summary>What touching its core does with a tank's hold (<see cref="Tank.CoreDropOff"/>).</summary>
+public enum CoreDropOff
+{
+    /// <summary>Nothing: the tank is not in its base, or the base store is full.</summary>
+    None,
+    /// <summary>The hold banks into the base store.</summary>
+    Banks,
+    /// <summary>The base is dark: the hold burns to restart it.</summary>
+    Burns,
+}
+
 /// <summary>
 /// A player's tank. It owns the tank's state and the order of one tick; the rules live in its collaborators:
 /// <see cref="TankThermals"/> (heat), <see cref="TankDigger"/> (moving and digging), <see cref="TankBuildController"/>
@@ -191,6 +202,18 @@ public class Tank
     public bool IsUnloadingOre { get; private set; }
 
     /// <summary>
+    /// Where the hold is going while <see cref="IsUnloadingOre"/>: the centre of the core or of the relay the tank
+    /// touches. The HUD draws the ore stream to it.
+    /// </summary>
+    public Position UnloadNode { get; private set; }
+
+    /// <summary>
+    /// What touching its core would do with the hold, as of the tank's last tick inside its own base's walls (none
+    /// anywhere else): bank it into the store, burn it to restart a dark base, or nothing while the store is full.
+    /// </summary>
+    public CoreDropOff CoreDropOff { get; private set; }
+
+    /// <summary>
     /// True once the live tank has been outside every base at the end of a tick: the player has driven out of the
     /// base at least once this match.
     /// </summary>
@@ -263,6 +286,7 @@ public class Tank
         _build.BeginTick();
         _thermals.BeginTick();
         IsUnloadingOre = false;
+        CoreDropOff = CoreDropOff.None;
         SyncHoldCapacity();
 
         if (Base?.IsDestroyed == true)
@@ -403,6 +427,7 @@ public class Tank
             baseColl.RechargeTank(Reactor);
         _thermals.CoolDockingArea(ctx.Heat, baseColl);
 
+        CoreDropOff = dark ? CoreDropOff.Burns : baseColl.Store.IsFull ? CoreDropOff.None : CoreDropOff.Banks;
         int banked = 0;
         if (TouchesCore(baseColl))
         {
@@ -411,6 +436,7 @@ public class Tank
                 ctx.Events?.Record(new StepEvent(StepEventKind.RestartOreBurned, Position, Color, Count: burned));
             banked = dark ? 0 : Hold.MoveTo(baseColl.Store, Tweaks.Base.HomeAbsorbOre);
             IsUnloadingOre = banked > 0;
+            UnloadNode = baseColl.Position;
         }
         _thermals.PumpHeatAtBase(baseColl);
         // A tank that is only shedding the last fraction of a degree near 0 is not being serviced any more.
@@ -431,19 +457,19 @@ public class Tank
     /// <summary>
     /// The first of its own base's standing, powered drop-off points (<see cref="MachineBehavior.TakesOre"/>, the relay)
     /// that the tank touches: a cell of its shape lies within <see cref="Tweaks.Cargo.ContactReach"/> cells of the
-    /// machine's square. Null when it touches none.
+    /// machine's square. Null when it touches none. Powered means linked: the link map reaches a base from it
+    /// (<see cref="LinkPoint.IsPowered"/>), whatever charge the relay holds; the ore needs that route home.
     /// </summary>
     internal Machine? TouchedRelay(MachineList? machines)
     {
         if (machines == null || Base == null)
             return null;
-        int reach = TankSpriteShape.Radius + Tweaks.Machine.BoundingBoxHalfSize + Tweaks.Cargo.ContactReach;
-        machines.CollectNear(Position, reach, _nearMachines);
+        int half = Tweaks.Machine.BoundingBoxHalfSize + Tweaks.Cargo.ContactReach;
+        machines.CollectNear(Position, TankSpriteShape.Radius + half, _nearMachines);
         foreach (var machine in _nearMachines)
             if (machine.StandsFor(Base) && machine.Behavior.TakesOre &&
                 machine.LinkPoint is { IsPowered: true, Hops: >= 0 } &&
-                TankSpriteShape.OverlapsSquare(Direction, Position, machine.Position,
-                    machine.BoundingBox.HalfWidth + Tweaks.Cargo.ContactReach))
+                TankSpriteShape.OverlapsSquare(Direction, Position, machine.Position, half))
                 return machine;
         return null;
     }
@@ -466,6 +492,7 @@ public class Tank
             return;
         }
         IsUnloadingOre = true;
+        UnloadNode = relay.Position;
         _unloadCredit += Tweaks.Ore.RelayUnloadPerSecond;
         if (_unloadCredit < Tweaks.Perf.TargetFps)
             return;

@@ -207,7 +207,8 @@ public class BotBehaviorTests
         }
         else
         {
-            // Nothing stands between an open gate and the core: the bot's shots reach it through the gate or from inside.
+            // Nothing stands between an open gate and the core, so the bot need not drive in: from outside it already has
+            // a clear shot through the gate (BotSiege.FindTarget), and takes it before it reaches the gate.
             Assert.True(enemyBase.ArmorFill < armourBefore,
                 $"its shots should reach the core. {armourBefore:0.000} -> {enemyBase.ArmorFill:0.000}; went in: {wentIn}; each second: {path}");
         }

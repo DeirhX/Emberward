@@ -7,8 +7,8 @@ using Emberward.Core.Network;
 
 /// <summary>
 /// The player's network coverage (DESIGN.md §4.6): a faint field around every node, and while the tank is covered
-/// (outside a base) a cool tether from the node carrying its heat away, and while its hold unloads into the network a
-/// stream of ore crystals beside it. Off network the fields brighten a little, so the way back reads at a glance.
+/// (outside a base) a cool tether from the node carrying its heat away, and while its hold unloads a stream of ore
+/// crystals to the core or relay it touches. Off network the fields brighten a little, so the way back reads at a glance.
 /// </summary>
 public sealed class CoverageQuads
 {
@@ -16,6 +16,7 @@ public sealed class CoverageQuads
     private TankCoverage _playerCoverage;
     private bool _playerOffNetwork;
     private bool _playerUnloading;
+    private Position _unloadNode;
 
     public void Capture(World world, int localSlot)
     {
@@ -28,7 +29,8 @@ public sealed class CoverageQuads
         world.CollectCoverageNodes(home, _coverageNodes);
         _playerCoverage = player.IsDead ? TankCoverage.None : player.Coverage;
         _playerOffNetwork = !player.IsDead && player.IsOffNetwork;
-        _playerUnloading = player.IsUnloadingOre && _playerCoverage.Covered;
+        _playerUnloading = player.IsUnloadingOre && !player.IsDead;
+        _unloadNode = player.UnloadNode;
     }
 
     /// <summary>The coverage fields around every node.</summary>
@@ -51,22 +53,24 @@ public sealed class CoverageQuads
     }
 
     /// <summary>
-    /// The tether (and the ore stream while the hold unloads), handed to <paramref name="beams"/>;
-    /// <paramref name="player"/> is the interpolated player tank, where they start.
+    /// The tether, and while the hold unloads the ore stream to the core or relay the tank touches
+    /// (<see cref="Tank.UnloadNode"/>), handed to <paramref name="beams"/>; <paramref name="player"/> is the interpolated
+    /// player tank, where they start.
     /// </summary>
     public void SubmitTether(BeamFader beams, PositionF player)
     {
-        if (!_playerCoverage.Covered)
-            return;
-        float dx = player.X - _playerCoverage.Node.X, dy = player.Y - _playerCoverage.Node.Y;
-        float length = MathF.Sqrt(dx * dx + dy * dy);
-        if (length < 4f)
-            return;   // standing on the node (or in the base): nothing to draw
-        // From the tank toward the node: heat flows that way. Keyed by the node, so it follows the tank about.
-        Position node = _playerCoverage.Node;
-        beams.Submit(new BeamKey(EntityShape.KindTether, node, node),
-            player.X, player.Y, node.X, node.Y, _playerCoverage.Strength, 2.5f);
         if (_playerUnloading)
-            beams.Submit(new BeamKey(EntityShape.KindOreBeam, node, node), player.X, player.Y, node.X, node.Y, 1f, 1.5f);
+            Submit(beams, EntityShape.KindOreBeam, player, _unloadNode, 1f, 1.5f);
+        if (_playerCoverage.Covered)
+            // From the tank toward the node: heat flows that way. Keyed by the node, so it follows the tank about.
+            Submit(beams, EntityShape.KindTether, player, _playerCoverage.Node, _playerCoverage.Strength, 2.5f);
+    }
+
+    private static void Submit(BeamFader beams, float kind, PositionF player, Position node, float strength, float width)
+    {
+        float dx = player.X - node.X, dy = player.Y - node.Y;
+        if (MathF.Sqrt(dx * dx + dy * dy) < 4f)
+            return;   // standing on the node: nothing to draw
+        beams.Submit(new BeamKey(kind, node, node), player.X, player.Y, node.X, node.Y, strength, width);
     }
 }

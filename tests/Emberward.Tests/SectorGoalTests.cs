@@ -75,6 +75,39 @@ public class SectorGoalTests
         }
     }
 
+    /// <summary>
+    /// In a world: a tank whose base bought every insulated hold level heats far less with 40 aboard than a stock one, and
+    /// its full hold of 70 heats about as the stock hold's 40 does.
+    /// </summary>
+    [Fact]
+    public void AnInsulatedHold_CoolsTheLoad_InTheWorld()
+    {
+        float HeatAfterASecond(int levels, int ore)
+        {
+            var s = RelayHeatTests.CreateScenario();
+            var press = new ControllerOutput { Upgrade = (int)BaseUpgrade.InsulatedHold + 1 };
+            for (int level = 0; level < levels; level++)
+            {
+                Fund(s.Base, s.Base.Store.Capacity);
+                s.World.Advance(i => i == 0 ? press : default);
+                s.World.Advance(_ => default);
+            }
+            Assert.Equal(levels, s.Base.Upgrades.Level(BaseUpgrade.InsulatedHold));
+            s.Tank.Position = s.RelayPos;
+            ClearArea(s.World.Terrain, s.Tank.Position, radius: 7);
+            SetTankHeat(s.Tank, 0f);
+            s.Tank.Hold.Ore = ore;
+            for (int i = 0; i < Tweaks.Perf.TargetFps; i++)
+                s.World.Advance(_ => default);
+            return s.Tank.Heat;
+        }
+
+        float stock = HeatAfterASecond(0, 40), insulated = HeatAfterASecond(BaseUpgrades.MaxLevel, 40);
+        float fullInsulated = HeatAfterASecond(BaseUpgrades.MaxLevel, 70);
+        Assert.True(insulated < stock * 0.35f, $"40 aboard: stock {stock:0.0}, insulated {insulated:0.0}");
+        Assert.InRange(fullInsulated, stock * 0.85f, stock * 1.15f);
+    }
+
     [Fact]
     public void ARadarLevel_ScalesEveryRange_ByAFifth_AndTheHeatBudget_ByAQuarter()
     {
