@@ -149,6 +149,41 @@ public class DepositQuadsTests
         Assert.True(qa.Vertices.AsSpan(0, qa.VertexCount).SequenceEqual(qb.Vertices.AsSpan(0, qb.VertexCount)));
     }
 
+    /// <summary>A pause holds the pour where it was drawn: the crystals stay put, whatever progress the frames say.</summary>
+    [Fact]
+    public void Held_ThePourStaysWhereItWasDrawn()
+    {
+        var run = AtCore();
+        run.Step(4);
+        var drawn = Drawn(run.Draw(alpha: 0.6f));
+
+        run.Deposits.Hold();
+        var heldEarly = Drawn(run.Draw(alpha: 0f));
+        var heldLate = Drawn(run.Draw(alpha: 1f));
+
+        Assert.NotEmpty(drawn);
+        Assert.Equal(drawn.Length, heldEarly.Length);
+        for (int i = 0; i < drawn.Length; i++)
+        {
+            Assert.Equal(drawn[i].X, heldEarly[i].X, 3);
+            Assert.Equal(drawn[i].Y, heldEarly[i].Y, 3);
+            Assert.Equal(heldEarly[i], heldLate[i]);
+        }
+    }
+
+    /// <summary>Where each crystal is drawn (corner plus motion times the step's progress), in emission order.</summary>
+    private static (float X, float Y)[] Drawn(EntityQuads quads)
+    {
+        var at = new List<(float, float)>();
+        for (int i = 0; i < quads.VertexCount; i += 6)
+        {
+            var v = quads.Vertices[i];
+            if (v.Kind == EntityShape.KindOreCrystal)
+                at.Add((v.CellX + v.MotionX * quads.Alpha, v.CellY + v.MotionY * quads.Alpha));
+        }
+        return [.. at];
+    }
+
     [Fact]
     public void AtARelay_EachUnitIsACrystal_AndTheVisitCountsUp()
     {
