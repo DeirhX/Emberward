@@ -118,23 +118,30 @@ public partial class BotTankAI
     public Position? Detour => _stuckWatch.Detour;
 
     /// <summary>
-    /// The tank a bot in slot <paramref name="self"/> fights: the nearest other tank that is alive, or the nearest
-    /// other tank when none is. Ties go to the lower slot. Null when it is alone.
+    /// The tank a bot in slot <paramref name="self"/> fights: an enemy at its own base first (alive, outside its own
+    /// base and within siege range of the bot's, so the bot answers an attack instead of waiting at another base), the
+    /// nearest of those; otherwise the nearest other tank that is alive, or the nearest other tank when none is. Ties
+    /// go to the lower slot. Null when it is alone.
     /// </summary>
     public static Tank? PickEnemy(IReadOnlyList<Tank> tanks, int self)
     {
         Tank? best = null;
         long bestRank = long.MaxValue;
+        var home = tanks[self].Base;
         for (int i = 0; i < tanks.Count; i++)
         {
             if (i == self || MatchReferee.IsEliminated(tanks[i]))
                 continue;
-            // A dead tank ranks behind every live one, whatever the distance.
-            long rank = Position.DistanceSquared(tanks[i].Position, tanks[self].Position)
-                + (tanks[i].IsDead ? (long)int.MaxValue + 1 : 0);
+            var other = tanks[i];
+            bool attacker = !other.IsDead && home is { IsDestroyed: false } && !other.IsDockedAtOwnBase &&
+                BotSiege.InSiegeRange(other.Position, home);
+            // An attacker ranks before every other tank, and a dead tank behind every live one, whatever the distance.
+            long rank = Position.DistanceSquared(other.Position, tanks[self].Position)
+                + (attacker ? 0 : (long)int.MaxValue + 1)
+                + (other.IsDead ? 2 * ((long)int.MaxValue + 1) : 0);
             if (rank < bestRank)
             {
-                best = tanks[i];
+                best = other;
                 bestRank = rank;
             }
         }
@@ -188,13 +195,12 @@ public partial class BotTankAI
         // Its enemy docked in a base it cannot break, the bot waits outside (BotLoiter); one it can break it lays siege to
         // once the opening grace is over, and before that roams as usual. It stops waiting while it sees the enemy (who
         // then has a shot at it too) or soon after it is hit, and fights.
-        bool breakable = enemy?.Base is { IsDestroyed: false } enemyBase && world.CanBreakBase(tank, enemyBase);
+        bool breakable = HoldBreakDecision(tank, enemy?.Base, world);
         bool canSiege = _gunner.BaseSiegeAllowed && breakable;
         TrackHits(tank);
-        bool loiter = _mode == TwitchMode.Twitch && enemy is { IsDockedAtOwnBase: true, Base: { IsDestroyed: false } } &&
-            !breakable && !_gunner.EnemyInSight && _loiterBreakFrames == 0;
-        _waiting = loiter;
-        WatchForStuck(tank, enemy, world, canSiege, loiter);
+        Position? post = ChooseLoiterPost(tank, enemy, world, breakable);
+        _waiting = post != null;
+        WatchForStuck(tank, enemy, world, canSiege, _waiting);
 
         if (_maneuverFrames > 0)
         {
@@ -214,7 +220,7 @@ public partial class BotTankAI
             TwitchMode.Start => DoStart(tank, world),
             TwitchMode.ExitBaseUp => DoExit(tank, world, exitY: -1, relX, relY),
             TwitchMode.ExitBaseDown => DoExit(tank, world, exitY: 1, relX, relY),
-            TwitchMode.Twitch => DoTwitch(tank, enemy, world, canSiege, loiter),
+            TwitchMode.Twitch => DoTwitch(tank, enemy, world, canSiege, post),
             TwitchMode.Return => DoReturn(tank, world, relX, relY),
             TwitchMode.Recharge => DoRecharge(tank, world, relX, relY),
             _ => default,
@@ -314,7 +320,7 @@ public partial class BotTankAI
         return Math.Abs(relX) >= BaseLayout.Lane ? new Offset(0, exitY) : new Offset(relX < 0 ? -1 : 1, 0);
     }
 
-    private ControllerOutput DoTwitch(Tank tank, Tank? enemy, World world, bool canSiege, bool loiter)
+    private ControllerOutput DoTwitch(Tank tank, Tank? enemy, World world, bool canSiege, Position? post)
     {
         var profile = _profiles.Active;
         // A hot load (DESIGN.md §6.3) sends it home to the core before the heat does.
@@ -328,8 +334,8 @@ public partial class BotTankAI
             return default;
         }
 
-        if (loiter)
-            return DoLoiter(tank, enemy!.Base!, world);
+        if (post is Position at)
+            return DoLoiter(tank, enemy!.Base!, at, world);
 
         // Out of the enemy's sight and near a base it can break, the bot works on the base (BotSiege): it shoots what a
         // shot wears down, a shut gate or the core, and otherwise heads for the place the next shot is fired from.
@@ -587,22 +593,27 @@ public partial class BotTankAI
     /// A committed move: leaving the base, heading home, a manoeuvre. It digs dirt the plain way and torches rock in
     /// its way only while the heat budget allows.
     /// </summary>
-    private ControllerOutput MoveOutput(Tank tank, Offset move, World world) => new()
+    private ControllerOutput MoveOutput(Tank tank, Offset move, World world, bool holdFire = false) => new()
     {
         MoveSpeed = move,
-        ShootPrimary = NeedsTorch(world.ProbeTankStep(tank, move), torchDirt: false, torchRock: MayTorchRock(tank)),
+        ShootPrimary = !holdFire && NeedsTorch(world.ProbeTankStep(tank, move), torchDirt: false, torchRock: MayTorchRock(tank)),
         AimDirection = BotGunner.AimTowardsOffset(move),
     };
 
-    /// <summary>Commits to <paramref name="move"/> for <paramref name="frames"/> ticks, then plans afresh.</summary>
-    private ControllerOutput StartManeuver(Tank tank, World world, Offset move, int frames, bool isBreakout = false)
+    /// <summary>
+    /// Commits to <paramref name="move"/> for <paramref name="frames"/> ticks, then plans afresh. One that
+    /// <paramref name="holdsFire"/> (on the way to a post outside an enemy's gate) never torches.
+    /// </summary>
+    private ControllerOutput StartManeuver(Tank tank, World world, Offset move, int frames, bool isBreakout = false,
+        bool holdsFire = false)
     {
         _maneuverMove = move;
         _maneuverFrames = frames;
         _maneuverIsBreakout = isBreakout;
+        _maneuverHoldsFire = holdsFire;
         _timeToChange = 0;
         _navigator.ResetStuck();
-        return MoveOutput(tank, move, world);
+        return MoveOutput(tank, move, world, holdsFire);
     }
 
     private ControllerOutput ContinueManeuver(Tank tank, World world)
@@ -610,9 +621,9 @@ public partial class BotTankAI
         _maneuverFrames--;
         // Nothing gets through a wall, nor through rock without heat to spare: the manoeuvre ends there.
         var met = world.ProbeTankStep(tank, _maneuverMove);
-        if (met == StepObstacle.Solid || (met == StepObstacle.Hard && !MayTorchRock(tank)))
+        if (met == StepObstacle.Solid || (met == StepObstacle.Hard && (_maneuverHoldsFire || !MayTorchRock(tank))))
             _maneuverFrames = 0;
-        return MoveOutput(tank, _maneuverMove, world);
+        return MoveOutput(tank, _maneuverMove, world, _maneuverHoldsFire);
     }
 
     /// <summary>
@@ -645,6 +656,7 @@ public partial class BotTankAI
         hash = Fnv1a.Mix(hash, _lastHealth);
         hash = Fnv1a.Mix(hash, _loiterBreakFrames);
         hash = Fnv1a.Mix(hash, _waiting);
+        hash = MixWaitingState(hash);
         return Fnv1a.Mix(hash, _rechargeStallFrames);
     }
 }

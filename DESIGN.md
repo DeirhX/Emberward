@@ -429,12 +429,17 @@ A base must not fall to a tank that drives up and shoots it. It is a keep (`Base
   core through an open gate or from the courtyard. Only a destroyed base ends a side; there are no lives. Relays cost 4
   ore, so a cut has to cost the defender time (relink, dearer links), or rebuilding makes attacks pointless.
 - **The bot** (`BotSiege`) shoots a shut gate, fires at the core through it once it opens, and drives in to a
-  corner when it has no shot from outside. It lays siege only to a base it can break (`World.CanBreakBase`: what its
-  gun fires in 60 seconds against the shield, the shield the store can buy back in that time, and the core with its
-  repairs), so a lone bot leaves a sound keep alone and goes for a worn, dark or unshielded one; a base it can break
-  it roams round until its 240-second opening grace is over. While its enemy sits docked in a base it cannot break it
-  waits 12 cells out from the wall beside the nearest gate, out of the straight line of fire through it, fire held
-  (`BotLoiter`). It stops waiting and fights while it sees the enemy, or for 5 seconds after it is hit. A bot that
+  corner when it has no shot from outside. It lays siege only to a base it can break (`World.CanBreakBase` plays the
+  siege forward a second at a time: its gun for up to 60 seconds, or until its off-network clock would send it home,
+  against the shield, the shield the store can buy back while its reactor has room for the heat, gates that shut
+  again at a quarter shield, and the core with its repairs while it is damaged), so a lone bot leaves a sound keep
+  alone and goes for a worn, dark or unshielded one; a base it can break it roams round until its 240-second opening
+  grace is over. Once it has decided it can break a base it holds to that while fire 15 % stronger still would, so a
+  store at the edge does not flip it every tick. While its enemy sits docked in a base it cannot break it waits 12
+  cells out from the wall beside the nearest gate, out of the straight line of fire through it, fire held even to
+  torch (`BotLoiter`); a post in rock or a wall is passed over, and a bot that gets no nearer its post for 15 seconds
+  gives up waiting for 20. It stops waiting and fights while it sees the enemy, or for 5 seconds after it is hit. An
+  enemy at the bot's own base is fought before a nearer one docked at home. A bot that
   stays within 10 cells of one spot for 10 seconds while trying to get somewhere drops its goal for a detour
   (`BotStuckWatch`).
 - *Still open:* the numbers are untested in play; a turret covers a gate from inside its 24 cells, which may make a

@@ -505,11 +505,19 @@ The bot drives its tank through the same `ControllerOutput` as a player, and ask
   to `DetourSeconds`. Fighting in sight, laying siege, waiting outside a base and anything in its own base are not
   watched.
 - **Sieges and waiting.** The bot asks `World.CanBreakBase` (the one owner of the answer) whether its gun alone can
-  break the enemy's base in `Tweaks.Bot.SiegeWindowSeconds` of steady fire. Only then does it lay siege (`BotSiege`),
-  once `Tweaks.Weapon.BotBaseSiegeGraceSeconds` are over; before that it roams. While the enemy sits docked in a base
-  it cannot break it waits at a post `LoiterCellsOutsideWall` out from the wall and `BotLoiter.PostSideStep` to one
-  side of the nearest gate, out of the gate's straight line of fire, turret on the base and fire held. It stops
-  waiting and fights while the enemy is in sight or for 5 s after a hit (`BotTankAI.TrackHits`).
+  break the enemy's base in one outing: at most `Tweaks.Bot.SiegeWindowSeconds` of steady fire, cut short by its
+  off-network clock (`World.SiegeFireTicks`), played forward a second at a time against the rules `BasePowerSystem`
+  applies (buy-back limited by spare charge and reactor room, gates that shut again at `ShieldRestoreFill`, core
+  repairs only while damaged); the remarks on `CanBreakBase` list what it leaves out. The decision is held
+  (`BotTankAI.HoldBreakDecision`): once it can, it keeps to that while fire `SiegeHoldFireFactor` times as strong
+  would. Only then does it lay siege (`BotSiege`), once `Tweaks.Weapon.BotBaseSiegeGraceSeconds` are over; before
+  that it roams. While the enemy sits docked in a base it cannot break it waits at a post `LoiterCellsOutsideWall`
+  out from the wall and `BotLoiter.PostSideStep` to one side of the nearest gate, out of the gate's straight line of
+  fire, turret on the base and fire held (its unstuck manoeuvres too). A post a tank cannot stand at
+  (`BotLoiter.CanStandAt`) is passed over; with none it does not wait, and one it gets no nearer for
+  `LoiterApproachSeconds` it gives up on for a while. It stops waiting and fights while the enemy is in sight or for
+  5 s after a hit (`BotTankAI.TrackHits`). `BotTankAI.PickEnemy` fights an enemy at the bot's own base before a
+  nearer one.
 
 It still has no route planner (moves are scored one step at a time), sees the whole map and always knows where the
 enemy is.
