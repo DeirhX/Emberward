@@ -235,7 +235,8 @@ public sealed class SoundDirector
             (1f - 0.05f * index) * approachRate, muffle);
         float fire = dead ? 0f : tank.FireLevel;
         bool fireOn = fire > 0f && audible;
-        _sink.SetLoop(track.FireLoop, fireOn ? gain * AudioTweaks.HullFireGain * (0.35f + 0.65f * fire) : 0f, pan, 1f, muffle);
+        _sink.SetLoop(track.FireLoop, fireOn ? gain * AudioTweaks.HullFireGain * (0.35f + 0.65f * fire) : 0f, pan,
+            0.9f + (0.2f * fire), muffle);
         LogLoop(SoundEffect.FireLoop, index, ref track.FireOn, fireOn);
         LogLoop(SoundEffect.EngineLoop, index, ref track.EngineOn, engineOn);
         LogLoop(SoundEffect.DigLoop, index, ref track.DigOn, digOn);

@@ -42,37 +42,4 @@ public static class HudDraw
         dl.PathArcTo(c, r, a0, a1, segments);
         dl.PathStroke(color, ImDrawFlags.None, thickness);
     }
-
-    /// <summary>Fills the part of a convex polygon between two heights.</summary>
-    public static void FillPolygonBand(ImDrawListPtr dl, Vector2[] poly, float y0, float y1, uint color)
-    {
-        if (y1 <= y0)
-            return;
-        float x0 = float.MaxValue, x1 = float.MinValue;
-        foreach (var p in poly)
-        {
-            x0 = MathF.Min(x0, p.X);
-            x1 = MathF.Max(x1, p.X);
-        }
-        dl.PushClipRect(new Vector2(x0 - 1f, y0), new Vector2(x1 + 1f, y1), true);
-        dl.AddConvexPolyFilled(ref poly[0], poly.Length, color);
-        dl.PopClipRect();
-    }
-
-    /// <summary>Left and right x where a horizontal line crosses a convex polygon (equal if it misses).</summary>
-    public static (float x0, float x1) PolygonSpanAtY(Vector2[] poly, float y)
-    {
-        float x0 = float.MaxValue, x1 = float.MinValue;
-        for (int i = 0; i < poly.Length; i++)
-        {
-            var a = poly[i];
-            var b = poly[(i + 1) % poly.Length];
-            if ((y < MathF.Min(a.Y, b.Y)) || (y > MathF.Max(a.Y, b.Y)) || a.Y == b.Y)
-                continue;
-            float x = a.X + (y - a.Y) / (b.Y - a.Y) * (b.X - a.X);
-            x0 = MathF.Min(x0, x);
-            x1 = MathF.Max(x1, x);
-        }
-        return x0 <= x1 ? (x0, x1) : (0f, 0f);
-    }
 }
