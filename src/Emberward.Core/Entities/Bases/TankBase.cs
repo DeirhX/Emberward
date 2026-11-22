@@ -5,6 +5,7 @@ using Emberward.Core.Config;
 using Emberward.Core.Resources;
 using Emberward.Core.Terrain;
 using Emberward.Core.Network;
+using Emberward.Core.Thermal;
 
 public class TankBase
 {
@@ -33,6 +34,9 @@ public class TankBase
 
     private readonly float _ambientTemperature;
 
+    // Heat a banked unit of cargo brings into the reactor (SimulationSettings.BaseDepositHeatPerOre).
+    private readonly double _depositHeatPerOre;
+
     /// <summary>
     /// The side of the base its tank spawns on, one of <see cref="BaseLayout.GateDirections"/>: the side that faces
     /// into the map, away from the border the base backs onto (<see cref="BaseLayout.FrontOf"/>).
@@ -51,7 +55,9 @@ public class TankBase
         Position = position;
         Color = color;
         Front = front ?? new Offset(0, 1);
-        _ambientTemperature = (settings ?? SimulationSettings.FromTweaks()).ThermalAmbientTemperature;
+        var resolved = settings ?? SimulationSettings.FromTweaks();
+        _ambientTemperature = resolved.ThermalAmbientTemperature;
+        _depositHeatPerOre = resolved.BaseDepositHeatPerOre;
     }
 
     public bool IsDestroyed => Reactor.Health <= 0;
@@ -317,6 +323,20 @@ public class TankBase
             return 0.0;
         CreditReactor(accepted);
         return accepted;
+    }
+
+    /// <summary>
+    /// Moves up to <paramref name="max"/> units from a tank's <paramref name="hold"/> into the store, the one way a tank
+    /// banks ore (at the core and at a relay). Each unit moved brings <see cref="SimulationSettings.BaseDepositHeatPerOre"/>
+    /// into the reactor, as much as it has room for, booked as injected; a full reactor takes none and nothing is
+    /// created. Returns the units moved.
+    /// </summary>
+    internal int BankFromHold(OreStore hold, int max, ThermalLedger ledger)
+    {
+        int moved = hold.MoveTo(Store, max);
+        if (moved > 0 && _depositHeatPerOre > 0.0)
+            ledger.RecordInjected(AcceptHeat(moved * _depositHeatPerOre));
+        return moved;
     }
 
     private void CreditReactor(double energy)

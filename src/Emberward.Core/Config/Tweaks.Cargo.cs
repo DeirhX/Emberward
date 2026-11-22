@@ -32,5 +32,14 @@ public static partial class Tweaks
         // disc or of the relay's square. At the core the hold empties at Base.HomeAbsorbOre a tick; at a relay at
         // Ore.RelayUnloadPerSecond, the units travelling home along the links.
         public const int ContactReach = 2;
+
+        // Heat a unit of cargo brings into the base reactor when the tank banks it (TankBase.BankFromHold), in energy
+        // units, as much as the reactor has room for, booked as injected: pyrite is hot. The reactor holds 50,000 and
+        // the stock radiator vents 500 a tick, so a full hold of 40 (10,000) is a fifth of the store, vented in under a
+        // second when nothing else feeds the reactor. The bank comes after the tank's dock pump, so it never takes room
+        // that tick's cooling wanted; but the heat it leaves takes room in the next ticks, so near a full reactor a
+        // deposit costs some later cooling, relay extraction and shield recharge. Harvested ore and ore burned to
+        // restart a dark base bring none. At 0 banking adds no heat.
+        public const float DepositHeatPerOre = 250f;
     }
 }

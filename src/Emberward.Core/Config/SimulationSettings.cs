@@ -76,6 +76,7 @@ public readonly record struct SimulationSettings
 
     // --- Base ---
     public int BaseSize { get; init; }
+    public double BaseDepositHeatPerOre { get; init; }
 
     // --- Tank thermals (TankThermals): work heat, docking-area cooling and the dock heat pump ---
     public int TankIdleHeatGain { get; init; }
@@ -133,6 +134,7 @@ public readonly record struct SimulationSettings
         TankOffNetworkHeatPerTick = Tweaks.Tank.OffNetworkHeatPerSecond / Tweaks.Perf.TargetFps,
         TankNetworkCoolingPerTick = Tweaks.Tank.NetworkCoolingPerSecond / Tweaks.Perf.TargetFps,
         BaseSize = Tweaks.Base.BaseSize,
+        BaseDepositHeatPerOre = Tweaks.Cargo.DepositHeatPerOre,
 
         // Tank thermals
         TankIdleHeatGain = Tweaks.Tank.IdleHeatGain,

@@ -757,7 +757,15 @@ what the off-network clock adds. From 20 every further unit adds 3.5 degrees a s
 insulated hold (§4.8) moves the start later and scales the line down, so its full hold is as hot as the stock one at 40.
 Ground soaks up a hot tank's heat fast, so in play 20 barely shows, 30 is a serious climb (in a tunnel about 50 degrees
 after 5 seconds; in the open past 100 in about 5), and 40 is an emergency: past 100 in about 2 seconds in the open and
-4 in a tunnel, on the network or off it. The heat is the ore's own energy, booked as injected in the ledger. The bot goes home as soon as its load is hot
+4 in a tunnel, on the network or off it. The heat is the ore's own energy, booked as injected in the ledger. Banking
+also warms the core: each unit a tank banks, at the core or at a relay, brings 250 energy units into its base's reactor
+(`Tweaks.Cargo.DepositHeatPerOre`, `TankBase.BankFromHold`), as much as the reactor has room for after the tank's own
+dock cooling in the same tick, booked as injected too. Both exist: the load heats the tank while it is carried, and the
+deposit heats the reactor when it is put down. A full hold is 10,000, a fifth of the reactor, vented in under a second
+by the stock radiator when nothing else feeds it; until it is vented it takes room, so near a full reactor a deposit
+costs some cooling, relay extraction and shield recharge in the ticks after. A full reactor takes the ore but none of
+its heat. Harvested ore and ore burned to restart a dark base bring
+none. The bot goes home as soon as its load is hot
 and drives up to its core to put it down, as a player must. Hot with
 20 or more aboard, the heat warnings say to unload, and the line under the hold says CARGO HOT.
 When the tank dies its hold spills back into the ground as plain ore in the nearest open or dirt cells around the wreck,
@@ -1099,6 +1107,7 @@ upgrades, throughput, turrets, removing the pylon and the tank's reserve are in)
 | Every heat body is finite: no pinned temperatures or permanent sources; the outside is a loss, not a cell | Decided |
 | Stored heat is the match's supply; what keeps it up over a long match is open (§4.10) | Proposed |
 | Carried pyrite heats the tank linearly, steeply from 20 units and dangerously at 40, with no step or spike, and the hold upgrade insulates the load more than it enlarges the hold; the hold unloads only by touching the own core or a powered relay, and the core has no baffles round it (§6.3, §4.9) | Prototype |
+| Each unit a tank banks (core or relay) brings 250 energy into its reactor, booked as injected, after the tank's dock cooling; harvested and burned ore bring none (§6.3) | Prototype |
 | A bot sieges only a base it can break and otherwise waits outside while its enemy is docked; emberites hunt bot and player tanks by the same rules, and leave any tank docked in its own base (§4.9, §6.2) | Prototype |
 
 ## 14. Open questions

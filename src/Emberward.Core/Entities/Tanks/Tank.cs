@@ -428,17 +428,26 @@ public class Tank
         _thermals.CoolDockingArea(ctx.Heat, baseColl);
 
         CoreDropOff = dark ? CoreDropOff.Burns : baseColl.Store.IsFull ? CoreDropOff.None : CoreDropOff.Banks;
-        int banked = 0;
-        if (TouchesCore(baseColl))
+        bool touchesCore = TouchesCore(baseColl);
+        if (touchesCore)
         {
             int burned = ctx.BasePower?.BurnHold(baseColl, Hold, ctx.Heat.Ledger) ?? 0;
             if (burned > 0)
-                ctx.Events?.Record(new StepEvent(StepEventKind.RestartOreBurned, Position, Color, Count: burned));
-            banked = dark ? 0 : Hold.MoveTo(baseColl.Store, Tweaks.Base.HomeAbsorbOre);
+                ctx.Events?.Record(new StepEvent(StepEventKind.RestartOreBurned, baseColl.Position, Color,
+                    Target: ImpactTarget.Base, Count: burned));
+        }
+        // The pump runs before the bank, so the deposit heat takes only the reactor room the tank's cooling left.
+        _thermals.PumpHeatAtBase(baseColl);
+        int banked = 0;
+        if (touchesCore)
+        {
+            banked = dark ? 0 : baseColl.BankFromHold(Hold, Tweaks.Base.HomeAbsorbOre, ctx.Heat.Ledger);
+            if (banked > 0)
+                ctx.Events?.Record(new StepEvent(StepEventKind.OreUnloaded, baseColl.Position, Color,
+                    Target: ImpactTarget.Base, Count: banked));
             IsUnloadingOre = banked > 0;
             UnloadNode = baseColl.Position;
         }
-        _thermals.PumpHeatAtBase(baseColl);
         // A tank that is only shedding the last fraction of a degree near 0 is not being serviced any more.
         if (Reactor.Health > health || Heat < heat - BaseServicedHeatDrop || banked > 0)
             ctx.Events?.Record(new StepEvent(StepEventKind.BaseServiced, Position, Color));
@@ -484,8 +493,7 @@ public class Tank
     /// </summary>
     private void AdvanceRelayUnload(in SimulationContext ctx)
     {
-        var store = Base?.Store;
-        if (store == null || IsUnloadingOre || Hold.Ore == 0 || store.IsFull || ctx.BasePower?.IsDark(Base!) == true ||
+        if (Base is not { } home || IsUnloadingOre || Hold.Ore == 0 || home.Store.IsFull || ctx.BasePower?.IsDark(home) == true ||
             TouchedRelay(ctx.Machines) is not { } relay)
         {
             _unloadCredit = 0;
@@ -497,9 +505,10 @@ public class Tank
         if (_unloadCredit < Tweaks.Perf.TargetFps)
             return;
         _unloadCredit -= Tweaks.Perf.TargetFps;
-        int moved = Hold.MoveTo(store, 1);
+        int moved = home.BankFromHold(Hold, 1, ctx.Heat.Ledger);
         LinkMap.CarryOre(relay.LinkPoint);
-        ctx.Events?.Record(new StepEvent(StepEventKind.OreUnloaded, Position, Color, Count: moved));
+        ctx.Events?.Record(new StepEvent(StepEventKind.OreUnloaded, relay.Position, Color, Target: ImpactTarget.Machine,
+            Count: moved));
     }
 
     private void AdvanceTurretAim(ControllerOutput input)

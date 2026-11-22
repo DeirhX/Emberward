@@ -40,8 +40,10 @@ public class TankHeatBehaviorTests
             double injected = ledger.Injected;
             AdvanceTank(tank, world, 1);
             Assert.True(tank.OreHeld < before);
+            // The load's heat for what is left aboard, and the deposit heat the banked units bring into the reactor.
             double remainingLoad = TankHeatModel.ComputeCargoHeat(world.Settings, tank.OreHeld) * (double)tank.ThermalCapacity;
-            Assert.Equal(remainingLoad, ledger.Injected - injected, precision: 4);
+            double depositHeat = (before - tank.OreHeld) * world.Settings.BaseDepositHeatPerOre;
+            Assert.Equal(remainingLoad + depositHeat, ledger.Injected - injected, precision: 4);
         }
         double afterUnload = ledger.Injected;
         AdvanceTank(tank, world, 1);

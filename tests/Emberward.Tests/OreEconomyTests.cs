@@ -65,10 +65,12 @@ public class OreEconomyTests
         Assert.InRange(unloaded, Tweaks.Ore.RelayUnloadPerSecond * seconds - 1, Tweaks.Ore.RelayUnloadPerSecond * seconds);
         Assert.Equal(total, s.Tank.OreHeld + s.Base.Store.Ore);
         Assert.True(s.Tank.IsUnloadingOre);
-        // Every unit is a step event at the tank, so Desktop can play and draw it.
+        // Every unit is a step event at the relay that took it, so Desktop can play and draw it.
         var unloads = events.Where(e => e.Kind == StepEventKind.OreUnloaded).ToList();
         Assert.Equal(unloaded, unloads.Sum(e => e.Count));
         Assert.All(unloads, e => Assert.Equal(s.Tank.Color, e.Color));
+        Assert.All(unloads, e => Assert.Equal(s.RelayPos, e.Position));
+        Assert.All(unloads, e => Assert.Equal(ImpactTarget.Machine, e.Target));
     }
 
     [Fact]
@@ -80,7 +82,7 @@ public class OreEconomyTests
         docked.Tank.Hold.Ore = ore;
         var networked = TankAtRelay(ore);
 
-        Advance(docked.World, Tweaks.Perf.TargetFps);
+        var dockedEvents = Advance(docked.World, Tweaks.Perf.TargetFps);
         Advance(networked.World, Tweaks.Perf.TargetFps);
 
         int byDock = ore - docked.Tank.OreHeld, byNetwork = ore - networked.Tank.OreHeld;
@@ -89,6 +91,13 @@ public class OreEconomyTests
         Assert.True(byNetwork > 0, "the relay was unloading too");
         Assert.True(byDock >= byNetwork * 4, $"the core should bank much faster. core={byDock}, relay={byNetwork}");
         Assert.Equal(ore, byDock);
+        // Banking at the core is recorded at the core's centre, a tick at a time, in the tank's colour.
+        var unloads = dockedEvents.Where(e => e.Kind == StepEventKind.OreUnloaded).ToList();
+        Assert.Equal(byDock, unloads.Sum(e => e.Count));
+        Assert.Equal((ore + Tweaks.Base.HomeAbsorbOre - 1) / Tweaks.Base.HomeAbsorbOre, unloads.Count);
+        Assert.All(unloads, e => Assert.Equal(docked.Base.Position, e.Position));
+        Assert.All(unloads, e => Assert.Equal(ImpactTarget.Base, e.Target));
+        Assert.All(unloads, e => Assert.Equal(docked.Tank.Color, e.Color));
     }
 
     /// <summary>Inside the walls but away from the core (the courtyard where the tank spawns), nothing unloads.</summary>

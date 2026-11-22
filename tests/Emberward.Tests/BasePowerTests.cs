@@ -311,7 +311,8 @@ public class BasePowerTests
         Assert.True(world.Terrain.Ledger.Injected >= home.Charge);
         Assert.Equal(home.Charge, world.Terrain.Ledger.ConvertedToCharge);
         Assert.False(world.IsBaseDark(home));
-        Assert.Contains(world.StepEvents.ToArray(), e => e.Kind == StepEventKind.RestartOreBurned && e.Count == 15);
+        Assert.Contains(world.StepEvents.ToArray(),
+            e => e.Kind == StepEventKind.RestartOreBurned && e.Count == 15 && e.Position == home.Position);
     }
 
     [Fact]
