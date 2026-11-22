@@ -25,10 +25,14 @@ public partial class BotTankAI
         if (!watched || IsInsideOwnBase(tank))
         {
             _stuckWatch.Reset();
+            _stuckWatch.EndDetour();
             return;
         }
         _stuckWatch.AdvanceDetour(tank.Position);
         if (!_stuckWatch.Watch(tank.Position))
+            return;
+        if (!_stuckWatch.StartDetour(tank.Position, _navigator.ChooseBreakoutHeading(tank, target: null, world, MayTorchRock(tank)),
+                world.Terrain.Size))
             return;
         if (_mode == TwitchMode.Return)
         {
@@ -38,8 +42,6 @@ public partial class BotTankAI
         _maneuverFrames = 0;
         _timeToChange = 0;
         _navigator.ResetProgress();
-        _stuckWatch.StartDetour(tank.Position, _navigator.ChooseBreakoutHeading(tank, target: null, world, MayTorchRock(tank)),
-            world.Terrain.Size);
     }
 
     /// <summary>

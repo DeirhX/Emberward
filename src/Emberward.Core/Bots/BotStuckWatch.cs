@@ -61,17 +61,22 @@ public sealed class BotStuckWatch
 
     /// <summary>
     /// Starts a detour from <paramref name="at"/> along <paramref name="heading"/>, its end kept inside a map of
-    /// <paramref name="size"/>. No heading (every way walled off) starts none.
+    /// <paramref name="size"/>. No heading (every way walled off), or an end already within reach of <paramref name="at"/>
+    /// (an edge in the way), starts none and returns false.
     /// </summary>
-    public void StartDetour(Position at, Offset heading, Size size)
+    public bool StartDetour(Position at, Offset heading, Size size)
     {
         if (heading.X == 0 && heading.Y == 0)
-            return;
+            return false;
         var end = at + new Offset(heading.X * Tweaks.Bot.DetourCells, heading.Y * Tweaks.Bot.DetourCells);
-        _detour = new Position(
+        var clamped = new Position(
             Math.Clamp(end.X, EdgeMargin, Math.Max(EdgeMargin, size.X - 1 - EdgeMargin)),
             Math.Clamp(end.Y, EdgeMargin, Math.Max(EdgeMargin, size.Y - 1 - EdgeMargin)));
+        if (Math.Abs(at.X - clamped.X) <= DetourReach && Math.Abs(at.Y - clamped.Y) <= DetourReach)
+            return false;
+        _detour = clamped;
         _detourFramesLeft = DetourFrames;
+        return true;
     }
 
     /// <summary>A tick on the detour from <paramref name="at"/>: it ends when reached or when its time is up.</summary>

@@ -55,7 +55,11 @@ public class BotStuckWatchTests
     {
         var watch = new BotStuckWatch();
         var size = new Size(100, 80);
-        watch.StartDetour(new Position(90, 40), new Offset(1, 0), size);
+        // Against the edge the clamped end is already within reach: no detour, nothing to give up for.
+        Assert.False(watch.StartDetour(new Position(90, 40), new Offset(1, 0), size));
+        Assert.Null(watch.Detour);
+
+        Assert.True(watch.StartDetour(new Position(80, 40), new Offset(1, 0), size));
         var end = Assert.NotNull(watch.Detour);
         Assert.True(end.X < size.X && end.X > 80, $"the detour end should be pulled inside the map: {end}");
 
