@@ -1042,7 +1042,7 @@ upgrades, throughput, turrets, removing the pylon and the tank's reserve are in)
 | The ore formerly called emberite is renamed pyrite; the creatures formerly called emberlings (and "mobs" in code) are now emberites | Decided |
 | A spent emberite drinks a new charge from the nearest hot ground (one second) and bites again instead of going home; a tank on ground at the scent heat is kept whatever its own heat (§6.2) | Decided |
 | An emberite short of a charge drinks at hot ground on its way home (a modest detour) before it goes home (§6.2) | Decided |
-| A discovered nest with creatures shows a danger ring at the distance it senses the player's tank from, with a title (§6.2) | Decided |
+| A discovered nest with creatures shows a small danger ring around the nest, with a title (§6.2) | Decided |
 | A living radar echo is one blip at the centre of what returned it, and emberites out of their nests return one (§6.6) | Decided |
 | Gatlings are the structure that fights emberites: fast light rounds that lead a runner and pass a little soil; the turret stays the answer to tanks (§6.2) | Decided |
 | A dying emberite now and then drops a unit of its nest's own deposit; the unit is a cell moved, so no new world data counts it (§6.2) | Decided |

@@ -34,8 +34,8 @@ const TEMP = { x: HEAT_X + 170, title: 151.5, readout: 179, right: HEAT_X + 239 
 // HudStrip.DrawLedger: SHIELD above HULL in the readout plate, a label left, a number right, a hairline bar under each.
 // LedgerLayout.cs: the SHIELD/HULL rows, laid out so no number, bar or outline overlaps another or leaves the plate.
 const LEDGER = {
-    left: SHIELD_X + 19, right: SHIELD_X + 140, shieldY: 173.8, hullY: 185, soloY: 180,
-    barDrop: 5.4, barHalf: 0.6, barOutline: 0.6, label: 8.5, number: 10,
+    left: SHIELD_X + 19, right: SHIELD_X + 140, shieldY: 173.8, hullY: 185.3, soloY: 180,
+    barDrop: 5.9, barHalf: 0.6, barOutline: 0.6, label: 10, number: 11,
 };
 // HudPalette: the shield's cyan, an empty shield's slate, the hull label's warm colour (ABGR).
 const SHIELD_CYAN = 0xffffe0a0,

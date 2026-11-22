@@ -6,8 +6,7 @@ using Emberward.Core.Types;
 
 /// <summary>
 /// A thin pink danger ring over each nest the player's side has discovered and that still has creatures, at the
-/// distance from which the nest senses the player's tank now, with a title above it. Core answers which nests and how
-/// far (<see cref="World.CopyNestDangers"/>); this only draws. A dormant nest's ring is faint, an awake one's full, and
+/// nest's own ground plus a margin, with a title above it. Core answers which nests and how big (<see cref="World.CopyNestDangers"/>); this only draws. A dormant nest's ring is faint, an awake one's full, and
 /// one whose creatures are out pulses. Drawn whether or not the nest is in sight: a discovered nest stays marked.
 /// </summary>
 public sealed class NestDangerQuads
@@ -28,8 +27,8 @@ public sealed class NestDangerQuads
     private const float RingMargin = 3f;
 
     /// <summary>A label dot, in cells, and the gap between the ring and the label and between its lines.</summary>
-    private const float DotCells = 0.5f;
-    private const float GapCells = 1.5f;
+    private const float DotCells = 0.3f;
+    private const float GapCells = 1f;
 
     private NestDanger[] _dangers = [];
     private int _count;

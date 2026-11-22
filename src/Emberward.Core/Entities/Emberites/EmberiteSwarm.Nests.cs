@@ -197,7 +197,7 @@ public sealed partial class EmberiteSwarm
         for (int i = 0; i < tanks.Count; i++)
         {
             Tank tank = tanks[i];
-            if (tank.IsDead)
+            if (tank.IsDead || tank.IsDockedAtOwnBase)
                 continue;
             float range = SenseRange(tank.Heat);
             if (range > 0f && Position.DistanceSquared(tank.Position, nest.Centre) <= range * range &&
@@ -220,7 +220,7 @@ public sealed partial class EmberiteSwarm
         for (int i = 0; i < tanks.Count; i++)
         {
             Tank tank = tanks[i];
-            if (tank.IsDead)
+            if (tank.IsDead || tank.IsDockedAtOwnBase)
                 continue;
             long distance = Position.DistanceSquared(tank.Position, nest.Centre);
             if (distance >= bestDistance)

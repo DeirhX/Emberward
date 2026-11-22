@@ -93,14 +93,14 @@ public sealed partial class EmberiteSwarm
         float range = Tweaks.Emberites.BiteRange;
         if (dx * dx + dy * dy <= range * range)
         {
-            if (emberite.Charge > 0.0 && !tank.IsDockedAtOwnBase && tank.SpawnProtectionTicks == 0)
+            if (emberite.Charge > 0.0 && tank.SpawnProtectionTicks == 0)
             {
                 Bite(ref emberite, tank);
                 SeekHeat(ref emberite);
             }
             else
             {
-                // Waiting at the tank (a base shields it, or it has just respawned): hold still.
+                // Waiting at the tank (it has no charge, or has just respawned): hold still.
                 emberite.Velocity = default;
             }
             return;
@@ -111,7 +111,7 @@ public sealed partial class EmberiteSwarm
     private Tank? ValidTarget(int index)
     {
         var tanks = _tanks.Tanks;
-        return index >= 0 && index < tanks.Count && !tanks[index].IsDead ? tanks[index] : null;
+        return index >= 0 && index < tanks.Count && !tanks[index].IsDead && !tanks[index].IsDockedAtOwnBase ? tanks[index] : null;
     }
 
     /// <summary>
@@ -171,6 +171,8 @@ public sealed partial class EmberiteSwarm
             emberite.Velocity = default;
             return;
         }
+        if (HasFullCharge(emberite) && TryResumeHunt(ref emberite))
+            return;
         if (!HasFullCharge(emberite) && emberite.FailedSeeks < Tweaks.Emberites.MaxFailedSeeks && --emberite.Timer <= 0)
         {
             emberite.Timer = Tweaks.Emberites.HomeScanTicks;
@@ -181,6 +183,38 @@ public sealed partial class EmberiteSwarm
             }
         }
         Steer(ref emberite, 1, emberite.Nest, nest.Centre, nest);
+    }
+
+    /// <summary>
+    /// A creature on its way home with a full charge goes back to hunting a tank it can see: not docked in its base,
+    /// within <see cref="Tweaks.Emberites.HuntLeashCells"/>, with a line clear of rock, looked for once in
+    /// <see cref="Tweaks.Emberites.SightCheckTicks"/> ticks. A tank it cannot see, it does not care about.
+    /// </summary>
+    private bool TryResumeHunt(ref Emberite emberite)
+    {
+        if (emberite.SightTick != 0 && _tick - emberite.SightTick < Tweaks.Emberites.SightCheckTicks)
+            return false;
+        emberite.SightTick = _tick;
+        var here = (Position)emberite.Position;
+        long reach = (long)Tweaks.Emberites.HuntLeashCells * Tweaks.Emberites.HuntLeashCells;
+        var tanks = _tanks.Tanks;
+        int best = -1;
+        long bestDistance = long.MaxValue;
+        for (int i = 0; i < tanks.Count; i++)
+        {
+            long distance = Position.DistanceSquared(tanks[i].Position, here);
+            if (ValidTarget(i) is null || distance > reach || distance >= bestDistance ||
+                !Raycaster.HasCreatureLine(_terrain, here, tanks[i].Position))
+                continue;
+            best = i;
+            bestDistance = distance;
+        }
+        if (best < 0)
+            return false;
+        emberite.State = EmberiteState.Hunting;
+        emberite.Target = best;
+        emberite.Sees = true;
+        return true;
     }
 
     /// <summary>Heads straight for <paramref name="goal"/> (a cell), turning aside from what blocks it; no flow field.</summary>

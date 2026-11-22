@@ -76,6 +76,6 @@ public enum NestDangerLevel : byte
 
 /// <summary>
 /// A nest a side has discovered and that still has creatures, as its danger ring is drawn: centred on the nest, at the
-/// distance from which it senses that side's tank now (<see cref="Entities.Emberites.EmberiteSwarm.DangerRadius"/>).
+/// nest's ground plus a margin (<see cref="Entities.Emberites.EmberiteSwarm.DangerRadius"/>).
 /// </summary>
 public readonly record struct NestDanger(Position Centre, float Radius, NestDangerLevel Level);
