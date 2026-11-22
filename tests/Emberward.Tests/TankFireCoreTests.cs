@@ -11,8 +11,8 @@ using Emberward.Desktop.Rendering.Entities;
 namespace Emberward.Tests;
 
 /// <summary>
-/// The exposed core on a burning hull and a dead tank's flash and slag disc: what the TankFire quad carries for the
-/// shader (hull fill, shield fill, death age), and the hull-heat ramp the shader colours the core with.
+/// The exposed core on a burning hull and a dead tank's core glow: how each part of the fire eases in, what the
+/// TankFire quad carries for the shader (hull fill, core glow, soot), and the hull-heat ramp the core is coloured with.
 /// </summary>
 public class TankFireCoreTests
 {
@@ -101,6 +101,7 @@ public class TankFireCoreTests
 
     [Theory]
     [InlineData(0.749f)]
+    [InlineData(0.7f)]
     [InlineData(0.5f)]
     [InlineData(0.25f)]
     [InlineData(0.05f)]
@@ -109,28 +110,136 @@ public class TankFireCoreTests
     {
         var (fire, motion) = Burning(hull);
         var quads = Draw(fire, motion);
+        float level = LevelAt(hull);
 
         EntityVertex flames = Assert.Single(Quads(quads, EntityShape.KindTankFire));
         Assert.Equal(hull, flames.R, 4);
-        Assert.Equal(0f, flames.G);
-        Assert.Equal(0f, flames.B);
-        Assert.Equal(LevelAt(hull), flames.P0, 4);
+        Assert.Equal(FireOnset.CoreGlow(level), flames.G, 4);
+        Assert.Equal(FireOnset.Soot(level), flames.B, 4);
+        Assert.Equal(FireOnset.Flames(level), flames.P0, 4);
         EntityVertex light = Assert.Single(Quads(quads, EntityShape.KindTankFireLight));
+        Assert.Equal(FireOnset.Light(level), light.R, 4);
         Assert.Equal(hull, light.P3, 4);
-        // A sagging core (below 25%) drips past the hull, so its quad reaches further down.
-        Assert.Equal(hull < 0.25f ? 8f : 4.5f, MaxLocalY(quads, EntityShape.KindTankFire), 3);
+        // The core's glow fits in the quad; a sagging core (below 25%) drips further down.
+        Assert.Equal(hull < 0.25f ? 8f : 6.5f, MaxLocalY(quads, EntityShape.KindTankFire), 3);
+    }
+
+    private static float[] Onsets(float hull)
+    {
+        float level = LevelAt(hull);
+        return [FireOnset.Light(level), FireOnset.CoreGlow(level), FireOnset.Soot(level), FireOnset.Flames(level),
+            FireOnset.SmokeShare(level), FireOnset.EmberShare(level), FireOnset.Sound(level)];
     }
 
     [Fact]
-    public void ARegeneratedShield_HidesTheCore()
+    public void EveryPart_EasesInFromZero_AtTheIgnitionThreshold()
+    {
+        Assert.All(Onsets(0.76f), v => Assert.Equal(0f, v));
+        Assert.All(Onsets(0.75f), v => Assert.Equal(0f, v));
+        float[] at70 = Onsets(0.70f), at60 = Onsets(0.60f);
+        for (int part = 0; part < at70.Length; part++)
+            Assert.True(at60[part] >= at70[part], $"part {part} fell from 70% to 60% hull");
+        Assert.InRange(at70[0], 0.05f, 0.95f);   // the light is already coming up at 70%
+
+        // Continuous and never falling as the hull drops, in steps of 0.1% hull.
+        float[] last = Onsets(0.8f);
+        for (int i = 799; i >= 0; i--)
+        {
+            float[] now = Onsets(i / 1000f);
+            for (int part = 0; part < now.Length; part++)
+            {
+                Assert.True(now[part] >= last[part] - 1e-6f, $"part {part} fell at hull {i / 1000f}");
+                Assert.True(now[part] - last[part] < 0.02f, $"part {part} jumps at hull {i / 1000f}");
+            }
+            last = now;
+        }
+    }
+
+    [Fact]
+    public void ThePartsComeIn_Staggered()
+    {
+        // The highest hull at which each part shows at all: the light first, then the core, its soot, the flames,
+        // smoke and, last, embers.
+        float First(int part)
+        {
+            for (int i = 750; i >= 0; i--)
+            {
+                if (Onsets(i / 1000f)[part] > 0f)
+                    return i / 1000f;
+            }
+            return 0f;
+        }
+        float[] firsts = [First(0), First(1), First(2), First(3), First(4), First(5)];
+        for (int part = 1; part < firsts.Length; part++)
+            Assert.True(firsts[part] < firsts[part - 1], $"part {part} starts at {firsts[part]}, before part {part - 1}");
+    }
+
+    [Fact]
+    public void ASuddenHit_EasesTheFireIn_AndARepairEasesItOut()
+    {
+        var fire = new TankFireQuads();
+        var motion = new EntityMotion();
+        Capture(fire, motion, 2, [1f], [0f], [false]);
+        Assert.Equal(0f, fire.DrawnLevel(0));
+
+        // One hit takes the hull from full to 10%.
+        float target = LevelAt(0.1f), last = 0f;
+        int fps = Tweaks.Perf.TargetFps;
+        for (int step = 0; step < 2 * fps; step++)
+        {
+            Capture(fire, motion, 1, [0.1f], [0f], [false]);
+            float level = fire.DrawnLevel(0);
+            Assert.True(level > last && level - last < 0.15f, $"step {step}: {last} to {level}");
+            last = level;
+        }
+        Assert.InRange(last, 0.95f * target, target);
+
+        // Docked: the hull is repaired at once; the fire dies down, then stops drawing.
+        int drawnSteps = 0;
+        for (int step = 0; step < 4 * fps; step++)
+        {
+            Capture(fire, motion, 1, [1f], [0f], [false]);
+            float level = fire.DrawnLevel(0);
+            Assert.True(level < last || level == 0f);
+            Assert.True(last - level < 0.15f);
+            last = level;
+            if (Draw(fire, motion).VertexCount > 0)
+                drawnSteps++;
+        }
+        Assert.Equal(0f, last);
+        Assert.InRange(drawnSteps, 1, 4 * fps - 1);
+    }
+
+    [Fact]
+    public void TheParticleCount_ChangesSmoothly_WithTheLevel()
+    {
+        int previous = 0;
+        for (int i = 0; i <= 100; i++)
+        {
+            float hull = 0.75f * (1f - (i / 100f));
+            var (fire, motion) = Burning(hull);
+            int count = Quads(Draw(fire, motion), EntityShape.KindFireParticle).Count;
+            Assert.True(count >= previous, $"level {i / 100f}: {count} particles after {previous}");
+            Assert.True(count - previous <= 3, $"level {i / 100f}: {count} particles after {previous}");
+            previous = count;
+        }
+        Assert.Equal(TankFireQuads.MaxSmoke + TankFireQuads.MaxEmbers, previous);
+    }
+
+    [Fact]
+    public void ARegeneratingShield_HidesTheCore()
     {
         var (fire, motion) = Burning(0.3f, shield: 1f);
-
-        EntityVertex flames = Assert.Single(Quads(Draw(fire, motion), EntityShape.KindTankFire));
-        Assert.Equal(1f, flames.G);
+        Assert.Equal(0f, Assert.Single(Quads(Draw(fire, motion), EntityShape.KindTankFire)).G);
 
         (fire, motion) = Burning(0.3f, shield: 0.4f);
-        Assert.Equal(0.4f, Assert.Single(Quads(Draw(fire, motion), EntityShape.KindTankFire)).G, 4);
+        Assert.Equal(0.6f * FireOnset.CoreGlow(LevelAt(0.3f)),
+            Assert.Single(Quads(Draw(fire, motion), EntityShape.KindTankFire)).G, 4);
+
+        // The shield coming back fades the core out over the steps, rather than at once.
+        (fire, motion) = Burning(0.3f, shield: 0f);
+        Capture(fire, motion, 1, [0.3f], [1f], [false]);
+        Assert.InRange(Assert.Single(Quads(Draw(fire, motion), EntityShape.KindTankFire)).G, 0.5f, 0.99f);
     }
 
     [Fact]
@@ -157,34 +266,63 @@ public class TankFireCoreTests
 
         EntityVertex flames = Assert.Single(Quads(quads, EntityShape.KindTankFire));
         Assert.Equal(tank.HullFraction, flames.R, 4);
-        Assert.Equal(world.TankShieldOf(tank).ShieldFill, flames.G, 4);
+        Assert.Equal(FireOnset.CoreGlow(tank.FireLevel) * (1f - world.TankShieldOf(tank).ShieldFill), flames.G, 4);
         Assert.True(flames.R is > 0f and < 0.75f);
     }
 
+    private static EntityVertex DeathQuad(EntityQuads quads) =>
+        Quads(quads, EntityShape.KindTankFire).Single(v => v.P0 == 0f && v.B == 0f);
+
     [Fact]
-    public void ADeadTank_FlashesThenLeavesSlag_ForTheDeathWindowOnly()
+    public void TheDeathGlow_FlaresFromYellowToWhite_ThenFadesSmoothly()
+    {
+        var (glow0, hull0) = TankFireQuads.DeathGlow(1f, 0f);
+        Assert.Equal(1f, glow0);
+        Assert.Equal(0.05f, hull0, 4);      // yellow: the ramp at 5%
+        var (peak, white) = TankFireQuads.DeathGlow(1f, TankFireQuads.DeathFlareSeconds);
+        Assert.Equal(0f, white);            // white-hot: the ramp at an empty hull
+        Assert.True(peak > 1f);
+        Assert.Equal(0f, TankFireQuads.DeathGlow(1f, TankFireQuads.DeathSeconds).Glow, 4);
+
+        float lastGlow = glow0, lastHull = hull0;
+        for (int ms = 1; ms <= (int)(TankFireQuads.DeathSeconds * 1000f); ms++)
+        {
+            var (glow, hull) = TankFireQuads.DeathGlow(1f, ms / 1000f);
+            Assert.True(Math.Abs(glow - lastGlow) < 0.02f, $"the glow jumps at {ms} ms");
+            Assert.True(hull <= lastHull + 1e-6f, $"the colour cools back at {ms} ms");
+            if (ms / 1000f > TankFireQuads.DeathFlareSeconds)
+                Assert.True(glow <= lastGlow + 1e-6f, $"the glow brightens again at {ms} ms");
+            lastGlow = glow;
+            lastHull = hull;
+        }
+    }
+
+    [Fact]
+    public void ADeadTank_GlowsWithNoEdge_ForTheDeathWindowOnly()
     {
         var (fire, motion) = Died(1);
         var quads = Draw(fire, motion);
-        EntityVertex flash = Assert.Single(Quads(quads, EntityShape.KindTankFire));
-        Assert.Equal(1f, flash.B, 3);            // just died
-        Assert.Equal(0f, flash.P0);              // no flames
-        Assert.Equal(0f, flash.R);
-        EntityVertex light = Assert.Single(Quads(quads, EntityShape.KindTankFireLight));
-        Assert.Equal(1f, light.P0, 3);           // the flash lights the ground at full size
+        EntityVertex glow = DeathQuad(quads);
+        Assert.Single(Quads(quads, EntityShape.KindTankFire));
+        Assert.Equal(0f, glow.P0);              // no flames
+        Assert.Equal(0f, glow.B);               // no soot ring, no crust: nothing with an edge
+        Assert.Equal(0.05f, glow.R, 3);         // yellow
+        Assert.Equal(FireOnset.CoreGlow(LevelAt(0.1f)), glow.G, 3);   // from the glow it had
+        // The quad reaches past the glow's soft falloff (1.6 times the core's 3.5 cells, off the hull's centre).
+        Assert.True(MaxLocalY(quads, EntityShape.KindTankFire) >= (1.6f * 3.5f) + 0.5f);
+        Assert.Single(Quads(quads, EntityShape.KindTankFireLight));
         Assert.Empty(Quads(quads, EntityShape.KindFireParticle));
 
         int fps = Tweaks.Perf.TargetFps;
-        (fire, motion) = Died(1 + (2 * fps));
-        EntityVertex slag = Assert.Single(Quads(Draw(fire, motion), EntityShape.KindTankFire));
-        Assert.Equal(1f + (2f / TankFireQuads.DeathSeconds), slag.B, 3);
+        (fire, motion) = Died(1 + (int)(TankFireQuads.DeathFlareSeconds * fps));
+        Assert.Equal(0f, DeathQuad(Draw(fire, motion)).R, 3);       // white-hot
 
         (fire, motion) = Died(1 + (int)MathF.Ceiling(TankFireQuads.DeathSeconds * fps));
         Assert.Equal(0, Draw(fire, motion).VertexCount);
     }
 
     [Fact]
-    public void ATankAlreadyDead_WhenFirstSeen_DoesNotFlash()
+    public void ATankAlreadyDead_WhenFirstSeen_DoesNotGlow()
     {
         var fire = new TankFireQuads();
         var motion = new EntityMotion();
@@ -194,7 +332,7 @@ public class TankFireCoreTests
     }
 
     [Fact]
-    public void TheSlag_StaysWhereTheTankDied_AfterARespawn()
+    public void TheDeathGlow_StaysWhereTheTankDied_AfterARespawn()
     {
         var (fire, motion) = Died(10);
         // Respawned at a base far away, at a full hull.
@@ -241,13 +379,13 @@ public class TankFireCoreTests
 
         var (playerDied, playerMotion) = Died(5, tanks: 2, dyingSlot: 0);
         var (enemyDied, enemyMotion) = Died(5, tanks: 2, dyingSlot: 1);
-        var playerDeath = Quads(Draw(playerDied, playerMotion), EntityShape.KindTankFire).Single(v => v.B > 0.5f);
-        var enemyDeath = Quads(Draw(enemyDied, enemyMotion), EntityShape.KindTankFire).Single(v => v.B > 0.5f);
-        Assert.Equal(playerDeath.B, enemyDeath.B);
+        EntityVertex playerDeath = DeathQuad(Draw(playerDied, playerMotion));
+        EntityVertex enemyDeath = DeathQuad(Draw(enemyDied, enemyMotion));
+        Assert.Equal(playerDeath.G, enemyDeath.G);
         Assert.Equal(playerDeath.R, enemyDeath.R);
     }
 
-    // The hull-heat ramp's stops (hull fill, colour), as the HUD's HudPalette.HullHeat has them.
+    // The hull-heat ramp's stops (hull fill, colour), as the HUD's HudPalette.HullEmber has them.
     private static readonly (string Name, float Hull, string Hex)[] HullHeatStops =
     [
         ("kHullHeat0", 0f, "FFF6D8"),
@@ -279,7 +417,7 @@ public class TankFireCoreTests
     }
 
     /// <summary>
-    /// The HUD colours the hull gauge with the same ramp (HudPalette.HullHeat, ABGR), so the two cannot drift.
+    /// The HUD colours the hull gauge with the same ramp (HudPalette.HullEmber, ABGR), so the two cannot drift.
     /// </summary>
     [Fact]
     public void TheHudRamp_MatchesTheShaderStops()
@@ -288,10 +426,10 @@ public class TankFireCoreTests
         {
             if (float.IsNaN(hull))
                 continue;
-            uint color = Emberward.Desktop.Gui.HudPalette.HullHeat(hull);
+            uint color = Emberward.Desktop.Gui.HudPalette.HullEmber(hull);
             string actual = string.Create(CultureInfo.InvariantCulture,
                 $"{color & 0xFF:X2}{(color >> 8) & 0xFF:X2}{(color >> 16) & 0xFF:X2}");
-            Assert.True(actual == hex, $"HudPalette.HullHeat({hull}) is #{actual}, {name} is #{hex}");
+            Assert.True(actual == hex, $"HudPalette.HullEmber({hull}) is #{actual}, {name} is #{hex}");
         }
     }
 }

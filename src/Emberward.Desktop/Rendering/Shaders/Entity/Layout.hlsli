@@ -42,15 +42,16 @@
 //                   color.rgb = team colour
 //  22 tank shield — .x = shield fill (0..1), .y = pulse age (0 just hit, 1 gone), .zw = where the shot landed, in cells from
 //                   the tank's centre ((0, 0) = no spot); color.rgb = team colour. Drawn only while a hit is fresh.
-//  23 tank fire   — .x = fire level (0..1), .y = seconds into a 4 s animation cycle, .z = a per-tank seed (0..1), .w = the hull
-//                   heading relative to the quad (radians). The quad's local -y points the way the flames go. Drawn only
-//                   while the hull burns, and for a few seconds where a tank died.
-//                   color.r = hull fill (0..1: the exposed core's size and colour), color.g = shield fill (0..1: the core
-//                   hides behind it), color.b = 0 alive, or 1 + the age of a dead tank's flash and slag disc (1 at the
-//                   death, 2 at the end of its window; fire level 0, no flames).
-//  24 tank fire light — .x = fire level (0..1), .y = seconds into a 4 s cycle, .z = a per-tank seed (0..1), .w = hull fill
-//                   (0..1: the light takes the core's colour). Additive.
-//  25 fire particle — .x = age (0 born, 1 gone), .y = 0 ember, 1 smoke, .z = fire level (0..1), .w = a per-particle seed (0..1)
+//  23 tank fire   — .x = the flames' level (0..1, eased in from the fire level), .y = seconds into a 4 s animation cycle,
+//                   .z = a per-tank seed (0..1), .w = the hull heading relative to the quad (radians). The quad's local
+//                   -y points the way the flames go. Drawn while the hull burns, and for a moment where a tank died.
+//                   color.r = hull fill (0..1: the exposed core's size and colour), color.g = the core's glow (0 hidden,
+//                   1 full, up to 2 as a dying core flares), color.b = soot (0..1: the soot ring, crust, drips, pulse).
+//                   A dead tank's glow has .x = 0 and color.b = 0: only a soft glow.
+//  24 tank fire light — .x = fire level (0..1: the pool's size), .y = seconds into a 4 s cycle, .z = a per-tank seed (0..1),
+//                   .w = hull fill (0..1: the light takes the core's colour); color.r = strength (eased in). Additive.
+//  25 fire particle — .x = age (0 born, 1 gone), .y = 0 ember, 1 smoke, .z = strength (0..1: fades it in with the fire),
+//                   .w = a per-particle seed (0..1)
 //  16 power label — .xy = packed 5x7 glyph bitmap (low 20 bits, then high 15), .z = dots per cell
 //                   (0 for a solid bar), .w = opacity
 //

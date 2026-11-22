@@ -205,8 +205,13 @@ The tank lives in a band around 0. Both ends hurt, and the world has places at b
   drips slag, below 5% it pulses white; a regenerated shield hides it), ragged flame tongues that multiply as the hull
   falls and lean away from the way it drives, a flickering light in the core's colour on the ground around it, heat
   shimmer over it, and smoke and embers that rise from where it has been, so a burning tank leaves a trail (none of it
-  shown out of sight). A tank that dies flashes white and leaves a slag disc that cools for about 3 seconds. It
-  crackles, higher as it grows and sizzling higher still once the core sags; the HUD's
+  shown out of sight). Nothing pops in: from 75% hull each part eases in from nothing, in turn (the light and the
+  shimmer, then the dull core, its soot, the flames, smoke and last embers; particles fade in one by one rather than
+  in batches), the drawn fire follows a sudden hit or repair over about a third of a second, and it eases out the same
+  way when the hull is repaired or the shield comes back. A tank that dies has its hot core flare from yellow to
+  white-hot over 0.3 s and fade over 1.5 s: a soft glow with no edge. It crackles, fading in as it catches, higher as
+  it grows and sizzling higher still once the core sags; the HUD's hull number eases from its neutral colour onto the
+  heat ramp between 75% and 60%, and the HUD's
   crystal shows the shield, the number under it the hull, and the plate reads FIRE ABOARD while it burns.
   **A hit on a shield** is seen and heard: its own zap (and a shatter when it breaks), a pulse that lights the veins of
   the whole shield, and a red patch where the shot landed; a base's gate shield does the same.

@@ -17,7 +17,7 @@ public class HullPlateTests
     [Fact]
     public void TheRamp_HitsItsStops()
     {
-        Assert.Equal(Rgb(0x5A, 0x14, 0x08), HudPalette.HullHeat(0.75f));
+        Assert.Equal(Rgb(0x5A, 0x14, 0x08), HudPalette.HullEmber(0.75f));
         Assert.Equal(Rgb(0xB3, 0x26, 0x0C), HudPalette.HullHeat(0.50f));
         Assert.Equal(Rgb(0xFF, 0x6A, 0x10), HudPalette.HullHeat(0.25f));
         Assert.Equal(Rgb(0xFF, 0xD0, 0x40), HudPalette.HullHeat(0.05f));
@@ -41,10 +41,27 @@ public class HullPlateTests
     }
 
     [Fact]
+    public void TheColour_EasesOntoTheRamp_WithoutAJump()
+    {
+        uint last = HudPalette.HullHeat(0.76f);
+        for (int i = 760; i >= 590; i--)
+        {
+            uint color = HudPalette.HullHeat(i / 1000f);
+            for (int shift = 0; shift < 24; shift += 8)
+            {
+                int step = Math.Abs((int)((color >> shift) & 0xFF) - (int)((last >> shift) & 0xFF));
+                Assert.True(step <= 4, $"the colour jumps by {step} at hull {i / 1000f}");
+            }
+            last = color;
+        }
+        Assert.Equal(HudPalette.HullEmber(0.6f), HudPalette.HullHeat(0.6f));
+    }
+
+    [Fact]
     public void TheRamp_BrightensAsTheHullFalls()
     {
         float last = -1f;
-        for (int i = 750; i >= 0; i--)
+        for (int i = (int)(HudPalette.HullHeatBlendEnd * 1000f); i >= 0; i--)
         {
             float b = Brightness(HudPalette.HullHeat(i / 1000f));
             Assert.True(b >= last, $"brightness fell at hull {i / 1000f}");

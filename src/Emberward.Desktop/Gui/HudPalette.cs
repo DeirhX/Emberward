@@ -74,14 +74,21 @@ public static class HudPalette
     /// <summary>
     /// The colour of a hull that has <paramref name="hullFraction"/> (0 to 1, clamped) of its health left: the shared
     /// hotspot ramp that the HUD's hull number and bar and the tank's own hotspot all use. Above
-    /// <see cref="HullHeatStart"/> it is <see cref="HullNeutral"/>; below it, interpolated between the stops
-    /// (75% dull red, 50% red, 25% orange, 5% yellow, 0% white-hot), brighter as the hull falls.
+    /// <see cref="HullHeatStart"/> it is <see cref="HullNeutral"/>; below it, it eases from there onto the ramp
+    /// (<see cref="HullEmber"/>) by <see cref="HullHeatBlendEnd"/>, so the colour never jumps as the hull starts to burn,
+    /// and from there on it brightens as the hull falls.
     /// </summary>
     public static uint HullHeat(float hullFraction)
     {
         float f = float.IsNaN(hullFraction) ? 0f : Math.Clamp(hullFraction, 0f, 1f);
-        return f > HullHeatStart ? HullNeutral : HullEmber(f);
+        if (f >= HullHeatStart)
+            return HullNeutral;
+        float t = Math.Clamp((HullHeatStart - f) / (HullHeatStart - HullHeatBlendEnd), 0f, 1f);
+        return Lerp(HullNeutral, HullEmber(f), t * t * (3f - (2f * t)));
     }
+
+    /// <summary>The hull fraction by which <see cref="HullHeat"/> has eased fully from the neutral colour onto the ramp.</summary>
+    public const float HullHeatBlendEnd = 0.6f;
 
     /// <summary>
     /// The heat ramp itself, with no neutral above <see cref="HullHeatStart"/>: a healthy hull gives the ramp's dull
