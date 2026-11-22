@@ -36,6 +36,20 @@ public sealed class RelayHub(ILogger<RelayHub> logger, IConfiguration configurat
     /// </summary>
     public TimeSpan EmptyRoomGrace { get; set; } = TimeSpan.FromMinutes(5);
 
+    /// <summary>
+    /// Whether a running room gets a clock that closes its ticks (true, the default). Off, nothing closes a tick
+    /// but a call to <see cref="MatchRoom.CloseTicksUpTo"/>: a test then plays a match tick by tick, and what it
+    /// plays does not hang on how fast the machine is. Set it before any match starts.
+    /// </summary>
+    public bool RunsClocks { get; set; } = true;
+
+    /// <summary>The room of that name, or null when there is none.</summary>
+    public MatchRoom? FindRoom(string code)
+    {
+        lock (_lock)
+            return _rooms.GetValueOrDefault(code);
+    }
+
     /// <summary>The shared secret from the configuration (empty when there is none).</summary>
     /// <exception cref="InvalidOperationException">The secret is longer than a client can send.</exception>
     public static string CheckedSecret(IConfiguration configuration)
@@ -212,6 +226,8 @@ public sealed class RelayHub(ILogger<RelayHub> logger, IConfiguration configurat
     /// </summary>
     private void StartClock(MatchRoom room, CancellationToken stopping)
     {
+        if (!RunsClocks)
+            return;
         lock (_lock)
         {
             // A room that has given its name up (its match is over and a new room has it) gets no clock.

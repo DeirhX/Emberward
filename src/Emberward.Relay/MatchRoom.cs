@@ -125,6 +125,24 @@ public sealed partial class MatchRoom
     }
 
     /// <summary>
+    /// True when the match is running and every player connected to it has an input waiting, so the next tick
+    /// closed plays one input from each of them. Bot seats and empty slots need none.
+    /// </summary>
+    public bool HasInputFromEveryPlayer
+    {
+        get
+        {
+            lock (_lock)
+            {
+                for (int slot = 0; slot < _peers.Length; slot++)
+                    if (_peers[slot] is not null && !_lockstep.IsBotSeat(slot) && _lockstep.QueuedInputs(slot) == 0)
+                        return false;
+                return IsRunning;
+            }
+        }
+    }
+
+    /// <summary>
     /// Returns the player slot or -1. A watcher receives Welcome(-1) and an empty refusal. A rejected peer gets a reason.
     /// </summary>
     public int Join(IPeer peer, string name, string buildId, out string refusal, SnapshotCapabilities snapshots = SnapshotCapabilities.None)
