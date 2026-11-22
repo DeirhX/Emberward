@@ -200,7 +200,10 @@ The tank lives in a band around 0. Both ends hurt, and the world has places at b
   burning tank warms its surroundings more than itself (the energy is booked as injected in the ledger). The fire
   does no damage of its own; it hurts through the heat (overheating, being seen by emberites). Only the base puts it
   out, by repairing the hull (a dark base repairs nothing, so a fire there stays, held down by the base's cooling).
-  The fire is drawn on the tank (soot, flame tongues that multiply as the hull falls, smoke) and crackles; the HUD's
+  The fire is drawn on the tank: soot on the hull, ragged flame tongues that multiply as the hull falls and lean away
+  from the way it drives, a flickering light on the ground around it, heat shimmer over it, and smoke and embers that
+  rise from where it has been, so a burning tank leaves a trail (none of it shown out of sight). It crackles, higher as
+  it grows; the HUD's
   crystal shows the shield, the number under it the hull, and the plate reads FIRE ABOARD while it burns.
   **A tank's shield is seen only while it blocks hits.** A hit brings up a translucent plastic dome of swirling blue
   with raised, shimmering hexagon ridges, a glossy highlight and a brighter rim, thin enough to see the tank through.

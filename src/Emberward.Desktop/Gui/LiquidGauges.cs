@@ -6,7 +6,7 @@ using Emberward.Core.Entities.Tanks;
 using static Emberward.Desktop.Gui.HudDraw;
 
 /// <summary>
-/// The shield crystal is dark above its liquid surface. A low level pulses red and the crystal flashes when hit.
+/// The shield crystal is dark where it has emptied, from its edge inward. A low level pulses red and the crystal flashes when hit.
 /// </summary>
 public sealed class LiquidGauges(HudLayout layout)
 {
@@ -31,38 +31,36 @@ public sealed class LiquidGauges(HudLayout layout)
         // Shield crystal.
         var o = new Vector2(shieldPanelX, 0f);
         var poly = new Vector2[ShieldOutline.Length];
-        float sTop = float.MaxValue, sBottom = float.MinValue;
         for (int i = 0; i < poly.Length; i++)
         {
             poly[i] = layout.At(o + ShieldOutline[i]);
-            sTop = MathF.Min(sTop, poly[i].Y);
-            sBottom = MathF.Max(sBottom, poly[i].Y);
         }
-        float sLevel = sBottom - (sBottom - sTop) * _shownShieldFill;
-        if (player.HitFlashTicks > Tank.HitFlashDuration - 6)
-            FillPolygonBand(dl, poly, sLevel, sBottom, 0x90FFFFFFu);         // hit flash
-        else if (low && shieldFill > 0f && pulse)
-            FillPolygonBand(dl, poly, sLevel, sBottom, 0x703030FFu);         // low shield (red pulse)
-        FillPolygonBand(dl, poly, sTop, sLevel, 0xC8080808u);                // empty part
-        var (sx0, sx1) = PolygonSpanAtY(poly, sLevel);
-        if (sx1 > sx0)
-            DrawSurface(dl, sLevel, (sx1 - sx0) * 0.5f, (sx0 + sx1) * 0.5f, shieldFill > 0f ? 0xFFFFE0A0u : 0u, time);
-    }
+        // The crystal empties from its edge inward on every side: what is left is the outline shrunk toward its middle,
+        // so the area left follows the fill. The dark ring between the outline and the shrunk shape is the empty part.
+        var centre = Vector2.Zero;
+        foreach (var point in poly)
+            centre += point;
+        centre /= poly.Length;
+        float shrink = MathF.Sqrt(Math.Clamp(_shownShieldFill, 0f, 1f));
+        var inner = new Vector2[poly.Length];
+        for (int i = 0; i < poly.Length; i++)
+            inner[i] = centre + (poly[i] - centre) * shrink;
 
-    /// <summary>A gently waving bright line where the liquid meets the empty part.</summary>
-    private void DrawSurface(ImDrawListPtr dl, float y, float halfWidth, float centerX, uint color, float time)
-    {
-        if (color == 0u || halfWidth < layout.S(3f))
-            return;
-        const int segments = 12;
-        var points = new Vector2[segments + 1];
-        for (int i = 0; i <= segments; i++)
+        if (player.HitFlashTicks > Tank.HitFlashDuration - 6)
+            dl.AddConvexPolyFilled(ref inner[0], inner.Length, 0x90FFFFFFu);        // hit flash
+        else if (low && shieldFill > 0f && pulse)
+            dl.AddConvexPolyFilled(ref inner[0], inner.Length, 0x703030FFu);        // low shield (red pulse)
+        for (int i = 0; i < poly.Length; i++)
         {
-            float u = i / (float)segments;
-            float x = centerX - halfWidth + 2f * halfWidth * u;
-            points[i] = new Vector2(x, y + MathF.Sin(u * 9f + time * 5f) * layout.S(1.2f));
+            int n = (i + 1) % poly.Length;
+            var ring = new[] { poly[i], poly[n], inner[n], inner[i] };
+            dl.AddConvexPolyFilled(ref ring[0], ring.Length, 0xC8080808u);          // empty part
         }
-        dl.AddPolyline(ref points[0], points.Length, HudTheme.WithAlphaByte(color, 0x50), ImDrawFlags.None, layout.S(4f));
-        dl.AddPolyline(ref points[0], points.Length, color, ImDrawFlags.None, layout.S(1.5f));
+        if (shieldFill > 0f)
+        {
+            // A bright line along the edge of what is left.
+            dl.AddPolyline(ref inner[0], inner.Length, HudTheme.WithAlphaByte(0xFFFFE0A0u, 0x50), ImDrawFlags.Closed, layout.S(4f));
+            dl.AddPolyline(ref inner[0], inner.Length, 0xFFFFE0A0u, ImDrawFlags.Closed, layout.S(1.5f));
+        }
     }
 }

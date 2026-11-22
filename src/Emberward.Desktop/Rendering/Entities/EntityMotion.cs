@@ -239,6 +239,9 @@ public sealed class EntityMotion
         return _hullHeading[index];
     }
 
+    /// <summary>The hull heading (radians) tank <paramref name="index"/> was last drawn at by <see cref="UpdateHullHeading"/>.</summary>
+    public float HullHeading(int index) => _hullHeading[index];
+
     /// <summary>The drawn heading of machine <paramref name="index"/>, turning smoothly to its crawl direction.</summary>
     public float UpdateMachineHeading(int index, Offset step, float turnSeconds, bool snap)
     {
