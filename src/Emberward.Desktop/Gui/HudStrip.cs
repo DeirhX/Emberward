@@ -20,6 +20,10 @@ public sealed class HudStrip
     // The readout numbers' green and size (art pixels).
     private const uint ReadoutColor = 0xFFAAFACDu;
     private const float ReadoutSize = 22f;
+    private const float SplitReadoutSize = 19f;
+    private const float HalfCell = 34f;
+    private const uint ShieldReadoutColor = 0xFFFFE0A0u;
+    private const uint HullReadoutColor = 0xFF70B8FFu;
 
     // The ore line, drawn on the narrow plate beneath the hold window (art pixels): the pale gold of the Pyrite in
     // the hold (tools/hud/make_hold_pyrite.py), deep orange once the hold is full, bright green while it unloads.
@@ -89,8 +93,8 @@ public sealed class HudStrip
         DrawPanelLabels(dl, burning: !player.IsDead && player.FireLevel > 0f, shielded: shield.Active);
 
         _heat.DrawOrb(dl, player, time);
-        // The crystal holds the shield when the match has one, else the hull; the number under it is always the hull.
-        float crystal = shield.Active ? shield.ShieldFill : player.HullFraction;
+        // The crystal holds the shield when the match has one, else the hull; the numbers under it are the shield's and the hull's (the hull alone with no shield).
+        float crystal = shield.Active ? (player.IsDead ? 0f : shield.ShieldFill) : player.HullFraction;
         bool crystalLow = shield.Active ? shield.Low : player.IsHullLow(latched: false);
         _liquids.Draw(dl, player, ShieldX, time, crystal, crystalLow);
 
@@ -101,9 +105,21 @@ public sealed class HudStrip
         _heat.DrawTrend(dl, player, TempPlate.ReadoutRight - 12f, TempPlate.ReadoutY);
         _heat.DrawOffNetworkTag(dl, player, HeatX + HeatPanelW * 0.5f, time, reserve);
 
-        // HULL: the tank's armor (under the shield, when there is one).
+        // SHIELD and HULL: two numbers side by side, the shield's points (cyan) and the hull's (warm); the hull alone
+        // when the match has no shield.
         int health = Math.Max(0, player.Reactor.Health);
-        DrawReadout(dl, ShieldPlate, health.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        string hull = health.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (shield.Active)
+        {
+            // A dead tank's shield is spent too (death resets it to full for the respawn).
+            string points = (player.IsDead ? 0 : shield.Shield).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            DrawStripText(dl, points, ShieldPlate.ReadoutLeft + HalfCell, ShieldPlate.ReadoutY, SplitReadoutSize, ShieldReadoutColor, glow: 0x28FFE060u);
+            DrawStripText(dl, hull, ShieldPlate.ReadoutRight - HalfCell, ShieldPlate.ReadoutY, SplitReadoutSize, HullReadoutColor, glow: 0x283090FFu);
+        }
+        else
+        {
+            DrawReadout(dl, ShieldPlate, hull);
+        }
 
         // MATERIALS: the ore in the tank's hold against what it takes, the currency structures are built from. The
         // pile is a sheet of 8 x 5 frames drawn by tools/hud/make_hold_pyrite.py; each stone carries its own corona.
@@ -162,8 +178,17 @@ public sealed class HudStrip
         if (burning)
             DrawStripText(dl, "FIRE ABOARD", ShieldPlate.CenterX, ShieldPlate.TitleY, 18f, 0xFF50A0FFu, glow: 0x402060FFu);
         else
-            DrawStripText(dl, shielded ? "SHIELD/HULL" : "HULL", ShieldPlate.CenterX, ShieldPlate.TitleY, shielded ? 17f : 20f,
-                0xFFF8E890u, glow: 0x20FFA030u);
+        {
+            if (shielded)
+            {
+                DrawStripText(dl, "SHIELD", ShieldPlate.ReadoutLeft + HalfCell, ShieldPlate.TitleY, 15f, ShieldReadoutColor, glow: 0x20FFA030u);
+                DrawStripText(dl, "HULL", ShieldPlate.ReadoutRight - HalfCell, ShieldPlate.TitleY, 15f, HullReadoutColor, glow: 0x20FFA030u);
+            }
+            else
+            {
+                DrawStripText(dl, "HULL", ShieldPlate.CenterX, ShieldPlate.TitleY, 20f, 0xFFF8E890u, glow: 0x20FFA030u);
+            }
+        }
         DrawStripText(dl, "MATERIALS", MaterialsPlate.CenterX, MaterialsPlate.TitleY, 21f, 0xFF68E0FFu, glow: 0x282090FFu);
         DrawStripText(dl, "BUILD STRUCTURES", BuildX + 162f, 23.5f, 17f, 0xFFB0E4F8u, glow: 0x181880FFu);
         DrawStripText(dl, "COMMAND", BuildX + 171f, 191.5f, 21f, 0xFF98E8FFu, glow: 0x202080FFu);
