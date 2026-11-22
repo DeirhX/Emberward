@@ -190,7 +190,7 @@ banks everything; bots and the tutorial would need retuning. Rejected for now.</
   <circle cx="120" cy="60" r="16" fill="url(#core)" stroke="#3a3a40" stroke-width="3"/>
   <g transform="translate(70,100) rotate(-50) scale(0.8)"><use href="#tank"/></g>
   <text x="128" y="24" font-family="monospace" font-size="12" font-weight="bold" fill="#ff6a50">BASE FULL</text>
-</svg><figcaption><b>Store full.</b> No pour; one dull red ring and a <code>BASE FULL</code> floater per touch, the refused sound, the ore line says BASE FULL (new <code>CoreDropOff.StoreFull</code>), and a toast with a 30 s cooldown.</figcaption></figure>
+</svg><figcaption><b>Store full (dropped when built: no capacity handling; see the design's §0).</b> No pour; one dull red ring and a <code>BASE FULL</code> floater per touch, the refused sound, the ore line says BASE FULL (new <code>CoreDropOff.StoreFull</code>), and a toast with a 30 s cooldown.</figcaption></figure>
 </div>
 
 <h2>MATERIALS panel (art pixels; plate 186 x 20)</h2>
@@ -223,15 +223,15 @@ banks everything; bots and the tutorial would need retuning. Rejected for now.</
   <text x="196" y="166" font-family="monospace" font-size="11" font-weight="bold" fill="#ffd05a" text-anchor="end">+40</text>
 </svg><figcaption><b>Proposed</b>, mid-pour: the pile drains over 0.9 s, UNLOADING is held for the pour, and the plate
 becomes a HOLD/BASE ledger. BASE counts up to 1,234 with a gold flash and a <code>+40</code> rising out of the row; the
-dim <code>+18/m</code> is the 30 s rate (deposits and harvesters). Colour by <code>StoreLevel</code>: warn at 90%,
-<code>FULL</code> at capacity. Same coordinates in <code>strip.js</code>.</figcaption></figure>
+dim <code>+18/m</code> is the 30 s rate (deposits and harvesters). (As built: BASE is one colour, no bar, no <code>FULL</code>; the
+<code>+N</code> rises in the plate's middle.) Same coordinates in <code>strip.js</code>.</figcaption></figure>
 </div>
 
 <h2>Variants compared</h2>
 <table>
 <tr><th></th><th>A. Pour and glow (recommended)</th><th>B. Beam hold, HUD first</th><th>C. Slow pour</th></tr>
 <tr><td>Simulation change</td><td>Deposit heat 250 a unit into the reactor (fingerprints change); no rate change</td><td>None</td><td>HomeAbsorbOre 10 → 2 (fingerprints, bots, tutorial)</td></tr>
-<tr><td>Core signal</td><td><code>OreUnloaded</code> at the core with receiver position; <code>CoreDropOff.StoreFull</code></td><td>Same event</td><td>Same event</td></tr>
+<tr><td>Core signal</td><td><code>OreUnloaded</code> at the core with receiver position and <code>Target</code> (core or relay)</td><td>Same event</td><td>Same event</td></tr>
 <tr><td>Entity kinds</td><td>27 OreCrystal, 28 CoreHeat; GlyphText floater</td><td>None (beam held longer)</td><td>28 CoreHeat</td></tr>
 <tr><td>Where the eye is</td><td>At the tank and core</td><td>On the HUD strip</td><td>At the tank and core</td></tr>
 <tr><td>Honesty of the glow</td><td>Real reactor heat plus a landing pulse</td><td>Event pulse only</td><td>Real reactor heat</td></tr>

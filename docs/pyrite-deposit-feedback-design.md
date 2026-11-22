@@ -1,9 +1,46 @@
 # Pyrite deposit feedback: design
 
-Status: **proposed, nothing built.** This document is the plan; the numbers are starting values to tune in play.
+Status: **built** as variant A in three PRs (#118 Core, #119 world, #120 HUD). §0 lists the decisions taken when it
+was built; where the sections below differ, §0 wins. The numbers are starting values to tune in play.
 The concept sheet beside it, `docs/concepts-pyrite-deposit.html`, sketches three variants and marks the recommended
 one (variant A). Times assume 24 ticks a second (`Tweaks.Perf.TargetFps`); distances are terrain cells (a tank is 7
 by 7, the core a disc 5 cells across).
+
+## 0. Decisions as built
+
+- **Deposit heat is on**, 250 a unit, at the core and at a relay (`TankBase.BankFromHold`, booked with
+  `RecordInjected`). Both heats exist: the cargo heats the tank while carried (DESIGN.md §6.3, already booked) and
+  the deposit heats the reactor when put down. At the core the bank runs **after** `PumpHeatAtBase`, so the deposit
+  takes only the reactor room the tank's dock cooling left; it never cuts the dock cooling. A reactor with no room
+  takes the ore but none of its heat, and the glow then shows the pulse only (it reads the real `HeatStoreFill`,
+  never the requested heat). No `SimulationFingerprintTests` constant changed: none of its recorded runs banks ore.
+- **Core or relay is told by `StepEvent.Target`** (`ImpactTarget.Base` at the core's centre, `ImpactTarget.Machine`
+  at a relay), not by comparing positions. `Position` is the receiver, so readers find the tank by `Color`.
+- **No store capacity anywhere** (user decision): no `CoreDropOff.StoreFull`, `StoreFill`, `StoreLevel`, `BASE FULL`
+  line or floater, refused ring (core heat mode 2), hairline bar, colour by level, `/ capacity` or extra store-full
+  toast. BASE is the number in one colour. The existing `store-full` toast (`GameEventWatcher`) and the base panel
+  line are unchanged, so §1's "nothing is said" at a full store was wrong.
+- **Rivals:** crystals and core glow for any base in sight (the old ore beam was the local player's only); the
+  numbers (`+N`, `BASE N`) for the player's own side only. A relay's flash follows the crystals (in sight); the
+  sounds stay the player's own.
+- **Harvested ore does not pulse the core**; the BASE row's rate counts it.
+- **Glyphs:** `GlyphText` gains `O` (for `BASE STORE`); the burn floater reads `+N RESTART` (units of ore), not
+  `CHARGE`, which needs letters the set lacks.
+- **Pulse:** 0.12 a landing, half-life **0.3 s**; the test is "under 0.05 within 1.5 s of the *last* landing".
+- **The relay label** (added at the user's request): the player's nearest powered relay within 24 cells, out of the
+  base, carries `BASE STORE`, the store and `+N/MIN` in the world, drawn like the nest labels. Core answers which
+  relay (`World.NearestOreDropOff` / `Tank.NearestDropOff`, through `MachineList.CollectNear`); output only.
+- **A hold** (pause, or a network tick with no step) freezes the pour where it was last drawn, as shots do.
+- **HUD state:** `OreLedgerView` (count-up, drained hold, held UNLOADING, the deposit's units and age) is fed with the
+  entity layer's steps; `MaterialsView` turns it and the tank into what MATERIALS shows, and the browser gets the same
+  view in `PlayerStatus.Materials`. `BuildSlotView.OreLine` takes the pouring flag; `OrePileFrame` takes a hold count.
+- **MATERIALS layout:** its plate's inside is 20 px (174 to 194), so `LedgerLayout` has its own rows (HOLD 179.2, BASE
+  189), without bars, checked by a layout test; the readout text drops from 22 to 11 art pixels. The `+N` rises in
+  the plate's middle, clear of both numbers.
+- **Sound:** `SoundBank.Deposit.cs` is listed in `Emberward.Rendering.csproj` and removed from the desktop's compile
+  list. A core bank is `Deposit` once per pour (`CueVoice.Pour`), a relay unit the pickup note, a burn `Deposit`
+  pitched down; all `CueHeard.Player`. No refused sound.
+- **Not done:** the base panel's ore line does not show the rate yet.
 
 ## 1. The problem
 
@@ -19,7 +56,7 @@ empties at `Tweaks.Base.HomeAbsorbOre` = 10 units a tick, and within 2 cells of 
 | Sound | none of its own (`BaseServiced` drives the recharge loop) | `Pickup` per unit |
 | HUD | UNLOADING with bobbing arrows under the hold for 4 ticks; the hold pile and `23 / 40` drop to empty | UNLOADING while it lasts |
 | Where it went | the base ore store, shown only in the base overlay panel (`NetworkPanel`: "Base ore store N") and as stock in a build slot's caption | same |
-| Full store | nothing is said (`CoreDropOff.None`, the ore line goes quiet) | the tank just keeps its ore |
+| Full store | the `store-full` toast and the base panel say so; the ore line goes quiet (`CoreDropOff.None`) | the tank just keeps its ore |
 
 So at the core, where most ore is banked, the hold empties in a sixth of a second with nothing that says where it went
 or how much the base has now. The MATERIALS panel deliberately leaves the store out (`BuildSlotView.OreLine`'s comment:
@@ -56,8 +93,8 @@ both paths:
   `Count: banked`, at `baseColl.Position`.
 - `Tank.AdvanceRelayUnload`, as today, but at `relay.Position` instead of the tank's.
 
-Readers tell the core from a relay by `e.Position == base.Position`: a relay cannot stand inside a base, so no relay
-shares the core's centre. (`StepEvent.Machine` cannot carry it: `MachineType`'s default is `Harvester`.)
+Readers tell the core from a relay by `StepEvent.Target`: `ImpactTarget.Base` at the core, `ImpactTarget.Machine` at
+a relay. (`StepEvent.Machine` cannot carry it: `MachineType`'s default is `Harvester`.) The tank is found by `Color`.
 
 `RestartOreBurned` moves its `Position` from the tank to the core's centre too, so the burn path can draw the same
 pour (it becomes charge rather than store; §4.3). Its only reader today (`BasePowerTests`) checks `Count`.
@@ -96,7 +133,8 @@ numbers through `SimulationSettings` (`SourceGuardTests`), so `DepositHeatPerOre
 - No new state: the heat lives in the reactor (`Reactor.Heat`, `_reactorHeatRemainder`), already saved and hashed
   (`MixReactorHeat`). `SnapshotCoverageTests` and `SnapshotRoundTripTests` are untouched.
 - **This changes results on purpose**: every run where a tank banks ore (the bot goes home with every hot load) gets a
-  different reactor curve. Update the constants in `SimulationFingerprintTests` and say so in the commit message.
+  different reactor curve. Update the constants in `SimulationFingerprintTests` and say so in the commit message (as
+  built none changed: no recorded run banks ore).
 
 The constant is the switch: at 0 the simulation is as today and the glow shows only the existing heat store and the
 event pulse (variant B's honesty rule).
@@ -106,10 +144,8 @@ event pulse (variant B's honesty rule).
 What the HUD needs mostly exists: `TankBase.Store.Ore`, `Store.Capacity`, `Store.IsFull`, `TankBase.HeatStoreFill`,
 `Tank.IsUnloadingOre`, `Tank.UnloadNode`, `Tank.CoreDropOff`. Small additions so Desktop does not recompute rules:
 
-- `CoreDropOff.StoreFull`: today `None` means both "not in the base" and "the store is full". Split it, so the ore line
-  and the core can say `BASE FULL`. `AdvanceBaseInteraction` sets it; `BuildSlotView.OreLine` reads it.
-- `TankBase.StoreFill` (`Store.Ore / (double)Store.Capacity`) and `TankBase.StoreLevel` (`StatusLevel`: warn at 90%,
-  danger when full), beside `ChargeFill`/`ChargeLevel`, so desktop and browser colour the base row alike.
+- ~~`CoreDropOff.StoreFull`, `TankBase.StoreFill`, `TankBase.StoreLevel`~~: dropped (§0, no capacity handling).
+- `World.NearestOreDropOff(tank, reach)`: the relay that carries the store label (§0).
 
 The store's **rate** is a statistic of events, not a game rule, so it is counted on the client from `OreUnloaded` and
 `OreHarvested` (§5.2), the way `GameEventWatcher` already counts "Harvesters delivered +N ore".
@@ -155,10 +191,10 @@ Entity kind **28 `KindCoreHeat`**: one quad per visible base core, radius 9 cell
 
 - `.x` heat: the base's `HeatStoreFill`, eased toward Core's value each step (display only). This is the real reactor;
   relays delivering heat light it too, which is right: the core is the base's heat store.
-- `.y` pulse 0..1: rises by 0.12 for each landing crystal (capped at 1) and halves every 0.35 s.
+- `.y` pulse 0..1: rises by 0.12 for each landing crystal (capped at 1) and halves every 0.3 s.
 - `.z` phase (the shared 4 s cycle).
-- `.w` mode: 0 store (gold), 1 burn (a dark base taking ore as charge: a cyan-white flash, no gold), 2 refused (store
-  full: one dull red ring, no warmth).
+- `.w` mode: 0 store (gold), 1 burn (a dark base taking ore as charge: a cyan-white flash, no gold). (No refused mode.)
+- `color.r` radius in cells (9 for a core, 4 for a relay's flash).
 
 Look: the reactor's centre brightens along the heat ramp (`HeatScale` colours: amber, orange, yellow-white) with `.x`;
 a soft additive halo whose reach grows with `.x`; on each pulse a thin bright ring expands from the core's rim to about
@@ -174,10 +210,9 @@ On the first crystal landing of a pour by the local player's side: a floater `+N
 `BASE 1234`, the store after the pour. At a relay the floater shows the visit's running total (`+1`, `+2`, … while the
 tank stays), so a relay drop-off reads as a counter, not a cloud of `+1`s.
 
-- Full store: no pour; a red `BASE FULL` floater at the core once per touch (on the step the local tank's
-  `CoreDropOff` becomes `StoreFull` with ore aboard while `TouchesCore`), and the mode-2 ring.
-- Dark base: the burn pour in cyan and `+N CHARGE` (units times `ChargePerRestartOre`, shown as units: the restart is
-  counted in ore on the HUD already).
+- Full store: nothing extra in the world (§0).
+- Dark base: the burn pour in cyan and `+N RESTART` (N in ore units: the restart is counted in ore on the HUD
+  already). `GlyphText` has `0-9 . : / + - > s k g e n A B D E G I M N O R S T` and space; `O` was added.
 
 ### 4.4 Shader notes
 
@@ -205,17 +240,13 @@ BASE   +18/m      1,234
 ```
 
 - **HOLD**: today's readout, in the readout green; deep orange when full.
-- **BASE**: the store, thousands separated, coloured by `TankBase.StoreLevel` (green; warn at 90%; at full the number
-  is replaced by `FULL`). A hairline bar under the row shows `StoreFill`. At the stock 20,000 it sits near empty all
-  match, which is honest; the bar is there so that a lower capacity (an upgrade, a mode) reads. The capacity number is
-  not printed: `/ 20000` is noise until it matters, and from 90% the colour says it.
+- **BASE**: the store, thousands separated, in one pale gold (§0: no capacity, bar, `FULL` or colour by level).
 - **Rate** `+18/m`: units a minute into the store for the player's side over the last 30 s (§5.2), dim, hidden at 0.
 - **Deposit tick**: when a pour lands, the BASE number counts up from the old value to the new over the pour's 0.9 s
   (display only: the store already holds it), a gold `+N` floats up out of the row and fades, and the row flashes gold
   once. The hold pile drains over the same 0.9 s instead of vanishing in 4 ticks (the pile frame eases toward
   `OrePileFrame`, as the gauges ease).
-- The ore line under the hold window: `UNLOADING` as today, held for at least the pour's length rather than 4 ticks;
-  `BASE FULL` in deep orange with ore aboard at a full store (`CoreDropOff.StoreFull`).
+- The ore line under the hold window: `UNLOADING` as today, held for at least the pour's length rather than 4 ticks.
 
 `BuildSlotView.OreLine`'s comment about the store not being here is rewritten. `NetworkPanel`'s "Base ore store N"
 line stays (it is the docked detail view) and gains the rate.
@@ -233,8 +264,8 @@ only.
 `PlayerStatus` (`BrowserFrame.cs`) already carries the store (`home.Store.Ore`). Add `baseOreCapacity`, `baseOreLevel`,
 `baseOreShown` (the count-up), `oreRatePerMinute`, `depositUnits` and `depositAge`, filled in `BrowserFrameBuilder`
 from `OreLedgerView`. `strip.js` draws the two rows at the desktop's coordinates (`MATERIALS` and a new
-`MATERIALS_LEDGER` mirroring `LedgerLayout`), the rising `+N` and the gold flash; `BASE FULL` arrives in `oreLine` from
-`BuildSlotView.OreLine` as today. The phone plates (`hud.js`) show `BASE 1,234` under the hold. `BrowserSessionTests`
+`MATERIALS_LEDGER` mirroring `LedgerLayout`), the rising `+N` and the gold flash, from `PlayerStatus.Materials` (the shared
+`MaterialsView`, §0) rather than separate fields. The phone plates (`hud.js`) show `BASE 1,234` under the hold. `BrowserSessionTests`
 checks the new fields.
 
 ### 5.4 Toasts
@@ -242,8 +273,7 @@ checks the new fields.
 - First deposit of the match into the player's base: "Pyrite banked: +40 (base 70)", detail "The base store pays for
   what you build inside the network. Touch the core or a powered relay to unload." `NotificationKind.Good`, from
   `GameEventWatcher`, key `first-deposit`, once a match.
-- Touching the core with ore at a full store: "Base ore store is full", detail "Spend ore on machines or upgrades; the
-  hold keeps the rest." Key `store-full`, the default 30 s cooldown.
+- No new store-full toast: `GameEventWatcher` already posts `store-full`.
 - No toast per deposit: the floater and the HUD row say it where the player is looking.
 
 ## 6. Sound
@@ -258,9 +288,7 @@ goes in a partial, `SoundBank.Deposit.cs`, listed in `Emberward.Rendering.csproj
   `SoundDirector` decide (it already knows the tracked tank's base).
 - `OreUnloaded` at a relay: the `Pickup` streak, as today.
 - `RestartOreBurned`: `Deposit` pitched down, beside the recharge loop.
-- Refused at a full store: the existing `PlantRefused`, once per touch, from the same client-side edge as the
-  `BASE FULL` floater (`CoreDropOff` turning `StoreFull` while touching). No new step event: the edge needs no saved
-  state in Core.
+- No refused sound (§0).
 
 `StepEventSoundsTests` gains the core and relay cases.
 
@@ -286,18 +314,17 @@ Core:
   centre, with the tank's colour; at a relay the event is at the relay's position.
 - `DepositHeatTests` (new): banking 40 units adds `40 * DepositHeatPerOre` to `ReactorHeatEnergy` and the same to
   `Injected`; at a full reactor neither changes; harvested ore adds none; the burn path adds none; the ledger balances
-  every tick throughout; a full store sets `CoreDropOff.StoreFull`.
+  every tick throughout.
 - `BasePowerTests`: `RestartOreBurned` at the core's centre.
 - `SimulationFingerprintTests`: new constants (said in the commit message).
 
 Rendering and HUD:
 
 - `DepositQuadsTests` (new): the four events of one bank make one pour of 12 crystals; a crystal is at the tank's hold
-  at age 0 and at the receiver at age 1; the pulse falls under 0.05 within 1.5 s; no pour at a base out of sight; the
+  at age 0 and at the receiver at age 1; the pulse falls under 0.05 within 1.5 s of the last landing; no pour at a base out of sight; the
   floater says `+40` for the player's side and nothing for a rival; the same steps give the same quads.
 - `EntityLayoutGuardTests`: passes with kinds 27 and 28.
 - `OreLedgerViewTests` (new): the 30 s rate; the count-up reaches the store at the end of the pour.
-- `BuildSlotView` tests: the `BASE FULL` line.
 - `StepEventSoundsTests`: a core bank is one `Deposit`; a relay unit is `Pickup`.
 - `BrowserSessionTests`: the new `PlayerStatus` fields.
 - `RenderingSourceGuardTests`: the new shader file passes (no `register()`, no early return).
@@ -306,14 +333,12 @@ Rendering and HUD:
 
 Three PRs, each green on `dotnet test Emberward.slnx` on its own.
 
-**PR 1, Core: the event, deposit heat, `StoreFull`** (changes results; fingerprints updated).
+**PR 1, Core: the event, deposit heat** (changes results).
 - `src/Emberward.Core/StepEvents.cs` (`OreUnloaded`, `RestartOreBurned` docs)
-- `src/Emberward.Core/Entities/Tanks/Tank.cs` (record at the core; receiver position; `BankFromHold`;
-  `CoreDropOff.StoreFull`)
-- `src/Emberward.Core/Entities/Bases/TankBase.cs` (`BankFromHold`, `StoreFill`, `StoreLevel`)
+- `src/Emberward.Core/Entities/Tanks/Tank.cs` (record at the core; receiver position and target; `BankFromHold`)
+- `src/Emberward.Core/Entities/Bases/TankBase.cs` (`BankFromHold`)
 - `src/Emberward.Core/Config/Tweaks.Cargo.cs`, `src/Emberward.Core/Config/SimulationSettings.cs`
-- `src/Emberward.Desktop/Gui/BuildSlotView.cs` (`BASE FULL`, since it reads `CoreDropOff`)
-- tests: `OreEconomyTests`, `DepositHeatTests`, `BasePowerTests`, `SimulationFingerprintTests`, BuildSlotView tests
+- tests: `OreEconomyTests`, `DepositHeatTests`, `BasePowerTests`, `SimulationFingerprintTests`, `TankHeatBehaviorTests`
 - `DESIGN.md` §6.3 (deposit heat) and §13 (decision log); `src/Emberward.Core/ARCHITECTURE.md`
 
 **PR 2, the world: pour, core heat, floater** (no result change).
@@ -336,6 +361,9 @@ Three PRs, each green on `dotnet test Emberward.slnx` on its own.
 - `DESIGN.md` §6.3 (the MATERIALS paragraph)
 
 ## 10. Open questions
+
+Questions 1 to 4 were settled when this was built (§0): deposit heat on; rival crystals and glow in sight, numbers only
+for your own side; no capacity on screen at all; harvested ore does not pulse the core. Question 5 is still open.
 
 1. **Deposit heat on or off.** Recommended on, at 250 a unit (a fifth of the reactor per full hold, vented in under a
    second): it makes the glow true and costs a negligible engine dip. At 0 there is no gameplay change and the glow
