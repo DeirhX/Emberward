@@ -30,7 +30,7 @@ public class TankFireCoreTests
         var quads = new EntityQuads();
         quads.Begin(new RenderView(new Size(1600, 1200), new Size(400, 300), new Position(0, 0), 4), 1.3f, 0f);
         fire.EmitLight(quads, motion, vision);
-        fire.Emit(quads, motion, vision, 1f / 60f, snap: false);
+        fire.Emit(quads, motion, vision);
         return quads;
     }
 
@@ -128,7 +128,7 @@ public class TankFireCoreTests
     {
         float level = LevelAt(hull);
         return [FireOnset.Light(level), FireOnset.CoreGlow(level), FireOnset.Soot(level), FireOnset.Flames(level),
-            FireOnset.SmokeShare(level), FireOnset.EmberShare(level), FireOnset.Sound(level)];
+            FireOnset.SmokeShare(level), FireOnset.EmberShare(level), FireOnset.Sound(level), FireOnset.FlameShare(level)];
     }
 
     [Fact]
@@ -223,7 +223,7 @@ public class TankFireCoreTests
             Assert.True(count - previous <= 3, $"level {i / 100f}: {count} particles after {previous}");
             previous = count;
         }
-        Assert.Equal(TankFireQuads.MaxSmoke + TankFireQuads.MaxEmbers, previous);
+        Assert.Equal(FireParticles.MaxPerTank, previous);
     }
 
     [Fact]
@@ -262,7 +262,7 @@ public class TankFireCoreTests
             (int)((tank.Position.X * 4) - 800), (int)((tank.Position.Y * 4) - 600)), 4);
         var quads = new EntityQuads();
         quads.Begin(view, 1.3f, 0f);
-        fire.Emit(quads, motion, null, 1f / 60f, snap: false);
+        fire.Emit(quads, motion, null);
 
         EntityVertex flames = Assert.Single(Quads(quads, EntityShape.KindTankFire));
         Assert.Equal(tank.HullFraction, flames.R, 4);
@@ -352,7 +352,7 @@ public class TankFireCoreTests
         var (fire, motion) = Died(3);
         var quads = new EntityQuads();
         quads.Begin(new RenderView(new Size(1600, 1200), new Size(400, 300), new Position(0, 0), 4), 1.3f, 0.5f);
-        fire.Emit(quads, motion, null, 1f / 60f, snap: false);
+        fire.Emit(quads, motion, null);
         float glow = DeathQuad(quads).G;
 
         fire.Hold();
@@ -360,7 +360,7 @@ public class TankFireCoreTests
         {
             quads.Begin(new RenderView(new Size(1600, 1200), new Size(400, 300), new Position(0, 0), 4), 1.3f + frame,
                 frame % 2 == 0 ? 1f : 0f);
-            fire.Emit(quads, motion, null, 1f / 60f, snap: false);
+            fire.Emit(quads, motion, null);
             Assert.Equal(glow, DeathQuad(quads).G);
         }
     }

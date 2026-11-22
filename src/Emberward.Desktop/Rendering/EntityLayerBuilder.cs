@@ -142,7 +142,7 @@ public sealed class EntityLayerBuilder
         TankQuads.Emit(_quads, _motion, tankPositions, turnSeconds, snapHeadings, protectedBlinkOn, vision);
         _projectiles.Emit(_quads, vision);
         _emberites.Emit(_quads, vision);
-        _tankFires.Emit(_quads, _motion, vision, turnSeconds, snapHeadings);
+        _tankFires.Emit(_quads, _motion, vision);
         _tankShields.Emit(_quads, _motion, vision);
         _baseShields.Emit(_quads, vision);
         _powerLabels.Emit(_quads, vision, powerLabelCellSize);

@@ -53,7 +53,7 @@ public class TankFireQuadsTests
     {
         var quads = Frame(phase);
         fire.EmitLight(quads, motion, vision);
-        fire.Emit(quads, motion, vision, 1f / 60f, snap: false);
+        fire.Emit(quads, motion, vision);
         return quads;
     }
 
@@ -74,8 +74,9 @@ public class TankFireQuadsTests
         Assert.Equal(1, CountKind(quads, EntityShape.KindTankFireLight));
         Assert.Equal(1, CountKind(quads, EntityShape.KindTankFire));
         int particles = CountKind(quads, EntityShape.KindFireParticle);
-        Assert.Equal(TankFireQuads.MaxSmoke + TankFireQuads.MaxEmbers, particles);
-        Assert.InRange(particles, 1, 36);
+        Assert.Equal(FireParticles.MaxPerTank, particles);
+        // The cap: every family's slots, at six vertices each.
+        Assert.InRange(particles, 1, 80);
     }
 
     [Fact]
@@ -122,34 +123,130 @@ public class TankFireQuadsTests
         Assert.Equal(0, Draw(fire, motion, vision).VertexCount);
     }
 
+    // How many particles of each FireParticleKind a frame draws (the kind is params.y).
+    private static int[] CountParticles(EntityQuads quads)
+    {
+        int[] counts = new int[4];
+        for (int v = 0; v < quads.VertexCount; v += 6)
+        {
+            if (quads.Vertices[v].Kind == EntityShape.KindFireParticle)
+                counts[(int)quads.Vertices[v].P1]++;
+        }
+        return counts;
+    }
+
     [Fact]
-    public void TheFlames_LeanIntoTheDrift_WithinHalfASecond()
+    public void AFullFire_IsMadeOfFlameLicksSparksCindersAndSmoke()
+    {
+        var (fire, motion) = Burning(1f);
+        int[] counts = CountParticles(Draw(fire, motion));
+
+        foreach (FireParticleFamily family in FireParticles.Families)
+            Assert.Equal(family.Count, counts[(int)family.Kind]);
+        // The flame licks are the body of the fire: the most numerous.
+        Assert.True(counts[(int)FireParticleKind.Flame] > counts[(int)FireParticleKind.Spark]);
+        Assert.True(counts[(int)FireParticleKind.Cinder] < counts[(int)FireParticleKind.Spark]);
+    }
+
+    [Fact]
+    public void AFireJustCatching_HasOnlyAFewFlameLicks()
+    {
+        var (fire, motion) = Burning(0.15f);
+        int[] counts = CountParticles(Draw(fire, motion));
+
+        Assert.InRange(counts[(int)FireParticleKind.Flame], 1, 10);
+        Assert.Equal(0, counts[(int)FireParticleKind.Spark]);
+        Assert.Equal(0, counts[(int)FireParticleKind.Cinder]);
+    }
+
+    [Fact]
+    public void TheCore_IsDrawnUpright_WithTheHullHeading()
+    {
+        var (fire, motion) = Burning(1f);
+        var quads = Draw(fire, motion);
+        int v = 0;
+        while (quads.Vertices[v].Kind != EntityShape.KindTankFire)
+            v += 6;
+
+        // Upright: the first corner (local min x, min y) is up and to the left of the anchor, axis-aligned.
+        EntityVertex corner = quads.Vertices[v];
+        Assert.Equal(EntityQuads.Centre(100) - 6.5f, corner.CellX, 3);
+        Assert.Equal(EntityQuads.Centre(100) - 6.5f, corner.CellY, 3);
+        Assert.Equal(motion.HullHeading(0), corner.P3, 4);
+    }
+
+    [Fact]
+    public void FlameLicksAndSparks_Rise_AndCindersArcUpThenFall()
+    {
+        var h = new FireParticles.Hashes(0.5f, 0.3f, 0.7f, 0.4f);
+        foreach (FireParticleFamily family in FireParticles.Families)
+        {
+            float life = family.LifeSeconds;
+            PositionF born = FireParticles.Offset(family.Kind, 0f, 1f, 2f, h);
+            PositionF mid = FireParticles.Offset(family.Kind, 0.4f * life, 1f, 2f, h);
+            PositionF end = FireParticles.Offset(family.Kind, life, 1f, 2f, h);
+            Assert.True(mid.Y < born.Y - 1f, $"{family.Kind} does not rise: {born.Y} to {mid.Y}");
+            if (family.Kind == FireParticleKind.Cinder)
+                Assert.True(end.Y > born.Y, $"a cinder ends at {end.Y}, above where it started ({born.Y})");
+            else
+                Assert.True(end.Y < mid.Y, $"{family.Kind} falls back: {mid.Y} to {end.Y}");
+            // Born on the hull or close round it.
+            Assert.InRange(MathF.Abs(born.X), 0f, 2.5f);
+        }
+
+        // A lick is turned along its motion: up the screen.
+        var (direction, speed) = FireParticles.Motion(FireParticleKind.Flame, 0.2f, 1f, 2f, h);
+        Assert.True(direction.Y < -0.8f && speed > 1f);
+    }
+
+    [Fact]
+    public void TheParticles_GrowWithTheFire()
+    {
+        Assert.True(FireParticles.Size(FireParticleKind.Flame, 0.3f, 1f, 0.5f) > 1.5f * FireParticles.Size(FireParticleKind.Flame, 0.3f, 0.2f, 0.5f));
+        Assert.True(FireParticles.Size(FireParticleKind.Spark, 0.3f, 1f, 0.5f) > FireParticles.Size(FireParticleKind.Spark, 0.3f, 0.2f, 0.5f));
+    }
+
+    [Fact]
+    public void AMovingTank_LeavesItsFireBehindIt()
     {
         var fire = new TankFireQuads();
         var motion = new EntityMotion();
-        for (int x = 0; x < 6; x++)
+        const int Steps = 40;
+        for (int x = 0; x < Steps; x++)
         {
             motion.CaptureTanks([Tank(100 + x, 100)]);
-            motion.SetAlpha(1f);
             fire.BeginCapture(1);
             fire.CaptureTank(0, new Position(100 + x, 100), 1f);
         }
         motion.UpdateHullHeading(0, East, 0f, snap: true);
-        var (_, drift) = motion.TankMotion(0);
-        Assert.True(drift.X > 0.9f);
+        var quads = Draw(fire, motion);
 
-        PositionF straight = fire.FlameDirection(0);
-        Assert.Equal(-1f, straight.Y, 3);
+        float sum = 0f;
+        int count = 0;
+        for (int v = 0; v < quads.VertexCount; v += 6)
+        {
+            if (quads.Vertices[v].Kind == EntityShape.KindFireParticle && quads.Vertices[v].P1 == (float)FireParticleKind.Flame)
+            {
+                sum += (quads.Vertices[v].CellX + quads.Vertices[v + 2].CellX) / 2f;
+                count++;
+            }
+        }
+        Assert.True(count > 0);
+        // The tank is at x = 139 now; its flames stream out behind it (west), where it was as they were born.
+        Assert.True(sum / count < EntityQuads.Centre(100 + Steps - 1) - 2f, $"flames centred at {sum / count}");
+    }
 
-        for (int frame = 0; frame < 30; frame++)
-            fire.Emit(Frame(), motion, null, 1f / 60f, snap: false);
+    [Fact]
+    public void TheParticles_AreTheSame_OnEveryRun()
+    {
+        EntityVertex[] Run()
+        {
+            var (fire, motion) = Burning(0.8f);
+            var quads = Draw(fire, motion);
+            return quads.Vertices.AsSpan(0, quads.VertexCount).ToArray();
+        }
 
-        float tx = -0.5f * MathF.Min(drift.X, 1.2f), ty = -1f;
-        float length = MathF.Sqrt((tx * tx) + (ty * ty));
-        PositionF leaned = fire.FlameDirection(0);
-        float dot = ((leaned.X * tx) + (leaned.Y * ty)) / length;
-        Assert.True(dot > 0.995f, $"flames point ({leaned.X}, {leaned.Y})");
-        Assert.True(leaned.X < -0.3f);
+        Assert.Equal(Run(), Run());
     }
 
     [Fact]
@@ -267,7 +364,7 @@ public class TankFireQuadsTests
     {
         var quads = new EntityQuads();
         quads.Begin(new RenderView(new Size(1600, 1200), new Size(400, 300), new Position(0, 0), 4), 1.3f, alpha);
-        fire.Emit(quads, motion, null, 1f / 60f, snap: false);
+        fire.Emit(quads, motion, null);
         return quads;
     }
 

@@ -3,15 +3,16 @@
 // ============================================================================
 //
 // Three kinds (params in Layout.hlsli):
-//   23 TankFire      the exposed core in its soot ring at the hull's centre and flame tongues, in the "flame frame":
-//                    local -y points the way the flames go (up the screen, leaning away from the drift), and params.w
-//                    turns the hull box into that frame. A dead tank's core glow, flaring and fading, is this kind
-//                    too (no flames, no soot: only the soft glow).
+//   23 TankFire      the exposed core in its soot ring at the hull's centre, upright on the screen (params.w, the hull
+//                    heading, finds the hull box's centre). A dead tank's core glow, flaring and fading, is this kind
+//                    too (no soot: only the soft glow).
 //   24 TankFireLight the flickering light the fire throws on the ground around the tank (additive).
-//   25 FireParticle  one puff of smoke or one ember, placed by the C# side where the tank was when it was born.
-// Every animation loops on a 4 s cycle: each frequency is a multiple of 1/4 Hz, and the flame noise scrolls a whole
-// number of lattice periods per cycle. How much of each part shows (FireOnset, eased in from nothing as the fire
-// grows) and the death glow's flare and fade come from the C# side.
+//   25 FireParticle  the fire itself: one flame lick, spark, cinder or puff of smoke, placed and turned along its
+//                    motion by the C# side (FireParticles), which steps it with the world. Each cools over its life
+//                    on FireRamp: white-yellow, orange, deep red, dark smoke.
+// The core's and the light's animations loop on a 4 s cycle: each frequency is a multiple of 1/4 Hz, and the noise
+// scrolls a whole number of lattice periods per cycle. How much of each part shows (FireOnset, eased in from nothing as
+// the fire grows) and the death glow's flare and fade come from the C# side.
 // ============================================================================
 
 #ifndef EMBERWARD_ENTITY_TANKFIRE_HLSLI
@@ -19,7 +20,15 @@
 
 static const float3 kFireWhite = float3(1.00, 0.93, 0.65);
 static const float3 kFireOrange = float3(1.00, 0.45, 0.08);
-static const float3 kFireRed = float3(0.70, 0.10, 0.03);
+static const float3 kFireYellow = float3(1.00, 0.72, 0.22);
+static const float3 kFireRed = float3(0.55, 0.07, 0.02);
+static const float3 kFireSmoke = float3(0.10, 0.085, 0.08);
+
+// What a fire particle is (params.y); FireParticleKind in FireParticles.cs has the same values.
+static const float kFireSparkKind = 0.0;
+static const float kFireSmokeKind = 1.0;
+static const float kFireFlameKind = 2.0;
+static const float kFireCinderKind = 3.0;
 static const float2 kFireHullCenter = float2(-0.5, 0.0);   // the hull box of Tank.hlsli
 static const float2 kFireHullHalf = float2(2.45, 1.55);
 
@@ -75,21 +84,11 @@ float FireFlicker(float t, float s)
     return 0.8 + 0.12 * sin(18.849556 * t + s) + 0.08 * sin(32.986723 * t + 2.0 * s);
 }
 
-// One flame tongue whose foot stands at `base`, `height` cells tall: 1 at its foot, falling to 0 at its tip.
-float FlameMask(float2 p, float2 base, float height, float sway)
-{
-    float v = (base.y - p.y) / max(height, 0.01);
-    float vc = saturate(v);
-    float centre = base.x + sway * vc * vc;
-    float halfWidth = lerp(1.4, 0.1, vc);
-    float across = 1.0 - smoothstep(halfWidth * 0.25, halfWidth, abs(p.x - centre));
-    float foot = smoothstep(-0.45, 0.05, v);
-    return across * foot * (1.0 - vc * vc);
-}
-
-// params.x = the flames' level (0..1, eased in); core.x = hull fill (0..1: the core's size and colour), core.y = the
-// core's glow (0 hidden, 1 full; up to 2 for a dying core's flare), core.z = soot (0..1: the soot ring, the core's
-// crust, its drips and its pulse). A dead tank's glow has flames and soot 0: only the soft glow, no edge.
+// The exposed core in its soot ring, upright on the screen (+y down): params.x = the flames' level (0..1, eased in: the
+// soot ring's reach and the embers in its cracks), params.w = the hull heading (the core sits at the hull box's
+// centre); core.x = hull fill (0..1: the core's size and colour), core.y = the core's glow (0 hidden, 1 full; up to 2
+// for a dying core's flare), core.z = soot (0..1: the soot ring, the core's crust, its drips and its pulse). A dead
+// tank's glow has level and soot 0: only the soft glow, no edge. The flames are particles (FireParticle).
 float4 TankFire(float2 p, float4 params, float3 core, float aa)
 {
     float level = saturate(params.x);
@@ -102,13 +101,13 @@ float4 TankFire(float2 p, float4 params, float3 core, float aa)
     float glow = max(core.y, 0.0);
     float solid = saturate(core.z);
 
-    // The noise the soot, the crust and the flames read, scrolling up the screen 8 lattice rows per cycle.
+    // The noise the soot and the crust read, scrolling up the screen 8 lattice rows per cycle.
     float2 q = p * float2(0.9, 0.6) + float2(seed * 8.0, 2.0 * t);
     float n = 0.65 * FireNoise(q) + 0.35 * FireNoise(q * 2.0 + float2(5.0, 3.0));
 
     float4 result = float4(0.0, 0.0, 0.0, 0.0);
 
-    // The core sits at the hull box's centre (turned into the flame frame); it grows from 1.5 to 3.5 cells as the hull
+    // The core sits at the hull box's centre (turned by the heading); it grows from 1.5 to 3.5 cells as the hull
     // falls from 75% to empty, and grows in with its glow (which a regenerating shield takes back).
     float2 cp = p - kFireHullCenter.x * float2(c, sn);
     float d = length(cp);
@@ -123,7 +122,7 @@ float4 TankFire(float2 p, float4 params, float3 core, float aa)
     Over(result, kCoreSoot, soot);
     result.rgb += kFireOrange * soot * level * 0.35 * smoothstep(0.62, 0.8, n);
 
-    // Molten drips down the screen (+y in the flame frame) from a sagging core: up to three lanes, one per 2 s.
+    // Molten drips down the screen (+y) from a sagging core: up to three lanes, one per 2 s.
     float lane = clamp(floor(cp.x / 1.1 + 0.5), -1.0, 1.0);
     float along = (cp.y - 0.6 * radius) / ((1.0 + 2.5 * frac(0.5 * t + FireHash(float2(lane + 4.0, seed * 8.0)))) * max(sag, 0.01));
     float drip = (1.0 - smoothstep(0.18, 0.32, abs(cp.x - 1.1 * lane) + 0.1 * along)) * step(0.0, along)
@@ -144,31 +143,6 @@ float4 TankFire(float2 p, float4 params, float3 core, float aa)
     float r2 = size * size * 2.56;
     float fall = saturate(1.0 - d * d / r2);
     result.rgb += heat * glow * 0.6 * fall * fall;
-
-    // Flames: four tongues standing on the hull (positions in its frame), the later ones lighting as the hull falls.
-    float flicker = FireFlicker(t, s);
-    float height = (2.5 + 7.5 * level) * (0.85 + 0.15 * flicker);
-    float2 b0 = float2(-2.0, 0.0);
-    float2 b1 = float2(-0.5, 1.1);
-    float2 b2 = float2(-0.5, -1.1);
-    float2 b3 = float2(1.0, 0.0);
-    float m0 = FlameMask(p, float2(c * b0.x - sn * b0.y, sn * b0.x + c * b0.y), height,
-        0.4 * sin(4.712389 * t + s)) * smoothstep(0.0, 0.15, level);
-    float m1 = FlameMask(p, float2(c * b1.x - sn * b1.y, sn * b1.x + c * b1.y), height * (0.8 + 0.08 * sin(25.132741 * t + s)),
-        0.4 * sin(6.283185 * t + s + 1.7)) * smoothstep(0.35, 0.5, level);
-    float m2 = FlameMask(p, float2(c * b2.x - sn * b2.y, sn * b2.x + c * b2.y), height * (0.8 + 0.08 * sin(21.991149 * t + s + 2.3)),
-        0.4 * sin(7.853982 * t + s + 3.1)) * smoothstep(0.35, 0.5, level);
-    float m3 = FlameMask(p, float2(c * b3.x - sn * b3.y, sn * b3.x + c * b3.y), height * 0.75,
-        0.4 * sin(3.141593 * t + s + 4.4)) * smoothstep(0.7, 0.85, level);
-    float mask = max(max(m0, m1), max(m2, m3));
-    float field = mask - 0.55 * n;
-
-    float3 flame = lerp(kFireRed, kFireOrange, smoothstep(0.35, 0.45, field));
-    flame = lerp(flame, kFireWhite, smoothstep(0.65, 0.75, field));
-    float shown = smoothstep(0.12, 0.2, field);
-    float alpha = 0.25 * shown;
-    result.rgb = flame * 1.5 * shown + result.rgb * (1.0 - alpha);
-    result.a = alpha + result.a * (1.0 - alpha);
     return result;
 }
 
@@ -186,38 +160,82 @@ float4 TankFireLight(float2 p, float4 params, float strength)
     return float4(colour * intensity * fall, 0.0);
 }
 
-// One puff of smoke (params.y = 1) or one ember (params.y = 0) at age params.x (0 born, 1 gone), params.z strong.
-float4 FireParticle(float2 p, float4 params, float aa)
+// The colour of fire as it cools (heat 1 to 0): white-yellow, yellow, orange, deep red, then dark smoke.
+float3 FireRamp(float heat)
+{
+    float3 c = lerp(kFireSmoke, kFireRed, saturate(heat * 4.0));
+    c = lerp(c, kFireOrange, saturate((heat - 0.25) * 4.0));
+    c = lerp(c, kFireYellow, saturate((heat - 0.5) * 4.0));
+    return lerp(c, kFireWhite, saturate((heat - 0.75) * 4.0));
+}
+
+// A puff of smoke of the given radius: a lumpy grey puff that swells and darkens as it rises, lit orange by the flames
+// while it is young.
+float4 FireSmokePuff(float2 p, float age, float strength, float seed, float radius)
+{
+    float2 r = p / max(radius, 0.05);
+    float2 lump = float2(cos(seed * 6.283185), sin(seed * 6.283185)) * 0.35;
+    float d = min(dot(r, r), dot(r - lump, r - lump) * 1.8);
+    float body = saturate(1.0 - d);
+    body *= body;
+    float3 grey = lerp(float3(0.36, 0.34, 0.33), float3(0.17, 0.15, 0.14), age);
+    float3 colour = lerp(float3(0.80, 0.42, 0.16), grey, smoothstep(0.0, 0.2, age));
+    float alpha = 0.45 * (1.0 - age) * smoothstep(0.0, 0.15, age) * strength * body;
+    return float4(colour * alpha, alpha);
+}
+
+// A flame lick, local +x along its motion: a soft teardrop, round at its foot and drawn out to its tip, `radius` cells
+// across and `stretch` times that along. It glows white-yellow when born and cools through orange and deep red,
+// flickering, to a wisp of dark smoke as it dies. Its glow adds light; only the smoke darkens what is under it.
+float4 FireFlame(float2 p, float age, float strength, float seed, float stretch, float radius, float swirl)
+{
+    float2 q = p / max(radius, 0.01);
+    q.x /= max(stretch, 0.1);
+    float taper = 1.0 - 0.5 * saturate(q.x);                    // narrower toward the tip
+    float across = q.y / taper;
+    float body = exp(-2.6 * (q.x * q.x + across * across));
+    float heat = saturate(1.1 - 1.2 * age - 0.15 * seed + 0.2 * body);
+    float flicker = 0.75 + 0.25 * sin(age * 47.0 + seed * 6.283185 + swirl * 3.0);
+    float life = smoothstep(0.0, 0.1, age) * (1.0 - smoothstep(0.75, 1.0, age)) * strength;
+    float burning = smoothstep(0.1, 0.55, heat);
+    float smoke = (1.0 - burning) * body * 0.3 * life;
+    float3 glow = FireRamp(heat) * body * burning * flicker * life * 0.6;
+    return float4(glow + kFireSmoke * smoke, smoke);
+}
+
+// A spark or a cinder, local +x along its motion: a hot head `radius` cells across with a streak `trail` cells long
+// behind it and a halo, as a shot is drawn (HotShot). It starts at `heat0` on FireRamp and cools as it ages, twinkling;
+// it only adds light.
+float4 FireStreak(float2 p, float age, float strength, float seed, float trail, float radius, float heat0, float aa)
+{
+    float len = max(trail, 0.01);
+    float dist = sdSegment(p, float2(-len, 0.0), float2(0.0, 0.0));
+    float along = saturate(1.0 + p.x / len);                    // 0 at the tail, 1 at the head
+    float heat = saturate(heat0 * (1.05 - age));
+    float core = FillAlpha(dist - radius * lerp(0.4, 1.0, along), aa) * lerp(0.2, 1.0, along);
+    float halo = exp(-max(dist - radius * 0.5, 0.0) * (2.4 / max(radius, 0.05))) * lerp(0.15, 1.0, along);
+    float twinkle = 0.7 + 0.3 * sin(age * 53.0 + seed * 6.283185);
+    float life = smoothstep(0.0, 0.06, age) * (1.0 - smoothstep(0.75, 1.0, age)) * strength;
+    float3 colour = FireRamp(heat * lerp(0.8, 1.0, along));
+    return float4(colour * (1.3 * core + 0.6 * halo) * twinkle * life * smoothstep(0.0, 0.35, heat + 0.1), 0.0);
+}
+
+// One of a burning tank's particles (TankFireQuads, FireParticles): params.x = age (0 born, 1 gone), params.y = what it
+// is (kFireSpark, kFireSmoke, kFireFlame, kFireCinder), params.z = strength (0..1: it fades in with the fire),
+// params.w = a seed (0..1); shape = colour channels: smoke (unused, radius, unused), a flame lick (stretch, radius,
+// swirl seed), a spark or cinder (trail, radius, starting heat).
+float4 FireParticle(float2 p, float4 params, float3 shape, float aa)
 {
     float age = saturate(params.x);
     float strength = saturate(params.z);
     float seed = params.w;
-    float4 result = float4(0.0, 0.0, 0.0, 0.0);
-    if (params.y > 0.5)
-    {
-        // Smoke: a lumpy grey puff that swells as it rises, lit orange by the flames while it is young.
-        float radius = 0.5 * (1.5 + 3.0 * age);
-        float2 r = p / radius;
-        float2 lump = float2(cos(seed * 6.283185), sin(seed * 6.283185)) * 0.35;
-        float d = min(dot(r, r), dot(r - lump, r - lump) * 1.8);
-        float body = saturate(1.0 - d);
-        body *= body;
-        float3 grey = float3(0.36, 0.34, 0.33);
-        float3 colour = lerp(float3(0.80, 0.42, 0.16), grey, smoothstep(0.0, 0.2, age));
-        float alpha = 0.45 * (1.0 - age) * smoothstep(0.0, 0.15, age) * strength * body;
-        result = float4(colour * alpha, alpha);
-    }
+    float4 result;
+    if (abs(params.y - kFireSmokeKind) < 0.5)
+        result = FireSmokePuff(p, age, strength, seed, shape.y);
+    else if (abs(params.y - kFireFlameKind) < 0.5)
+        result = FireFlame(p, age, strength, seed, shape.x, shape.y, shape.z);
     else
-    {
-        // Ember: a hot dot with a little halo, cooling from white-yellow through orange to red, and twinkling.
-        float d = length(p);
-        float core = 1.0 - smoothstep(0.35 - aa, 0.35 + aa, d);
-        float halo = saturate(1.0 - d / 0.8);
-        float3 colour = lerp(kFireWhite, kFireOrange, saturate(age / 0.35));
-        colour = lerp(colour, kFireRed, saturate((age - 0.35) / 0.65));
-        float twinkle = 0.65 + 0.35 * sin(age * 37.0 + seed * 6.283185);
-        result = float4(colour * (core + 0.35 * halo * halo) * twinkle * (1.0 - age) * smoothstep(0.0, 0.08, age) * strength * 1.6, 0.0);
-    }
+        result = FireStreak(p, age, strength, seed, shape.x, shape.y, shape.z, aa);
     return result;
 }
 

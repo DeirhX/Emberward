@@ -48,21 +48,23 @@
 //                   centre to where the shot landed (TankShieldQuads.NoHitAngle, 10, for none), .w = how much of the
 //                   bubble shows in whole 255ths plus the animation loop as the fraction (0..1 over
 //                   TankShieldQuads.LoopSeconds); color.rgb = team colour. Drawn only while hits are fresh.
-//  23 tank fire   — .x = the flames' level (0..1, eased in from the fire level), .y = seconds into a 4 s animation cycle,
-//                   .z = a per-tank seed (0..1), .w = the hull heading relative to the quad (radians). The quad's local
-//                   -y points the way the flames go. Drawn while the hull burns, and for a moment where a tank died.
+//  23 tank fire   — the exposed core: .x = the flames' level (0..1, eased in from the fire level: the soot ring's reach),
+//                   .y = seconds into a 4 s animation cycle, .z = a per-tank seed (0..1), .w = the hull heading (radians;
+//                   the quad is upright). Drawn while the hull burns, and for a moment where a tank died.
 //                   color.r = hull fill (0..1: the exposed core's size and colour), color.g = the core's glow (0 hidden,
 //                   1 full, up to 2 as a dying core flares), color.b = soot (0..1: the soot ring, crust, drips, pulse).
 //                   A dead tank's glow has .x = 0 and color.b = 0: only a soft glow.
 //  24 tank fire light — .x = fire level (0..1: the pool's size), .y = seconds into a 4 s cycle, .z = a per-tank seed (0..1),
 //                   .w = hull fill (0..1: the light takes the core's colour); color.r = strength (eased in). Additive.
-//  25 fire particle — .x = age (0 born, 1 gone), .y = 0 ember, 1 smoke, .z = strength (0..1: fades it in with the fire),
-//                   .w = a per-particle seed (0..1)
+//  25 fire particle — .x = age (0 born, 1 gone), .y = FireParticleKind (0 spark, 1 smoke, 2 flame lick, 3 cinder),
+//                   .z = strength (0..1: fades it in with the fire), .w = a per-particle seed (0..1); local +x along its
+//                   motion (smoke: upright). color.rgb = smoke (0, radius, 0), a flame lick (stretch, radius, swirl
+//                   seed), a spark or cinder (trail length, head radius, starting heat).
 //  26 danger ring — .x = radius (cells), .y = level (NestDangerLevel: 0 dormant, 1 awake, 2 swarming: it pulses),
 //                   .z = phase, .w = opacity; color.rgb = the ring's colour
 //
 // color.rgb is the team colour (tank hull, turret), the body colour (hot shot),
-// the tint (reach area, coverage, power label) or data (radar blip, tank fire). Every other kind owns its colours
+// the tint (reach area, coverage, power label) or data (radar blip, tank fire, fire particle). Every other kind owns its colours
 // here in the shader; the C# side sends black for them.
 // ============================================================================
 

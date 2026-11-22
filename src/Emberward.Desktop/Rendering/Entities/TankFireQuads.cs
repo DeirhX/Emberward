@@ -8,8 +8,9 @@ using Emberward.Core.Types;
 
 /// <summary>
 /// The fire on a tank whose hull is damaged (DESIGN.md §4.7): a flickering light on the ground under it, the exposed
-/// core glowing through a soot ring at the hull's centre, flame tongues that lean away from the way it drives, and
-/// smoke and embers that rise from where it has been. How big it is comes from
+/// core glowing through a soot ring at the hull's centre, and the fire itself as particles (<see cref="FireParticles"/>):
+/// flame licks rising off the core and the hull, sparks shooting up, cinders that arc off and fall, and smoke, all born
+/// where the tank was, so a moving tank's fire streams out behind it. How big it is comes from
 /// <see cref="Emberward.Core.Entities.Tanks.Tank.FireLevel"/> and the hull and shield Core answers; this only draws.
 /// Each part eases in from nothing as the level rises (<see cref="FireOnset"/>), and the drawn level, hull and shield
 /// follow Core's over <see cref="FireOnset.FollowSeconds"/>, so a hit or a repair never snaps the fire. When a tank
@@ -17,11 +18,12 @@ using Emberward.Core.Types;
 /// captured). A tank that is not burning costs nothing but its step trail. Output only.
 /// </summary>
 /// <remarks>
-/// Smoke and embers keep no particle pool: each of a tank's particles is a slot on a loop of its own life, born where
-/// the tank was that long ago (the trail of its last <see cref="TrailSteps"/> step positions), so a moving tank leaves
-/// a trail that stays where it was made, and nothing is allocated per step or per frame. A slot is in the air in a
-/// life when its hash falls under the level's share (<see cref="FireOnset.SmokeShare"/>), fading in as the share
-/// passes it, so the count grows smoothly with the fire.
+/// The particles keep no pool: each of a tank's particles is a slot on a loop of its own life, born where the tank was
+/// that long ago (the trail of its last <see cref="TrailSteps"/> step positions), so a moving tank leaves a trail that
+/// stays where it was made, and nothing is allocated per step or per frame. A slot is in the air in a life when its
+/// hash falls under the level's share (<see cref="FireParticles.Share"/>), fading in as the share passes it, so the
+/// count, and with it the birth rate, grows smoothly with the fire. Their clock is the steps captured, so they are
+/// step-locked: they stand still while the world does and are the same on every machine.
 /// </remarks>
 public sealed class TankFireQuads
 {
@@ -31,33 +33,20 @@ public sealed class TankFireQuads
     /// <summary>A tank that moved further than this in one step was respawned: its trail starts again where it is.</summary>
     public const float RespawnJumpCells = 20f;
 
-    /// <summary>How long the flames take to lean most of the way into a new drift (seconds; exponential).</summary>
-    public const float FlameLeanSeconds = 0.25f;
-
-    /// <summary>Smoke slots per tank: the most smoke puffs a fully burning tank keeps in the air.</summary>
-    public const int MaxSmoke = 20;
-
-    /// <summary>Ember slots per tank.</summary>
-    public const int MaxEmbers = 16;
-
     /// <summary>How long the glow of a dead tank's core lasts: a flare from yellow to white, then a fade (seconds).</summary>
     public const float DeathSeconds = DeathFlareSeconds + DeathFadeSeconds;
 
     /// <summary>How long a dead tank's core takes to flare from yellow to white-hot (seconds).</summary>
     public const float DeathFlareSeconds = 0.3f;
 
+    /// <summary>How much longer than it is wide a flame lick is drawn, along the way it rises.</summary>
+    public const float FlameStretch = 1.8f;
+
     private const float DeathFadeSeconds = 1.5f;
     private const float DeathPeakGlow = 2f;
     private const float PhaseCycleSeconds = 4f;
     private const float SagHullFraction = 0.25f;
-    private const float SmokeLifeSeconds = 1.6f;
-    private const float SmokeRiseCellsPerSecond = 4f;
-    private const float EmberLifeSeconds = 0.7f;
-    private const float EmberRiseCellsPerSecond = 7f;
     private const float ShareFade = 12f;
-    private const float MaxLeanDrift = 1.2f;
-    private const float ParticleSmoke = 1f;
-    private const float ParticleEmber = 0f;
 
     // Per tank slot (the world's tank list index). Level, hull and shield are as drawn: following Core's.
     private float[] _levels = [];
@@ -66,17 +55,16 @@ public sealed class TankFireQuads
     private Position[] _trail = [];
     private int[] _trailHead = [];
     private bool[] _trailKnown = [];
-    private PositionF[] _lean = [];
     private bool[] _alive = [];
     private long[] _diedStep = [];          // the capture a tank was seen to die at (0: no death glow drawn)
     private float[] _deathGlow = [];        // its core's glow just before it died
-    private float[] _deathLevel = [];       // and its fire level, which the smoke and embers then in the air keep
+    private float[] _deathLevel = [];       // and its fire level, which the particles then in the air keep
     private Position[] _deathAt = [];
     private float[] _deathHeading = [];
     private int _count;
 
-    // Steps captured: the particles' clock, so smoke and embers stand still while the world does (a pause, a network
-    // stall) and keep pace with it when it catches up. Counted in a long and read in doubles, so it never wraps.
+    // Steps captured: the particles' clock, so they stand still while the world does (a pause, a network stall) and
+    // keep pace with it when it catches up. Counted in a long and read in doubles, so it never wraps.
     private long _steps;
 
     // The particle clock last drawn, and whether the world is held (no step is coming): the clock never runs back,
@@ -107,7 +95,7 @@ public sealed class TankFireQuads
         }
     }
 
-    /// <summary>Forgets every trail and lean: the next capture starts each tank afresh where it is.</summary>
+    /// <summary>Forgets every trail: the next capture starts each tank afresh where it is.</summary>
     public void Reset()
     {
         Array.Clear(_trailKnown);
@@ -128,7 +116,6 @@ public sealed class TankFireQuads
             Array.Resize(ref _trail, count * TrailSteps);
             Array.Resize(ref _trailHead, count);
             Array.Resize(ref _trailKnown, count);
-            Array.Resize(ref _lean, count);
             Array.Resize(ref _alive, count);
             Array.Resize(ref _diedStep, count);
             Array.Resize(ref _deathGlow, count);
@@ -197,11 +184,10 @@ public sealed class TankFireQuads
                 return true;
             }
         }
-        // A new tank, or one that respawned: its trail starts where it is now, and its flames stand straight.
+        // A new tank, or one that respawned: its trail starts where it is now.
         trail.Fill(position);
         _trailHead[slot] = 0;
         _trailKnown[slot] = true;
-        _lean[slot] = default;
         return false;
     }
 
@@ -210,14 +196,6 @@ public sealed class TankFireQuads
     {
         int back = Math.Clamp(stepsAgo, 0, TrailSteps - 1);
         return _trail[(slot * TrailSteps) + ((_trailHead[slot] - back + TrailSteps) % TrailSteps)];
-    }
-
-    /// <summary>The way tank <paramref name="slot"/>'s flames point (a unit vector; (0, -1) is straight up the screen).</summary>
-    public PositionF FlameDirection(int slot)
-    {
-        float x = -0.5f * _lean[slot].X, y = -1f - (0.5f * _lean[slot].Y);
-        float length = MathF.Sqrt((x * x) + (y * y));
-        return length < 1e-4f ? new PositionF(0f, -1f) : new PositionF(x / length, y / length);
     }
 
     /// <summary>
@@ -256,44 +234,41 @@ public sealed class TankFireQuads
     }
 
     /// <summary>
-    /// The core and flames on each burning hull, and its smoke and embers: drawn over the tanks (call after
-    /// <see cref="TankQuads"/>, which turns the hulls this draws on). <paramref name="frameSeconds"/> is the game
-    /// time since the last displayed frame, which leans the flames into the drift; <paramref name="snap"/> leans them at once.
+    /// The core on each burning hull and its fire's particles: drawn over the tanks (call after <see cref="TankQuads"/>,
+    /// which turns the hulls this draws on). Smoke goes under the core; flame licks, sparks and cinders over it.
     /// </summary>
-    public void Emit(EntityQuads quads, EntityMotion motion, VisionMap? vision, float frameSeconds, bool snap)
+    public void Emit(EntityQuads quads, EntityMotion motion, VisionMap? vision)
     {
         ReadOnlySpan<TankRenderState> tanks = motion.Tanks;
         float scale = quads.View.PixelScale;
         float t = quads.Phase % PhaseCycleSeconds;
         double clock = ParticleClock(quads.Alpha);
-        float follow = snap ? 1f : 1f - MathF.Exp(-Math.Max(0f, frameSeconds) / FlameLeanSeconds);
+        ReadOnlySpan<FireParticleFamily> families = FireParticles.Families;
         for (int i = 0; i < tanks.Length && i < _count; i++)
         {
             float level = _levels[i];
-            var (start, drift) = motion.TankMotion(i);
-            LeanInto(i, drift, follow);
-            EmitDeath(quads, vision, i, tanks[i].IsDead ? motion.HullHeading(i) : float.NaN, clock, t, scale);
+            float heading = motion.HullHeading(i);
+            EmitDeath(quads, vision, i, tanks[i].IsDead ? heading : float.NaN, clock, t, scale);
             if (!IsDrawn(tanks[i], level, vision))
                 continue;
 
-            EmitParticles(quads, vision, i, level, clock, smoke: true);
+            for (int f = 0; f < FireParticles.UnderCore; f++)
+                EmitParticles(quads, vision, i, level, clock, families[f]);
 
-            if (!quads.IsOffScreen(quads.ScreenX(start.X), quads.ScreenY(start.Y), 16f * scale))
+            var (start, drift) = motion.TankMotion(i);
+            if (!quads.IsOffScreen(quads.ScreenX(start.X), quads.ScreenY(start.Y), 9f * scale))
             {
-                // The flame frame: local -y points the way the flames go, so the shader draws them straight up.
-                PositionF flame = FlameDirection(i);
-                float axisX = -flame.Y, axisY = flame.X;
-                float heading = MathF.IEEERemainder(motion.HullHeading(i) - MathF.Atan2(axisY, axisX), MathF.Tau);
-                // The core's glow reaches 6 cells round it, and a sagging core's drips run further below.
+                // The core's glow reaches 6 cells round it, and a sagging core's drips run further down the screen.
                 float below = _hull[i] < SagHullFraction ? 8f : 6.5f;
-                // A dead tank's core is the death glow now; its flames and soot die down here.
+                // A dead tank's core is the death glow now; its soot dies down here.
                 float core = tanks[i].IsDead ? 0f : CoreGlow(i);
-                quads.Add(EntityQuads.Centre(start.X), EntityQuads.Centre(start.Y), axisX, axisY, -6.5f, 6.5f, -14f, below,
+                quads.Add(EntityQuads.Centre(start.X), EntityQuads.Centre(start.Y), 1f, 0f, -6.5f, 6.5f, -6.5f, below,
                     _hull[i], core, FireOnset.Soot(level), EntityShape.KindTankFire, FireOnset.Flames(level), t,
                     Seed(i), heading, drift);
             }
 
-            EmitParticles(quads, vision, i, level, clock, smoke: false);
+            for (int f = FireParticles.UnderCore; f < families.Length; f++)
+                EmitParticles(quads, vision, i, level, clock, families[f]);
         }
     }
 
@@ -327,7 +302,7 @@ public sealed class TankFireQuads
         return (glow, 0.05f * (1f - flare));
     }
 
-    /// <summary>A dead tank's core glow, where it died, for <see cref="DeathSeconds"/>: no flames, no soot, no crust.</summary>
+    /// <summary>A dead tank's core glow, where it died, for <see cref="DeathSeconds"/>: no soot, no crust.</summary>
     private void EmitDeath(EntityQuads quads, VisionMap? vision, int slot, float deadHeading, double clock, float t, float scale)
     {
         if (!float.IsNaN(deadHeading))
@@ -348,7 +323,7 @@ public sealed class TankFireQuads
     }
 
     /// <summary>
-    /// The world takes no step (a pause, or a network tick that carried none): smoke and embers stand where they are
+    /// The world takes no step (a pause, or a network tick that carried none): the particles stand where they are
     /// drawn now until the next capture, whatever the frames' alpha does meanwhile.
     /// </summary>
     public void Hold() => _held = true;
@@ -364,45 +339,32 @@ public sealed class TankFireQuads
         return _clock;
     }
 
-    // A dead tank's fire still dies down where it fell, and its smoke and embers drift off as the level falls.
+    // A dead tank's fire still dies down where it fell, and its particles drift off as the level falls.
     private static bool IsDrawn(in TankRenderState tank, float level, VisionMap? vision) =>
         level > 0f && Sight.Sees(vision, tank.Position);
 
-    private void LeanInto(int slot, PositionF drift, float follow)
-    {
-        float dx = drift.X, dy = drift.Y;
-        float length = MathF.Sqrt((dx * dx) + (dy * dy));
-        if (length > MaxLeanDrift)
-        {
-            dx *= MaxLeanDrift / length;
-            dy *= MaxLeanDrift / length;
-        }
-        PositionF lean = _lean[slot];
-        _lean[slot] = new PositionF(lean.X + ((dx - lean.X) * follow), lean.Y + ((dy - lean.Y) * follow));
-    }
-
     /// <summary>
-    /// One kind of particle for tank <paramref name="slot"/>. Particle k of n is on a loop of its life L, at age
+    /// One family of particles for tank <paramref name="slot"/>. Particle k of n is on a loop of its life L, at age
     /// <c>frac(clock / L + k / n)</c>, the clock being the steps captured plus the frame's progress through the next;
-    /// it was born where the tank was <c>age * L</c> ago and has risen since. It is in the air in this life when its
-    /// hash is under the level's share, and fades in as the share passes the hash. Once the tank has died, those born
-    /// before live out their lives at the level it died at, and no more are born.
+    /// it was born where the tank was <c>age * L</c> ago and has moved since (<see cref="FireParticles.Offset"/>). It is
+    /// in the air in this life when its hash is under the level's share, and fades in as the share passes the hash.
+    /// Once the tank has died, those born before live out their lives at the level it died at, and no more are born.
     /// </summary>
-    private void EmitParticles(EntityQuads quads, VisionMap? vision, int slot, float level, double clock, bool smoke)
+    private void EmitParticles(EntityQuads quads, VisionMap? vision, int slot, float level, double clock,
+        in FireParticleFamily family)
     {
         long died = _alive[slot] ? 0 : _diedStep[slot];
         if (died != 0)
             level = _deathLevel[slot];
-        float kind = smoke ? ParticleSmoke : ParticleEmber;
-        int count = smoke ? MaxSmoke : MaxEmbers;
-        float share = smoke ? FireOnset.SmokeShare(level) : FireOnset.EmberShare(level);
+        FireParticleKind kind = family.Kind;
+        float share = FireParticles.Share(kind, level);
         if (share <= 0f)
             return;
-        float life = smoke ? SmokeLifeSeconds : EmberLifeSeconds;
-        float rise = smoke ? SmokeRiseCellsPerSecond : EmberRiseCellsPerSecond;
-        float strength = smoke ? 0.4f + (0.6f * level) : 1f;
-        float stepsPerSecond = Tweaks.Perf.TargetFps;
-        double lifeSteps = life * stepsPerSecond;
+        float life = family.LifeSeconds;
+        int count = family.Count;
+        float strength = kind == FireParticleKind.Smoke ? 0.4f + (0.6f * level) : 1f;
+        float coreRadius = FireParticles.CoreRadius(_hull[slot]);
+        double lifeSteps = life * Tweaks.Perf.TargetFps;
         float scale = quads.View.PixelScale;
         for (int k = 0; k < count; k++)
         {
@@ -412,32 +374,57 @@ public sealed class TankFireQuads
             int cycle = unchecked((int)(long)cycleStart);
             if (died != 0 && clock - (age * lifeSteps) >= died)
                 continue;
-            float shown = Math.Clamp((share - Hash(slot, k, cycle, smoke ? 71 : 83)) * ShareFade, 0f, 1f);
+            float shown = Math.Clamp((share - Hash(slot, k, cycle, family.Salt)) * ShareFade, 0f, 1f);
             if (shown <= 0f)
                 continue;
             // The frame is drawn alpha of a step after the latest step, so that much less of the trail lies behind it.
             int stepsAgo = (int)Math.Round((age * lifeSteps) - (clock - _steps));
             Position birth = TrailPosition(slot, stepsAgo);
-            float h1 = Hash(slot, k, cycle, smoke ? 17 : 29);
-            float h2 = Hash(slot, k, cycle, smoke ? 43 : 61);
-            float risen = rise * age * life;
-            float x, y, half;
-            if (smoke)
+            var h = new FireParticles.Hashes(Hash(slot, k, cycle, family.Salt + 1), Hash(slot, k, cycle, family.Salt + 2),
+                Hash(slot, k, cycle, family.Salt + 3), Hash(slot, k, cycle, family.Salt + 4));
+            float seconds = age * life;
+            PositionF offset = FireParticles.Offset(kind, seconds, level, coreRadius, h);
+            float x = EntityQuads.Centre(birth.X) + offset.X, y = EntityQuads.Centre(birth.Y) + offset.Y;
+            float size = FireParticles.Size(kind, age, level, h.D);
+            float reach = kind switch
             {
-                x = EntityQuads.Centre(birth.X) + ((h1 - 0.5f) * 2f) + ((h2 - 0.5f) * 2.5f * age);
-                y = EntityQuads.Centre(birth.Y) - 0.5f - risen;
-                half = 0.5f * (1.5f + (3f * age)) * 1.3f;
-            }
-            else
-            {
-                x = EntityQuads.Centre(birth.X) + ((h1 - 0.5f) * 3f) + (0.6f * MathF.Sin(MathF.Tau * ((age * 1.5f) + h2)));
-                y = EntityQuads.Centre(birth.Y) - 0.5f - risen;
-                half = 0.8f;
-            }
-            if (!Sight.Sees(vision, x, y) || quads.IsOffScreen(quads.ScreenX(x - 0.5f), quads.ScreenY(y - 0.5f), (half + 1f) * scale))
+                FireParticleKind.Flame => 1.5f * size * FlameStretch,
+                FireParticleKind.Smoke => 1.3f * size,
+                _ => (3.5f * size) + 1.2f,
+            };
+            if (!Sight.Sees(vision, x, y)
+                || quads.IsOffScreen(quads.ScreenX(x - 0.5f), quads.ScreenY(y - 0.5f), (reach + 1f) * scale))
                 continue;
-            quads.Add(x, y, 1f, 0f, -half, half, -half, half, EntityShape.KindFireParticle, age, kind, strength * shown, h2);
+            AddParticle(quads, kind, x, y, age, size, strength * shown, seconds, level, coreRadius, h);
         }
+    }
+
+    // One particle's quad. A smoke puff is upright; a lick, a spark and a cinder turn their local +x along their motion.
+    private static void AddParticle(EntityQuads quads, FireParticleKind kind, float x, float y, float age, float size,
+        float strength, float seconds, float level, float coreRadius, in FireParticles.Hashes h)
+    {
+        float particle = (float)kind;
+        if (kind == FireParticleKind.Smoke)
+        {
+            float half = 1.3f * size;
+            quads.Add(x, y, 1f, 0f, -half, half, -half, half, 0f, size, 0f, EntityShape.KindFireParticle, age, particle,
+                strength, h.B);
+            return;
+        }
+        var (dir, speed) = FireParticles.Motion(kind, seconds, level, coreRadius, h);
+        if (kind == FireParticleKind.Flame)
+        {
+            float along = 1.5f * size * FlameStretch, across = 1.5f * size;
+            quads.Add(x, y, dir.X, dir.Y, -along, along, -across, across, FlameStretch, size, h.C,
+                EntityShape.KindFireParticle, age, particle, strength, h.B);
+            return;
+        }
+        // A spark or a cinder: a hot head with a streak behind it, as long as it is fast.
+        float trail = Math.Clamp(speed * 0.045f, 0.1f, kind == FireParticleKind.Spark ? 1.2f : 0.9f);
+        float glow = 3.5f * size;
+        float heat = kind == FireParticleKind.Spark ? 1f : 0.75f;
+        quads.Add(x, y, dir.X, dir.Y, -trail - glow, glow, -glow, glow, trail, size, heat,
+            EntityShape.KindFireParticle, age, particle, strength, h.B);
     }
 
     private static float Seed(int slot) => ((slot * 0.618034f) + 0.31f) % 1f;

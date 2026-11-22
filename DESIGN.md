@@ -202,15 +202,19 @@ The tank lives in a band around 0. Both ends hurt, and the world has places at b
   out, by repairing the hull (a dark base repairs nothing, so a fire there stays, held down by the base's cooling).
   The fire is drawn on the tank: the exposed core glowing at the hull's centre in a ring of soot (1.5 cells across at
   75% hull to 3.5 at none, dark red through orange and yellow to white-hot on the hull-heat ramp; below 25% it sags and
-  drips slag, below 5% it pulses white; a regenerated shield hides it), ragged flame tongues that multiply as the hull
-  falls and lean away from the way it drives, a flickering light in the core's colour on the ground around it, heat
-  shimmer over it, and smoke and embers that rise from where it has been, so a burning tank leaves a trail (none of it
-  shown out of sight). Nothing pops in: from 75% hull each part eases in from nothing, in turn (the light and the
-  shimmer, then the dull core, its soot, the flames, smoke and last embers; particles fade in one by one rather than
-  in batches), the drawn fire follows a sudden hit or repair over about a third of a second, and it eases out the same
+  drips slag, below 5% it pulses white; a regenerated shield hides it), a flickering light in the core's colour on the
+  ground around it, heat shimmer over it, and the fire itself as particles, the way a shot's burst throws glowing
+  fragments: soft flame licks rising off the core and the hull with a little swirl, flickering and cooling from
+  white-yellow through orange and deep red to a wisp of dark smoke in half a second; small sparks that shoot up as
+  streaks; now and then a larger cinder thrown off to one side that arcs up and falls; and smoke. More of them, and
+  bigger, the more the hull burns. Each is born where the tank was, so a moving tank's fire streams out behind it and
+  leaves a trail (none of it shown out of sight). Nothing pops in: from 75% hull each part eases in from nothing, in
+  turn (the light and the shimmer, then the dull core, its soot, the flame licks, smoke and last sparks and cinders;
+  particles fade in one by one rather than in batches), the drawn fire follows a sudden hit or repair over about a
+  third of a second, and it eases out the same
   way when the hull is repaired or the shield comes back. A tank that dies has its hot core flare from yellow to
   white-hot over 0.3 s and fade over 1.5 s: a soft glow with no edge; its flames, light and crackle die down over the
-  same third of a second, and the smoke and embers already in the air live out their lives. It crackles, fading in as it catches, higher as
+  same third of a second, and the particles already in the air live out their lives. It crackles, fading in as it catches, higher as
   it grows and sizzling higher still once the core sags; the HUD's hull number eases from its neutral colour onto the
   heat ramp between 75% and 60%, and the HUD's
   crystal shows the shield, the number under it the hull, and the plate names the worst state: SLAG, MELTING (under
