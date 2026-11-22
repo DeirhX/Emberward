@@ -50,6 +50,10 @@ public sealed class TerrainAuxBuilder
                 float damageVisual = 0.85f + 0.15f * MathF.Sqrt(Math.Clamp(damageFrac * 8.0f, 0.0f, 1.0f));
                 visibleT = Math.Max(visibleT, damageVisual);
             }
+            // A burning hull shimmers the air above it through the same haze.
+            float fire = tank.FireLevel;
+            if (fire > 0f)
+                visibleT = Math.Max(visibleT, 0.55f + (0.4f * fire));
             if (visibleT <= 0.0f) continue;
 
             float radiusFactor = (0.55f + 0.45f * MathF.Sqrt(visibleT)) * 1.35f;
