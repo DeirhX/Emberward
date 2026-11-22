@@ -11,9 +11,14 @@ by 7, the core a disc 5 cells across).
 - **Deposit heat is on**, 250 a unit, at the core and at a relay (`TankBase.BankFromHold`, booked with
   `RecordInjected`). Both heats exist: the cargo heats the tank while carried (DESIGN.md §6.3, already booked) and
   the deposit heats the reactor when put down. At the core the bank runs **after** `PumpHeatAtBase`, so the deposit
-  takes only the reactor room the tank's dock cooling left; it never cuts the dock cooling. A reactor with no room
+  takes only the reactor room the tank's dock cooling left, so it never cuts that tick's cooling. The heat it leaves
+  does take room in the ticks after, so near a full reactor a deposit costs some later dock cooling, relay extraction
+  and shield recharge; a full hold vents in under a second only when nothing else feeds the reactor. A reactor with no room
   takes the ore but none of its heat, and the glow then shows the pulse only (it reads the real `HeatStoreFill`,
-  never the requested heat). No `SimulationFingerprintTests` constant changed: none of its recorded runs banks ore.
+  never the requested heat). None of the five existing `SimulationFingerprintTests` constants changed (none of those
+  runs banks ore); a sixth run, `TankBanksAtCore`, now records a bank and its deposit heat.
+- **Core sound before the HUD PR:** in the Core PR a bank at the core plays nothing of its own (the relay's pickup note
+  would have sounded every tick); the HUD PR gives it the deposit sound.
 - **Core or relay is told by `StepEvent.Target`** (`ImpactTarget.Base` at the core's centre, `ImpactTarget.Machine`
   at a relay), not by comparing positions. `Position` is the receiver, so readers find the tank by `Color`.
 - **No store capacity anywhere** (user decision): no `CoreDropOff.StoreFull`, `StoreFill`, `StoreLevel`, `BASE FULL`
@@ -115,14 +120,15 @@ engine's efficiency dips for under a second. A real but negligible cost, in the 
 One owner for banking. Add to `TankBase`:
 
 ```csharp
-/// Moves up to max units from a tank's hold into the store. Each unit moved brings DepositHeatPerOre into the
+/// Moves up to max units from a tank's hold into the store. Each unit moved brings the deposit heat into the
 /// reactor, as much as it has room for, booked as injected. Returns the units moved.
-internal int BankFromHold(OreStore hold, int max, ThermalLedger ledger, SimulationSettings settings)
+internal int BankFromHold(OreStore hold, int max, ThermalLedger ledger)
 ```
 
-Both unload paths call it instead of `Hold.MoveTo(store, …)`. It calls `AcceptHeat(units * settings.DepositHeatPerOre)`
-and `ledger.RecordInjected(accepted)`; a full reactor accepts nothing, and nothing is created. Thermal code reads its
-numbers through `SimulationSettings` (`SourceGuardTests`), so `DepositHeatPerOre` is added there from `Tweaks`.
+Both unload paths call it instead of `Hold.MoveTo(store, …)`. It calls `AcceptHeat(units * depositHeatPerOre)` and
+`ledger.RecordInjected(accepted)`; a full reactor accepts nothing, and nothing is created. Thermal code reads its
+numbers through `SimulationSettings` (`SourceGuardTests`), so `BaseDepositHeatPerOre` is added there from `Tweaks`,
+and the base keeps it from the settings it is built with (as it keeps the ambient temperature).
 
 - Reactor energy is already in `World.SumSystemThermalEnergy`, so the ledger balances with one `RecordInjected`
   (`ThermalLedgerTests` checks every tick).
@@ -312,11 +318,12 @@ Core:
 
 - `OreEconomyTests`: touching the core records `OreUnloaded` whose counts sum to what was banked, at the core's
   centre, with the tank's colour; at a relay the event is at the relay's position.
-- `DepositHeatTests` (new): banking 40 units adds `40 * DepositHeatPerOre` to `ReactorHeatEnergy` and the same to
-  `Injected`; at a full reactor neither changes; harvested ore adds none; the burn path adds none; the ledger balances
-  every tick throughout.
+- `DepositHeatTests` (new), each case against the same world with no deposit heat: banking 40 units injects
+  `40 * DepositHeatPerOre` more and leaves the reactor warmer (by part of it: the radiator has started venting); a
+  full reactor injects nothing more; the burn path injects nothing more; a relay injects its units' worth; the pump
+  comes before the bank; the ledger balances every tick throughout.
 - `BasePowerTests`: `RestartOreBurned` at the core's centre.
-- `SimulationFingerprintTests`: new constants (said in the commit message).
+- `SimulationFingerprintTests`: a new run, `TankBanksAtCore`, with its recorded constant (said in the commit message).
 
 Rendering and HUD:
 
