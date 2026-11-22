@@ -21,12 +21,12 @@ public class BotLoiterTests
     private const int Half = BaseLayout.Half;
 
     /// <summary>Blank ground, tank 0's base on the left and tank 1's (the bot's) on the right.</summary>
-    private static World CreateWorld(bool energyNetwork = true, int width = 100)
+    private static World CreateWorld(bool energyNetwork = true, int width = 100, bool tankShield = false)
     {
         var size = new Size(width, 72);
         var ground = new TerrainGrid(size);
         ground.Fill(TerrainPixel.Blank);
-        var world = new World(size, rules: new MatchRules { EnergyNetwork = energyNetwork, TerrainRegrowth = false });
+        var world = new World(size, rules: new MatchRules { EnergyNetwork = energyNetwork, TerrainRegrowth = false, TankShield = tankShield });
         world.Initialize(ground, [new Position(25, 36), new Position(width - 25, 36)]);
         return world;
     }
@@ -223,5 +223,21 @@ public class BotLoiterTests
             stopped = !ai.IsWaiting;
         }
         Assert.True(stopped, "a bot that is shot at its post should leave it or fight back");
+    }
+
+    [Fact]
+    public void AHitTheShieldTook_AlsoStopsTheWaiting()
+    {
+        var world = CreateWorld(width: 160, tankShield: true);
+        var (enemy, bot) = (world.TankList.Tanks[0], world.TankList.Tanks[1]);
+        var ai = new BotTankAI(9);
+        Run(world, ai, 40 * Fps);
+        Assert.True(ai.IsWaiting);
+
+        float hull = bot.Reactor.Health;
+        bot.TakeDamage(5, Emberward.Core.Entities.DamageCause.EnemyFire);
+        Assert.Equal(hull, bot.Reactor.Health);
+        world.Advance(i => i == 1 ? ai.GetInput(bot, enemy, world) : default);
+        Assert.False(ai.IsWaiting, "fire the shield absorbed is still fire");
     }
 }
