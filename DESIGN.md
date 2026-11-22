@@ -630,10 +630,10 @@ Pyrite pockets and lumps at least 60 cells from every base hold a nest (a pocket
 60 by size); specks hold none. Heat is the noise a tank makes and the fight makes heat:
 
 - *Scout.* A guarded deposit shows resting embers on the ore, and the radar returns a life echo from the nest's centre
-  and from each creature out where it is. Once a side has discovered a nest (seen its centre; the radar's echo alone does not
-  discover it), a thin pink danger ring is drawn over it, a small mark around the nest's ground, titled "EMBERITE NEST" over "DANGER: EMBERITES". It is
+  and from each creature out where it is. Once a side has discovered a nest (seen any of its ground: a lump's centre lies deeper in the ore than
+  sight reaches, so the face of the deposit is enough; the radar's echo alone does not discover it), a thin pink danger ring is drawn over it, a small mark around the nest's ground, titled "EMBERITE NEST" over "DANGER: EMBERITES". It is
   faint while the nest sleeps, full once it is awake, and pulses while its creatures are out; a cleared nest has
-  none. The ring shows the nest as the side last saw it (its centre in sight): out of sight, a
+  none. The ring shows the nest as the side last saw it (some of its ground in sight): out of sight, a
   nest that wakes or is cleared keeps its old ring, as remembered ground keeps its old look. The ring marks the nest, not
   how far it senses (a hunt starts from 40 to 110 cells by heat and a nest follows a tank much farther, up to 220 cells by heat), so
   the pulse says it is hunting. A nest the player has seen cleared loses its ring for good. Rock

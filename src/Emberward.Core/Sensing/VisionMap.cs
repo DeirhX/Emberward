@@ -90,6 +90,46 @@ public sealed class VisionMap
         (uint)pos.X < (uint)_width && (uint)pos.Y < (uint)_height && _explored[pos.X + pos.Y * _width];
 
     /// <summary>
+    /// Cells apart that <see cref="IsAnyVisibleWithin"/> and <see cref="IsAnyExploredWithin"/> look at. Sight comes in
+    /// runs wider than this (a tunnel, and the <see cref="Tweaks.Vision.WallSkin"/> of wall beside it), so a grid this
+    /// fine finds any of it that reaches the circle.
+    /// </summary>
+    public const int AreaStride = 2;
+
+    /// <summary>
+    /// Whether any cell within <paramref name="radius"/> of <paramref name="centre"/> is in sight, looked at on a grid of
+    /// every <see cref="AreaStride"/>th cell through the centre. For what covers ground, such as a nest, whose middle
+    /// may lie deeper in solid ground than sight reaches while its edge is in plain view.
+    /// </summary>
+    public bool IsAnyVisibleWithin(Position centre, int radius) => AnyWithin(centre, radius, explored: false);
+
+    /// <summary>Like <see cref="IsAnyVisibleWithin"/>, for cells that have been in sight at least once.</summary>
+    public bool IsAnyExploredWithin(Position centre, int radius) => AnyWithin(centre, radius, explored: true);
+
+    private bool AnyWithin(Position centre, int radius, bool explored)
+    {
+        int minY = Math.Max(0, centre.Y - radius), maxY = Math.Min(_height - 1, centre.Y + radius);
+        int minX = Math.Max(0, centre.X - radius), maxX = Math.Min(_width - 1, centre.X + radius);
+        long radiusSq = (long)radius * radius;
+        // On the grid through the centre, so the centre itself is always looked at.
+        int startY = minY + GridOffset(centre.Y - minY), startX = minX + GridOffset(centre.X - minX);
+        for (int y = startY; y <= maxY; y += AreaStride)
+        {
+            long dy = y - centre.Y;
+            for (int x = startX; x <= maxX; x += AreaStride)
+            {
+                long dx = x - centre.X;
+                int offset = x + y * _width;
+                if (dx * dx + dy * dy <= radiusSq && (explored ? _explored[offset] : _level[offset] != 0))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    private static int GridOffset(int distance) => ((distance % AreaStride) + AreaStride) % AreaStride;
+
+    /// <summary>
     /// The terrain as this side last saw it: a cell in sight matches the world, a cell out of sight keeps the pixel
     /// it had when it was last seen. A cell never seen holds what the map had when tracking began; presentation
     /// hides those anyway.

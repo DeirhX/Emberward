@@ -201,4 +201,61 @@ public class NestDangerTests
 
         Assert.Equal(2, Dangers(world, tank).Length);
     }
+    [Fact]
+    public void ANestWhoseCentreIsBuried_IsFound_WhenItsGroundComesIntoSight()
+    {
+        var (world, tank) = Arena();
+        // The centre lies 12 cells into the dirt beyond the pocket's edge, deeper than sight reaches into solid
+        // ground; the nest's ground reaches the pocket.
+        var nest = world.Emberites!.AddNest(Centre + new Offset(24, 0), radius: 14, creatures: 6);
+
+        Tick(world, tank, 2);
+
+        var vision = world.TrackVision(tank);
+        Assert.False(vision.IsVisible(nest.Centre));
+        Assert.True(vision.IsVisible(Centre + new Offset(11, 0)));
+        var danger = Assert.Single(Dangers(world, tank));
+        Assert.Equal(nest.Centre, danger.Centre);
+        Assert.Equal(6, Emitted(world).Rings.Count);
+    }
+
+    /// <summary>
+    /// The report this guards: a tank in a tunnel beside a generated lump sees the lump's face (and the radar's square
+    /// echo of the nest) but not the deposit's first cell, which is the nest's centre, and so never got the ring.
+    /// </summary>
+    [Fact]
+    public void ALumpSeenFromATunnelBesideIt_ShowsItsNestRing()
+    {
+        var world = Emberward.Core.Match.MatchSetup.Build(new Size(320, 200), TestHelpers.DefaultSeed,
+            Emberward.Core.Match.MatchRules.Standard with { Emberites = true, TerrainRegrowth = false });
+        var lump = world.OreDeposits.First(d => d.Kind == Emberward.Core.LevelGen.OreDepositKind.Lump);
+        int nestIndex = Enumerable.Range(0, world.Emberites!.Nests.Count).Single(i => world.Emberites.Nests[i].Centre == lump.Center);
+        // A tunnel running past the lump 12 cells from its centre.
+        int tunnelY = lump.Center.Y + 12;
+        for (int x = lump.Center.X - 30; x <= lump.Center.X + 30; x++)
+            for (int y = tunnelY - 3; y <= tunnelY + 3; y++)
+                if (Pixel.IsSoil(world.Terrain.GetPixelRaw(new Position(x, y))))
+                    world.Terrain.SetPixel(new Position(x, y), TerrainPixel.Blank);
+        var tank = world.TankList.Tanks[0];
+        tank.Position = new Position(lump.Center.X, tunnelY);
+        var vision = world.TrackVision(tank);
+
+        Tick(world, tank, 3);
+
+        Assert.False(vision.IsVisible(lump.Center));
+        Assert.True(OreInSight(world, vision, lump.Center), "the tank should see some of the lump");
+        Assert.Contains(Dangers(world, tank), d => d.Centre == world.Emberites.Nests[nestIndex].Centre);
+    }
+
+    private static bool OreInSight(World world, Emberward.Core.Sensing.VisionMap vision, Position around)
+    {
+        for (int y = -12; y <= 12; y++)
+            for (int x = -12; x <= 12; x++)
+            {
+                var cell = around + new Offset(x, y);
+                if (vision.IsVisible(cell) && Pixel.IsOre(world.Terrain.GetPixelRaw(cell)))
+                    return true;
+            }
+        return false;
+    }
 }

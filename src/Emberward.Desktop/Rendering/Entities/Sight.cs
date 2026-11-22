@@ -14,4 +14,8 @@ public static class Sight
         vision == null || vision.IsVisible(new Position((int)MathF.Floor(x), (int)MathF.Floor(y)));
 
     public static bool Sees(VisionMap? vision, Position cell) => vision == null || vision.IsVisible(cell);
+
+    /// <summary>True without fog or when any of the ground within <paramref name="radius"/> of <paramref name="centre"/> is in sight (a nest).</summary>
+    public static bool SeesAny(VisionMap? vision, Position centre, int radius) =>
+        vision == null || vision.IsAnyVisibleWithin(centre, radius);
 }
