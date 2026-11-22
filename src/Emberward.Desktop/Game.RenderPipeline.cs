@@ -69,7 +69,6 @@ public partial class Game
                 _terrainView, visibleRect, steppedSinceRender, visualTime, sightChanged);
 
             _drawProfile.ScreenHiResTerrain += hiResWatch.Elapsed;
-            double terrainMs = hiResWatch.Elapsed.TotalMilliseconds;
 
             hiResWatch.Restart();
             int tankHeatGlowCount = 0;
@@ -94,8 +93,7 @@ public partial class Game
                 TerrainAux: terrainAux.Upload,
                 NativeContinuous: new NativeContinuousUpload(
                     SourcePixels: _worldPixels,
-                    SourceChanged: _worldPixelsChanged,
-                    SampleCount: _renderViewState.NativeContinuousSampleCount),
+                    SourceChanged: _worldPixelsChanged),
                 Entities: new EntityLayerUpload(
                     Vertices: _entityLayer.Vertices,
                     VertexCount: _entityLayer.VertexCount),
@@ -106,12 +104,6 @@ public partial class Game
             _worldPixelsChanged = false;
             _terrainAuxUploader.Commit(_world.Terrain, terrainAux);
             _drawProfile.ScreenUpload += hiResWatch.Elapsed;
-            double uploadMs = hiResWatch.Elapsed.TotalMilliseconds;
-
-            DrawProfile.Measure(ref _drawProfile.ScreenQualityAdjust, () =>
-            {
-                _renderViewState.UpdateNativeContinuousQuality(terrainMs + uploadMs);
-            });
         });
 
         DrawProfile.Measure(ref _drawProfile.ScreenClearFrame, () =>

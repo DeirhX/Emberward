@@ -1,17 +1,25 @@
 namespace Emberward.Desktop;
 
 using System.Globalization;
+using Emberward.Desktop.Rendering;
 
 internal sealed class PerfCaptureSession
 {
     private readonly PerfCaptureOptions? _options;
     private readonly List<double> _frameMs;
+    private readonly List<double> _swapchainWaitMs;
+    private readonly List<double> _submitMs;
+    private readonly List<double> _gpuMs;
     private int _framesSeen;
 
     private PerfCaptureSession(PerfCaptureOptions? options)
     {
         _options = options;
-        _frameMs = options is PerfCaptureOptions o ? new List<double>(o.MeasureFrames) : [];
+        int capacity = options is PerfCaptureOptions o ? o.MeasureFrames : 0;
+        _frameMs = new List<double>(capacity);
+        _swapchainWaitMs = new List<double>(capacity);
+        _submitMs = new List<double>(capacity);
+        _gpuMs = new List<double>(capacity);
     }
 
     public static PerfCaptureSession Create(PerfCaptureOptions? options)
@@ -27,19 +35,26 @@ internal sealed class PerfCaptureSession
         return new PerfCaptureSession(normalized);
     }
 
-    public bool Capture(TimeSpan totalFrame)
+    /// <param name="render">Where the frame's render waited (<see cref="IGameRenderBackend.LastFrameTiming"/>).</param>
+    public bool Capture(TimeSpan totalFrame, RenderTiming render)
     {
         if (_options is not PerfCaptureOptions perf)
             return false;
 
         _framesSeen++;
         if (_framesSeen > perf.WarmupFrames)
+        {
             _frameMs.Add(totalFrame.TotalMilliseconds);
+            _swapchainWaitMs.Add(render.SwapchainWaitMs);
+            _submitMs.Add(render.SubmitMs);
+            _gpuMs.Add(render.GpuMs);
+        }
 
         return _frameMs.Count >= perf.MeasureFrames;
     }
 
-    public void ReportIfEnabled()
+    /// <param name="windowHidden">The run never showed its window, so the OS may hold back its presents.</param>
+    public void ReportIfEnabled(bool windowHidden = false)
     {
         if (_options is not PerfCaptureOptions perf || _frameMs.Count == 0)
             return;
@@ -60,6 +75,20 @@ internal sealed class PerfCaptureSession
         Console.WriteLine(
             $"[Perf] frames={_frameMs.Count} warmup={perf.WarmupFrames} avg={avg:F3}ms " +
             $"p50={p50:F3}ms p95={p95:F3}ms p99={p99:F3}ms min={min:F3}ms max={max:F3}ms");
+        // The frame time above includes waiting on the display. These say where: the GPU's own time is what the
+        // shaders cost, and a long swapchain wait or submit with a short GPU time is the OS holding presents back.
+        // Waiting for the GPU every frame stops the CPU queueing the next one meanwhile, so a GPU-bound frame time reads
+        // higher here than in play, and higher than captures made before the split.
+        ReportPart("swapchainWait", _swapchainWaitMs);
+        ReportPart("submit", _submitMs);
+        ReportPart("gpu", _gpuMs);
+        var cpuMs = new List<double>(_frameMs.Count);
+        for (int i = 0; i < _frameMs.Count; i++)
+            cpuMs.Add(Math.Max(0, _frameMs[i] - _swapchainWaitMs[i] - _submitMs[i] - _gpuMs[i]));
+        ReportPart("cpu", cpuMs);
+        if (windowHidden)
+            Console.WriteLine("[Perf] The window was hidden: the OS may throttle its presents, so frame times can be far " +
+                "above the work done. Read the gpu and cpu lines, or capture with the window shown and the display on.");
 
         if (perf.CsvPath is null)
             return;
@@ -70,10 +99,23 @@ internal sealed class PerfCaptureSession
             Directory.CreateDirectory(dir);
 
         using var writer = new StreamWriter(fullPath, false);
-        writer.WriteLine("frame,ms");
+        writer.WriteLine("frame,ms,swapchainWaitMs,submitMs,gpuMs");
         for (int i = 0; i < _frameMs.Count; i++)
-            writer.WriteLine($"{i},{_frameMs[i].ToString("F6", CultureInfo.InvariantCulture)}");
+            writer.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"{i},{_frameMs[i]:F6},{_swapchainWaitMs[i]:F6},{_submitMs[i]:F6},{_gpuMs[i]:F6}"));
         Console.WriteLine($"[Perf] wrote csv: {fullPath}");
+    }
+
+    private static void ReportPart(string name, List<double> samples)
+    {
+        double[] sorted = samples.ToArray();
+        Array.Sort(sorted);
+        double sum = 0;
+        foreach (double ms in sorted)
+            sum += ms;
+        Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"[Perf]   {name}: avg={sum / Math.Max(1, sorted.Length):F3}ms p50={Percentile(sorted, 0.50):F3}ms " +
+            $"p95={Percentile(sorted, 0.95):F3}ms max={(sorted.Length > 0 ? sorted[^1] : 0):F3}ms"));
     }
 
     private static double Percentile(double[] sorted, double p)

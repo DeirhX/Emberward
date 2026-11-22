@@ -64,7 +64,7 @@ while running:
            scripted commands -> keyboard / scripted input for the local slot, a BotTankAI per other slot -> World.Advance
          EntityLayerBuilder.CaptureStep    (tank, projectile, machine and link snapshot for the entity layer)
          GameAudio.AfterStep               (SoundDirector plays the step's World.StepEvents, sets the loops)
-         GameHud.AfterStep                 (GameEventWatcher counts the ore harvesters banked this step)
+         GameHud.AfterStep                 (GameEventWatcher hands the step's events to its watches)
          TerrainAuxUploader.ObserveTerrainChanges (changed cells, to repack on the next frame)
          Game.DrawTerrainChangesToSurface  (incremental update of the world pixel buffer)
            with fog of war both follow the cells the player's VisionMap says changed in the terrain
@@ -182,11 +182,14 @@ updates it after each step on the match's time (`BrowserSession.HudSeconds`) and
   stay on the network, power from hot rock, harvester, relay beside it, power for it, frost). Each step knows from the world
   when it is done, so a player who acts early skips ahead; explainer steps also finish after a few seconds on screen.
   A step can name a world cell to point at.
-- `GameEventWatcher` compares the player's side of the world with the previous frame and posts toasts to a
-  `NotificationFeed` (relay linked or lost, harvester started, stalled or out of charge, ore
-  store full, charge low, off network, radar scattered by heat, engine running, harvester ore deliveries, the first pyrite banked). The
-  deliveries are counted from `StepEventKind.OreHarvested` after every step (`AfterStep`), not from the store, so a
-  tank unloading in the same frame is not mistaken for them. The feed de-duplicates by key with a cooldown.
+- `GameEventWatcher` posts toasts to a `NotificationFeed` through one watch per system in `Guidance/Events`
+  (`IEventWatch`): base attacks, upgrades, the sector goal, the network (relays linking or lost, harvesters started,
+  stalled or out of charge, off network), the base's power (heat store, low charge, engine), ore (first ore, first pyrite banked,
+  full hold, full store, harvester deliveries), radar scattered by heat, and nests. Each watch compares its system's state with
+  the previous frame and hears the step's events (`AfterStep`); harvester deliveries are counted from
+  `StepEventKind.OreHarvested`, not from the store, so a tank unloading in the same frame is not mistaken for them. A
+  new system's toasts are a new watch and a line in the watcher's list; retiring a system deletes both. The feed
+  de-duplicates by key with a cooldown.
 - `HintSelector` picks the one context hint for the build keys (what E will do now, or why a carried machine will not
   plant), and `PlayerWarnings` the one warning banner, most urgent first (overheating, frostbite, chilled, low shield,
   running hot, the respawn shield, and after the first hit a tip about the thermal view where the host has one).

@@ -18,13 +18,6 @@ public static class DesktopScreenTweaks
     /// by eye if motion looks to run ahead of or behind the tank's input.
     /// </summary>
     public const float MotionLead = 1f;
-    public const int NativeContinuousSampleLow = 1;
-    public const int NativeContinuousSampleMedium = 2;
-    public const int NativeContinuousSampleHigh = 4;
-    public const float NativeContinuousRenderBudgetMs = 5.0f;
-    public const int NativeContinuousBudgetHysteresisFrames = 10;
-    public const float NativeContinuousBudgetUnderThreshold = 0.65f;
-    public const int NativeContinuousRecoveryFramesMultiplier = 20;
     public const int HeatAuxUpdateIntervalFrames = 2;
 
     /// <summary>

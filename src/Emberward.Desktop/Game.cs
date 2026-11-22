@@ -107,6 +107,7 @@ public partial class Game : IDisposable
 
         var sdlGpuBackend = new SdlGpuBackend(_renderer.NativeWindow);
         _renderBackend = sdlGpuBackend;
+        _renderBackend.MeasureGpuTime = perfCapture is not null;
         _textures = new SdlGpuTextureLoader(sdlGpuBackend);
         if (!DesktopDisplayOptions.Hidden)
             DrawStartupSplash();
@@ -222,11 +223,11 @@ public partial class Game : IDisposable
                     if (_drawProfile.FrameCount >= 100)
                         _drawProfile.Report();
 
-                    if (_perfSession.Capture(elapsed))
+                    if (_perfSession.Capture(elapsed, _renderBackend.LastFrameTiming))
                         _isRunning = false;
                 });
 
-            _perfSession.ReportIfEnabled();
+            _perfSession.ReportIfEnabled(windowHidden: DesktopDisplayOptions.Hidden);
         }
         finally
         {

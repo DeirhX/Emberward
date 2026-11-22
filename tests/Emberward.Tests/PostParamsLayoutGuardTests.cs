@@ -56,7 +56,7 @@ public partial class PostParamsLayoutGuardTests
             ["MaterialScorchedR", "MaterialScorchedG", "MaterialScorchedB", "MaterialScorchedStrength"],
         ["MaterialEmissivePulse"] = ["MaterialPulseFreq", "MaterialPulseMin", "MaterialPulseRange", "MaterialPulsePad"],
         ["NativeContinuousParams"] =
-            ["NativeSmoothingEnabled", "_padReserved5", "NativeSampleFactor", "NativeCurvingEnabled"],
+            ["NativeSmoothingEnabled", "_padReserved5", "_padReserved6", "NativeCurvingEnabled"],
         ["LightDir"] = ["LightDirX", "LightDirY", "LightDirZ", "LightNormalStrength"],
         ["HalfVector"] = ["HalfVecX", "HalfVecY", "HalfVecZ", "LightMicroNormalStrength"],
         ["LightParams"] = ["LightAmbient", "LightDiffuseWeight", "LightShininess", "LightSpecularIntensity"],

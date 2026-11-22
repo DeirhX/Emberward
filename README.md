@@ -100,7 +100,7 @@ Run `Emberward.Desktop --help` for the full list. The common ones:
 | `--mute` | Start with the sound off; `EMBERWARD_MUTE=1` does the same |
 | `--hidden` | Never show the window (automated runs) |
 | `--terrain-test` | Static terrain patterns for renderer work |
-| `--perf` | Capture frame times and exit |
+| `--perf` | Capture frame times and exit, split into swapchain wait, submit, GPU and CPU time (it waits for the GPU each frame, so GPU-bound frames read higher than in play) |
 | `--energy-audit` | Print the heat energy balance with the simulation profile (it sums the whole map, so it is off by default) |
 | `--dump-sounds=DIR` | Write every sound effect to a WAV file in DIR, print its length and levels, and exit |
 

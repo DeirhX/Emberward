@@ -100,6 +100,31 @@ public class GuidanceTests
     }
 
     [Fact]
+    public void Events_StateSeenBeforePrimingOrWhileQuiet_IsNotToldLate()
+    {
+        // Already off the network on the first frame: that frame only records it.
+        var s = RelayHeatTests.CreateScenario();
+        s.Tank.Position = s.Base.Position + new Offset(0, s.DirY * 80);
+        Advance(s, 2);
+        Assert.True(s.Tank.IsOffNetwork);
+        var feed = new NotificationFeed();
+        var events = new GameEventWatcher();
+        events.Update(s.World, s.Tank, feed, 0f);
+        Assert.Empty(feed.Active);
+
+        // Left while the tutorial kept quiet: once it speaks, the tank is still out, but that is not news.
+        s = RelayHeatTests.CreateScenario();
+        feed = new NotificationFeed();
+        events = new GameEventWatcher();
+        events.Update(s.World, s.Tank, feed, 0f, introQuiet: true);
+        s.Tank.Position = s.Base.Position + new Offset(0, s.DirY * 80);
+        Advance(s, 2);
+        events.Update(s.World, s.Tank, feed, 1f, introQuiet: true);
+        events.Update(s.World, s.Tank, feed, 2f, introQuiet: false);
+        Assert.DoesNotContain(feed.Active, n => n.Key == "off-network");
+    }
+
+    [Fact]
     public void Tutorial_CanBeSkipped()
     {
         var s = RelayHeatTests.CreateScenario();

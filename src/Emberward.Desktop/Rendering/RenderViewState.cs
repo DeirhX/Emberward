@@ -6,9 +6,6 @@ using Emberward.Desktop.Gui;
 
 public sealed class RenderViewState
 {
-    private int _nativeOverBudgetFrames;
-    private int _nativeUnderBudgetFrames;
-
     /// <summary>Size of the game view in device pixels.</summary>
     public Size HiResSize { get; private set; }
     /// <summary>Camera position of the view's top-left corner, in device pixels.</summary>
@@ -16,7 +13,6 @@ public sealed class RenderViewState
     public int CamPixelY { get; private set; }
     /// <summary>How far the camera moves in one simulation step (device pixels); see <see cref="RenderView.CameraMotion"/>.</summary>
     public PositionF CamMotion { get; private set; }
-    public int NativeContinuousSampleCount { get; private set; } = DesktopScreenTweaks.NativeContinuousSampleHigh;
 
     /// <summary>Device pixels per point of the window: 2 on Retina, 1 on a standard display.</summary>
     public float PixelDensity { get; private set; } = 1f;
@@ -111,46 +107,5 @@ public sealed class RenderViewState
     {
         CamPixelX = Math.Clamp(CamPixelX, -viewW / 2, worldPixelW - viewW / 2);
         CamPixelY = Math.Clamp(CamPixelY, -viewH / 2, worldPixelH - viewH / 2);
-    }
-
-    public void UpdateNativeContinuousQuality(double frameMs)
-    {
-        float budget = DesktopScreenTweaks.NativeContinuousRenderBudgetMs;
-        int hysteresis = DesktopScreenTweaks.NativeContinuousBudgetHysteresisFrames;
-        if (frameMs > budget)
-        {
-            _nativeOverBudgetFrames++;
-            _nativeUnderBudgetFrames = 0;
-        }
-        else if (frameMs < budget * DesktopScreenTweaks.NativeContinuousBudgetUnderThreshold)
-        {
-            _nativeUnderBudgetFrames++;
-            _nativeOverBudgetFrames = 0;
-        }
-        else
-        {
-            _nativeOverBudgetFrames = 0;
-            _nativeUnderBudgetFrames = 0;
-        }
-
-        if (_nativeOverBudgetFrames >= hysteresis && NativeContinuousSampleCount > DesktopScreenTweaks.NativeContinuousSampleLow)
-        {
-            NativeContinuousSampleCount = NativeContinuousSampleCount >= DesktopScreenTweaks.NativeContinuousSampleHigh
-                ? DesktopScreenTweaks.NativeContinuousSampleMedium
-                : DesktopScreenTweaks.NativeContinuousSampleLow;
-            _nativeOverBudgetFrames = 0;
-            _nativeUnderBudgetFrames = 0;
-            Console.WriteLine($"[Render] Native continuous sample count reduced to {NativeContinuousSampleCount}");
-        }
-        else if (_nativeUnderBudgetFrames >= hysteresis * DesktopScreenTweaks.NativeContinuousRecoveryFramesMultiplier &&
-                 NativeContinuousSampleCount < DesktopScreenTweaks.NativeContinuousSampleHigh)
-        {
-            NativeContinuousSampleCount = NativeContinuousSampleCount <= DesktopScreenTweaks.NativeContinuousSampleLow
-                ? DesktopScreenTweaks.NativeContinuousSampleMedium
-                : DesktopScreenTweaks.NativeContinuousSampleHigh;
-            _nativeOverBudgetFrames = 0;
-            _nativeUnderBudgetFrames = 0;
-            Console.WriteLine($"[Render] Native continuous sample count increased to {NativeContinuousSampleCount}");
-        }
     }
 }

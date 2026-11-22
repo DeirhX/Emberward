@@ -1,64 +1,43 @@
 namespace Emberward.Desktop.Gui.Guidance;
 
 using Emberward.Core;
-using Emberward.Core.Config;
-using Emberward.Core.Entities.Machines;
-using Emberward.Core.Match;
 using Emberward.Core.Entities.Tanks;
-using Emberward.Core.Entities.Bases;
 using Emberward.Core.Types;
-using Emberward.Desktop.Presentation;
+using Emberward.Desktop.Gui.Guidance.Events;
 
 /// <summary>
-/// Watches the player's side of the world from frame to frame and posts a toast when something changes that the
-/// player should know about: a relay linking or losing its link, a harvester starting, stalling or running dry, the
-/// base stores filling up, charge running low, leaving the network. It only reads Core state. What happens inside a
-/// step (harvesters banking ore) it counts from <see cref="World.StepEvents"/> in <see cref="AfterStep"/>.
+/// Posts a toast when something happens on the player's side that the player should know about. Each system has its
+/// own watch in <c>Guidance/Events</c> (base attacks, upgrades, the sector goal, the network, the base's power, ore,
+/// radar, nests); this holds them in the order their toasts stack within a frame. A new system's notifications are a
+/// new watch and a line in <see cref="_watches"/>; retiring a system deletes its watch and that line. It only reads
+/// Core state. What happens inside a step a watch hears from <see cref="World.StepEvents"/> in <see cref="AfterStep"/>.
 /// </summary>
 public sealed class GameEventWatcher
 {
+    private readonly BaseAttackWatch _baseAttack = new();
+    private readonly IEventWatch[] _watches;
     private bool _primed;
-    private int _poweredRelays;
-    private int _harvesters;
-    private int _stalledHarvesters;
-    private int _dryHarvesters;
-    private bool _storeFull;
-    private bool _heatStoreFull;
-    private bool _chargeLow;
-    private bool _offNetwork;
-    private bool _engineRunning;
-    private bool _radarScattered;
-    private bool _holdingOre;
-    private bool _oreHoldFull;
-    private readonly int[] _upgradeLevels = new int[BaseUpgrades.Count];
-    private int _upgradeRefused;
-    private bool _tappingCore;
-    private bool _meetingGoal;
-    private bool _tappedCore;
-    private int _harvestedSinceReport;
-    private bool _nestExplained;
-    private readonly List<Position> _nestsWoke = new();
-    private readonly List<Position> _nestsStarved = new();
-    private float _lastHarvestReport;
-    private int _baseHits;
-    private bool _baseShieldBroken;
-    private bool _baseCoreHit;
-    private bool _baseDestroyed;
-    private bool _depositTold;
-    private int _depositUnits;
-    private int _stepsSinceDeposit;
 
-    /// <summary>
-    /// Steps without a deposit after which the player's first bank counts as done and is told: the HUD's join window,
-    /// well past a relay's unit interval, so a relay visit is told once, with its total.
-    /// </summary>
-    private const int DepositSettleSteps = OreLedgerView.JoinSteps;
+    public GameEventWatcher()
+    {
+        _watches =
+        [
+            _baseAttack,
+            new UpgradeWatch(),
+            new SectorGoalWatch(),
+            new NetworkWatch(),
+            new BasePowerWatch(),
+            new OreWatch(),
+            new RadarWatch(),
+            new NestWatch(),
+        ];
+    }
 
     /// <summary>When the player's base last took enemy fire, in HUD seconds; negative before the first hit.</summary>
-    public float LastBaseHitTime { get; private set; } = -1e9f;
+    public float LastBaseHitTime => _baseAttack.LastHitTime;
 
     /// <summary>Where the last enemy bullet struck the player's base.</summary>
-    public Position LastBaseHitAt { get; private set; }
+    public Position LastBaseHitAt => _baseAttack.LastHitAt;
 
     /// <summary>How long after a hit the base counts as under attack.</summary>
     public const float UnderAttackSeconds = 3f;
@@ -71,50 +50,23 @@ public sealed class GameEventWatcher
     public void Reset()
     {
         _primed = false;
-        _harvestedSinceReport = 0;
-        _baseHits = 0;
-        _baseDestroyed = false;
-        _baseShieldBroken = false;
-        _baseCoreHit = false;
-        LastBaseHitTime = -1e9f;
-        _nestExplained = false;
-        _nestsWoke.Clear();
-        _nestsStarved.Clear();
-        _depositTold = false;
-        _depositUnits = 0;
+        foreach (IEventWatch watch in _watches)
+            watch.Reset();
     }
 
     /// <summary>
-    /// Call after each simulation step, while <see cref="World.StepEvents"/> still holds that step's events: counts
-    /// the ore the player's harvesters banked, however many steps a displayed frame runs.
+    /// Call after each simulation step, while <see cref="World.StepEvents"/> still holds that step's events, however
+    /// many steps a displayed frame runs.
     /// </summary>
     public void AfterStep(World world, Tank player)
     {
-        _stepsSinceDeposit++;
+        ArgumentNullException.ThrowIfNull(world);
+        ArgumentNullException.ThrowIfNull(player);
+        foreach (IEventWatch watch in _watches)
+            watch.OnStep();
         foreach (ref readonly StepEvent e in world.StepEvents)
-        {
-            if (e.Kind == StepEventKind.OreHarvested && e.Color == player.Color)
-                _harvestedSinceReport += e.Count;
-            else if (e.Kind == StepEventKind.OreUnloaded && e.Color == player.Color && !_depositTold)
-            {
-                _depositUnits += e.Count;
-                _stepsSinceDeposit = 0;
-            }
-            else if (e.Color == player.Color && e.Kind is StepEventKind.BaseDamaged or StepEventKind.BaseDestroyed or StepEventKind.BaseShieldHit
-                or StepEventKind.BaseShieldBroken)
-            {
-                _baseHits++;
-                _baseShieldBroken |= e.Kind == StepEventKind.BaseShieldBroken;
-                _baseCoreHit |= e.Kind is StepEventKind.BaseDamaged or StepEventKind.BaseDestroyed;
-                LastBaseHitAt = e.Position;
-                _baseDestroyed |= e.Kind == StepEventKind.BaseDestroyed;
-            }
-            else if (e.Kind == StepEventKind.NestWoke && NestAlert.Covers(world, player, e.Position))
-                _nestsWoke.Add(e.Position);
-            // The last creature of a nest starved (a count of 0): told to whoever has the nest in sight.
-            else if (e.Kind == StepEventKind.EmberiteStarved && e.Count == 0 && world.TrackVision(player).IsVisible(e.Position))
-                _nestsStarved.Add(e.Position);
-        }
+            foreach (IEventWatch watch in _watches)
+                watch.OnStepEvent(world, player, in e);
     }
 
     /// <param name="introQuiet">
@@ -123,193 +75,14 @@ public sealed class GameEventWatcher
     /// </param>
     public void Update(World world, Tank player, NotificationFeed feed, float now, bool introQuiet = false)
     {
-        var home = player.Base;
-        if (home == null)
+        ArgumentNullException.ThrowIfNull(world);
+        ArgumentNullException.ThrowIfNull(player);
+        if (player.Base is not { } home)
             return;
 
-        var network = world.GetNetworkStatus(home);
-        int poweredRelays = network.PoweredRelays, harvesters = network.Harvesters;
-        int stalled = network.HarvestersTooHot, dry = network.HarvestersOutOfCharge;
-
-        int store = home.Store.Ore;
-        bool storeFull = home.Store.IsFull;
-        bool heatStoreFull = network.HeatStoreLevel == StatusLevel.Bad;
-        bool chargeLow = home.Charge < home.ChargeCapacity * 0.1 && harvesters > 0;
-        bool offNetwork = player.IsOffNetwork;
-        bool engineRunning = home.IsEngineRunning;
-        bool radarScattered = !player.IsDead && world.RadarOf(player) is { HeatLoss: >= RadarScatteredShare };
-        bool holdingOre = player.OreHeld > 0;
-        bool oreHoldFull = player.IsOreHoldFull;
-
-        CoreTap? core = world.CoreTapOf(home);
-        bool tappingCore = core?.TapPerSecond > 1.0;
-        bool meetingGoal = core?.IsMeetingGoal == true;
-
-        // The first pyrite the player banks this match, once the bank is done: what the store is for.
-        if (!_depositTold && _depositUnits > 0 && _stepsSinceDeposit > DepositSettleSteps)
-        {
-            _depositTold = true;
-            feed.Post(now, "first-deposit", string.Create(System.Globalization.CultureInfo.InvariantCulture,
-                    $"Pyrite banked: +{_depositUnits} (base {store:N0})"),
-                "The base store pays for what you build inside the network. Touch the core or a powered relay to unload.",
-                NotificationKind.Good, cooldown: 1e9f);
-        }
-
-        if (_baseHits > 0)
-        {
-            LastBaseHitTime = now;
-            if (_baseDestroyed)
-                feed.Post(now, "base-destroyed", "Your base was destroyed",
-                    "Without a base your tank cannot respawn.", NotificationKind.Danger, cooldown: 1e9f);
-            else
-                // The gates-open warning has its own key, so it is not held back by the shield-taking one.
-                feed.Post(now, _baseShieldBroken ? "base-gates-open" : "base-attacked", "Your base is under attack",
-                    _baseShieldBroken
-                        ? "Its gate shield is spent and the gates stand open. Drive off the attacker and keep the base charged."
-                        : _baseCoreHit
-                            ? "Shells are reaching its core. Drive off the attacker."
-                            : "Its gate shield is taking the hits and drains as it does. Defend it, and keep it charged.",
-                    NotificationKind.Danger, cooldown: 12f);
-            _baseHits = 0;
-            _baseShieldBroken = false;
-            _baseCoreHit = false;
-        }
-
-        if (!_primed)
-        {
-            _primed = true;
-            _lastHarvestReport = now;
-            for (int i = 0; i < BaseUpgrades.Count; i++)
-                _upgradeLevels[i] = home.Upgrades.Level((BaseUpgrade)i);
-            _tappedCore = core?.HasTapped == true;
-        }
-        else
-        {
-            for (int i = 0; i < BaseUpgrades.Count; i++)
-            {
-                int level = home.Upgrades.Level((BaseUpgrade)i);
-                if (level > _upgradeLevels[i])
-                {
-                    var (name, effect) = BaseUpgrades.Describe((BaseUpgrade)i);
-                    feed.Post(now, $"upgrade-{i}-{level}", $"{name} upgraded to level {level}", effect, NotificationKind.Good, cooldown: 0f);
-                }
-                _upgradeLevels[i] = level;
-            }
-            if (player.UpgradeRefusedTicks > _upgradeRefused)
-                feed.Post(now, "upgrade-refused", "Can't buy that upgrade", player.LastUpgradeRefusal switch
-                {
-                    UpgradeRefusal.NotDocked => "Upgrades are bought while docked at your base.",
-                    UpgradeRefusal.Maxed => "That upgrade is already at its top level.",
-                    _ => "Not enough ore in the base store. Bring ore to the core or a relay, or let harvesters mine it.",
-                }, NotificationKind.Warning, cooldown: 2f);
-
-            if (tappingCore && !_tappingCore)
-                feed.Post(now, "core-tap", "Tapping the core",
-                    $"Your relays by the core make charge. Reach {Tweaks.Goal.GoalChargePerSecond / 1000:0}k/s and hold it for {Tweaks.Goal.GoalHoldSeconds:0} s.",
-                    NotificationKind.Good, cooldown: 60f);
-            if (meetingGoal && !_meetingGoal)
-                feed.Post(now, "core-goal", "Core tap at the goal rate",
-                    "Keep it there: the hold timer is running. Falling short drains it.", NotificationKind.Good, cooldown: 30f);
-            if (core?.HasTapped == true && !_tappedCore)
-                feed.Post(now, "sector-complete", "Sector complete", "The core is tapped.", NotificationKind.Good,
-                    duration: 12f, cooldown: 1e9f);
-
-            if (poweredRelays > _poweredRelays)
-                feed.Post(now, "relay-linked", "Relay linked",
-                    "It pumps heat home whenever the ground around it is warm, and widens your network.", NotificationKind.Good, cooldown: 4f);
-            else if (poweredRelays < _poweredRelays)
-                feed.Post(now, "relay-lost", "Relay lost its link",
-                    "Something blocks its line to the network. Dig the line clear or plant a relay closer.", NotificationKind.Warning);
-
-            if (harvesters > _harvesters)
-                feed.Post(now, "harvester-planted", "Harvester working",
-                    "Inside your network it mines the ore around it into your base store. Keep it cool and charged.", NotificationKind.Good, cooldown: 4f);
-            if (stalled > _stalledHarvesters)
-                feed.Post(now, "harvester-stalled", "Harvester stalled: too hot",
-                    "Mining heats the ground. A linked relay near it pumps that heat away.", NotificationKind.Warning);
-            if (dry > _dryHarvesters)
-                feed.Post(now, "harvester-dry", "Harvester out of charge",
-                    "It runs on your base's charge where your network covers it. Put a relay by hot rock to make more.",
-                    NotificationKind.Danger);
-
-            if (storeFull && !_storeFull)
-                feed.Post(now, "store-full", "Base ore store full",
-                    "Harvesters idle until you spend ore: dock and buy upgrades (1-7) or build machines.", NotificationKind.Warning);
-            if (heatStoreFull && !_heatStoreFull)
-                feed.Post(now, "heat-full", "Base heat store nearly full",
-                    "Relays and docking cool less until the radiator catches up.", NotificationKind.Warning);
-            if (chargeLow && !_chargeLow)
-                feed.Post(now, "charge-low", "Base charge low",
-                    "Machines stop when it runs out. Put a relay by hot rock to make more.", NotificationKind.Danger);
-            if (offNetwork && !_offNetwork && !introQuiet)
-                feed.Post(now, "off-network", "Off network",
-                    "Your tank heats up out here. Head back inside the pale circles, or extend the network with a relay.",
-                    NotificationKind.Warning, cooldown: 90f);
-            if (radarScattered && !_radarScattered && !introQuiet)
-                feed.Post(now, "radar-heat", "Radar scattered by heat",
-                    "Hot ground swallows the pulse: red dots show how far it got. Cool that ground to see past it.",
-                    NotificationKind.Warning, cooldown: 60f);
-            // Once each per match: the first ore in the hold, and the first time the hold fills.
-            if (holdingOre && !_holdingOre)
-                feed.Post(now, "ore-collected", "Pyrite collected",
-                    "Ore rides in your hold (MATERIALS) and heats the tank, hard from 20. Touch your base's core, or a relay, to bank it; if you die, it spills where you fall.",
-                    NotificationKind.Good, cooldown: 1e9f);
-            if (oreHoldFull && !_oreHoldFull)
-                feed.Post(now, "ore-hold-full", "Ore hold full",
-                    $"The hold takes {player.OreHoldCapacity}, and a full load cooks the tank. Touch your core or a relay to bank it before you dig more ore.",
-                    NotificationKind.Warning, cooldown: 1e9f);
-            if (engineRunning && !_engineRunning)
-                feed.Post(now, "engine-running", "Base engine making charge",
-                    "Relay heat is being turned into charge. Hotter sources make more.", NotificationKind.Good, cooldown: 120f);
-
-            if (_harvestedSinceReport > 0 && now - _lastHarvestReport >= 20f)
-            {
-                feed.Post(now, "harvested", $"Harvesters delivered +{_harvestedSinceReport} ore",
-                    $"Base ore store {store}.", NotificationKind.Good, cooldown: 0f);
-                _harvestedSinceReport = 0;
-                _lastHarvestReport = now;
-            }
-        }
-
-        // A nest the player's side can see or read on its radar woke: no tank or side is named. The first time says what
-        // emberites are; after that, a short alert for each nest, not repeated for the same one for a while.
-        foreach (Position nest in _nestsWoke)
-        {
-            if (!_nestExplained)
-            {
-                _nestExplained = true;
-                feed.Post(now, "nest-woke", "A nest woke: emberites",
-                    "They hunt hot tanks and come in waves: the nest flares before each, and the hotter you run the bigger it is. Clear a nest to free its ore.",
-                    NotificationKind.Danger, cooldown: 1e9f);
-            }
-            else
-            {
-                feed.Post(now, $"nest-woke-{nest.X}-{nest.Y}", "A nest woke nearby", "Emberites are out. Cool down or find cover.",
-                    NotificationKind.Danger, cooldown: 20f);
-            }
-        }
-        _nestsWoke.Clear();
-
-        foreach (Position nest in _nestsStarved)
-            feed.Post(now, $"nest-starved-{nest.X}-{nest.Y}", "A nest starved", "No heat was left for its emberites. Its ore is free.",
-                NotificationKind.Good, cooldown: 0f);
-        _nestsStarved.Clear();
-
-        _poweredRelays = poweredRelays;
-        _harvesters = harvesters;
-        _stalledHarvesters = stalled;
-        _dryHarvesters = dry;
-        _storeFull = storeFull;
-        _heatStoreFull = heatStoreFull;
-        _chargeLow = chargeLow;
-        _offNetwork = offNetwork;
-        _engineRunning = engineRunning;
-        _radarScattered = radarScattered;
-        _holdingOre = holdingOre;
-        _oreHoldFull = oreHoldFull;
-        _upgradeRefused = player.UpgradeRefusedTicks;
-        _tappingCore = tappingCore;
-        _meetingGoal = meetingGoal;
-        _tappedCore = core?.HasTapped == true;
+        var frame = new GuidanceFrame(world, player, home, world.GetNetworkStatus(home), feed, now, introQuiet, _primed);
+        foreach (IEventWatch watch in _watches)
+            watch.Update(in frame);
+        _primed = true;
     }
 }
