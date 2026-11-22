@@ -20,7 +20,7 @@ using Emberward.Relay;
 /// The real relay on a local port, with real WebSocket clients. These tests wait with generous limits, so they run
 /// beside the rest; those that time a connection closely are in <see cref="TimingSensitive"/>.
 /// </summary>
-public class RelayOverSocketsTests
+public partial class RelayOverSocketsTests
 {
     private static readonly Size MapSize = new(320, 200);
 
@@ -43,7 +43,10 @@ public class RelayOverSocketsTests
         return (app, new Uri($"ws://127.0.0.1:{http.Port}/play"));
     }
 
-    private static NetLaunchOptions Options(Uri play, string name) => new(play, "test-room", name, Players: 2);
+    /// <summary>The room the tests play in, unless they name another.</summary>
+    private const string RoomName = "test-room";
+
+    private static NetLaunchOptions Options(Uri play, string name) => new(play, RoomName, name, Players: 2);
 
     private static MatchConfig Config(int seed) =>
         NetMatch.ProposeConfig(seed, MapSize, Core.LevelGen.LevelGenMode.Deterministic, players: 2);
@@ -70,7 +73,7 @@ public class RelayOverSocketsTests
         await using var _ = app;
         using var first = NetLaunch.Join(Options(play, "Ann"), Config(seed: 42));
 
-        var otherBuild = new Hello(MessageCodec.ProtocolVersion, "some-other-build", "Eve", "test-room", Config(1));
+        var otherBuild = new Hello(MessageCodec.ProtocolVersion, "some-other-build", "Eve", RoomName, Config(1));
         var refused = Assert.Throws<RelayException>(
             () => RelayConnection.Connect(play, otherBuild, TimeSpan.FromSeconds(5)));
         Assert.Contains("some-other-build", refused.Message, StringComparison.Ordinal);
@@ -154,7 +157,7 @@ public class RelayOverSocketsTests
     }
 
     private static Hello HelloFor(string name) =>
-        new(MessageCodec.ProtocolVersion, NetMatch.BuildId, name, "test-room", Config(seed: 42));
+        new(MessageCodec.ProtocolVersion, NetMatch.BuildId, name, RoomName, Config(seed: 42));
 
     /// <summary>
     /// A relay that completes the handshake and says welcome, then never says anything again and does not answer
@@ -495,193 +498,6 @@ public class RelayOverSocketsTests
             // Everything so far, and at most the few ticks of the moments since: no stall to make up, no jump.
             Assert.InRange(caughtUp, seen, seen + 8);
             Assert.Null(back.Failure);
-        }
-    }
-
-    /// <summary>
-    /// The tests that play a match through the relay. The relay's clock is off (<see cref="RelayHub.RunsClocks"/>):
-    /// the test closes every tick itself, in lockstep with the clients (<see cref="PlayInLockstep"/>), so the match
-    /// they play is the same on every run, however slow the machine. They still wait on real sockets, so they run on
-    /// their own beside the other socket tests (<see cref="TimedTestGroup"/>).
-    /// </summary>
-    [Collection(TimedTestGroup.Name)]
-    [Trait("Category", "Slow")]
-    public class MatchPlayTests
-    {
-        /// <summary>
-        /// How long one message may take to go round between a client and the relay. Nothing waits for a rate or a
-        /// timer, so the limit only ends a test whose connection has stopped; it is long so that a loaded machine
-        /// never reaches it.
-        /// </summary>
-        private static readonly TimeSpan DeliveryLimit = TimeSpan.FromSeconds(30);
-
-        private const string Room = "test-room";
-
-        private static async Task<(WebApplication App, Uri Play, RelayHub Hub)> StartUnclockedRelayAsync()
-        {
-            var (app, play) = await StartRelayAsync();
-            var hub = app.Services.GetRequiredService<RelayHub>();
-            hub.RunsClocks = false;
-            return (app, play, hub);
-        }
-
-        private static void Wait(Func<bool> condition, params RelayConnection[] pump) =>
-            WaitFor(condition, pump, DeliveryLimit);
-
-        /// <summary>
-        /// Plays the match on to <paramref name="until"/> ticks, one tick at a time: a tick is closed only once every
-        /// client has stepped the ones before it (<paramref name="steppedTo"/>, which steps them) and every player still
-        /// connected has sent the relay its input for it. Each bundle then holds exactly one input from each player,
-        /// the same on every run, and no client can step past <paramref name="until"/>, because no later tick exists.
-        /// </summary>
-        private static void PlayInLockstep(MatchRoom room, int until, Func<int, bool> steppedTo, params RelayConnection[] pump)
-        {
-            for (int tick = room.TicksClosed; tick < until; tick++)
-            {
-                // A client sends an input after each step, so the first tick has none to wait for.
-                if (tick > 0)
-                {
-                    int closed = tick;
-                    Wait(() => steppedTo(closed) && room.HasInputFromEveryPlayer, pump);
-                }
-                room.CloseTicksUpTo(tick + 1);
-            }
-            Wait(() => steppedTo(until), pump);
-        }
-
-        [Fact]
-        public async Task TwoClients_PlayTheSameMatchThroughTheRelay()
-        {
-            var (app, play, hub) = await StartUnclockedRelayAsync();
-            await using var _ = app;
-            // The second client proposes another seed; the room's settings, from the first, win.
-            using var a = NetLaunch.Join(Options(play, "Ann"), Config(seed: 42));
-            using var b = NetLaunch.Join(Options(play, "Bob"), Config(seed: 77));
-            Assert.Equal((0, 1), (a.Slot, b.Slot));
-            Assert.Equal(42, b.Config.Seed);
-
-            var connections = new[] { a, b };
-            var worlds = connections.Select(c => TestHelpers.CreateSeededWorld(MapSize, c.Config.Seed)).ToArray();
-            var sessions = connections.Select((c, i) => new NetSession(c, worlds[i])).ToArray();
-            Wait(() => a.Roster.Count(n => n.Length > 0) == 2, a);
-            Assert.Equal("Waiting for players: 2 of 2 here.", a.Status);
-            foreach (var (c, i) in connections.Select((c, i) => (c, i)))
-                c.SendReady(WorldStateHash.ComputeReady(worlds[i]));
-            Wait(() => a.Started && b.Started, a, b);
-            Assert.Null(a.Status);
-            var room = hub.FindRoom(Room)!;
-
-            // Each client drives its tank and steps whatever ticks have arrived, like the game loop does.
-            bool SteppedTo(int tick)
-            {
-                for (int i = 0; i < sessions.Length; i++)
-                {
-                    sessions[i].Receive();
-                    while (sessions[i].TryStep())
-                        sessions[i].SendInput(new ControllerOutput
-                        {
-                            MoveSpeed = new Offset(i == 0 ? 1 : -1, worlds[i].AdvanceCount / 10 % 2),
-                            ShootPrimary = worlds[i].AdvanceCount % 7 == 0,
-                        });
-                }
-                return worlds.All(w => w.AdvanceCount == tick);
-            }
-
-            const int Ticks = 60;
-            PlayInLockstep(room, Ticks, SteppedTo, a, b);
-
-            Assert.Equal(WorldStateHash.Compute(worlds[0]), WorldStateHash.Compute(worlds[1]));
-            // The inputs went round: the tanks are not where an idle match would have left them.
-            var idle = TestHelpers.CreateSeededWorld(MapSize, 42);
-            TestSimulation.AdvanceIdle(idle, Ticks);
-            Assert.NotEqual(WorldStateHash.Compute(idle), WorldStateHash.Compute(worlds[0]));
-            Assert.Null(a.DesyncTick);
-            Assert.Null(a.Failure);
-        }
-
-        [Fact]
-        public async Task PlayerWhoDropsOut_RejoinsAndCatchesUpToTheSameWorld()
-        {
-            var (app, play, hub) = await StartUnclockedRelayAsync();
-            await using var _ = app;
-            // Two players and two bots: the bots must run alike on the client that stayed and the one that came back.
-            var config = NetMatch.ProposeConfig(42, FourPlayerMap, Core.LevelGen.LevelGenMode.Deterministic, players: 4);
-            using var a = NetLaunch.Join(Options(play, "Ann"), config);
-            var b = NetLaunch.Join(Options(play, "Bob"), config);
-            var worldA = CreateFourTankWorld(42);
-            var worldB = CreateFourTankWorld(42);
-            var sessionA = new NetSession(a, worldA);
-            var sessionB = new NetSession(b, worldB);
-            a.SendReady(WorldStateHash.ComputeReady(worldA));
-            b.SendReady(WorldStateHash.ComputeReady(worldB));
-            a.RequestStart();
-            Wait(() => a.Started && b.Started, a, b);
-            var room = hub.FindRoom(Room)!;
-
-            // Steps what has arrived; the bots are chosen when the relay says the match has started.
-            static void Play(NetSession session, RelayConnection connection, World world)
-            {
-                session.Receive();
-                if (connection.Started && world.AdvanceCount == 0 && session.HumanMask != connection.HumanMask)
-                    session.StartSeats(connection.Config.Seed, connection.HumanMask);
-                while (session.TryStep())
-                    session.SendInput(new ControllerOutput
-                    {
-                        MoveSpeed = new Offset(connection.Slot == 0 ? 1 : -1, world.AdvanceCount / 15 % 2),
-                        ShootPrimary = true,
-                    });
-            }
-
-            const int WarmUp = 20;
-            PlayInLockstep(room, WarmUp, tick =>
-            {
-                Play(sessionA, a, worldA);
-                Play(sessionB, b, worldB);
-                return worldA.AdvanceCount == tick && worldB.AdvanceCount == tick;
-            }, a, b);
-
-            // Bob drops out. Once the relay has seen him go (the roster says so), Ann plays on alone to the tick the two
-            // worlds are compared at.
-            b.Dispose();
-            Wait(() => a.PlayersHere == 1, a);
-            const int Compared = 60;
-            PlayInLockstep(room, Compared, tick =>
-            {
-                Play(sessionA, a, worldA);
-                return worldA.AdvanceCount == tick;
-            }, a);
-
-            // Bob starts the game again: a fresh world, the same room and name. He gets every tick so far from the
-            // relay's log, and no tick is closed after them.
-            using var back = NetLaunch.Join(Options(play, "Bob"), config with { Seed = 1 });
-            var worldBack = CreateFourTankWorld(back.Config.Seed);
-            var sessionBack = new NetSession(back, worldBack);
-            Wait(() =>
-            {
-                Play(sessionBack, back, worldBack);
-                return back.Rejoined && worldBack.AdvanceCount == Compared;
-            }, a, back);
-
-            Assert.Equal(Compared, worldA.AdvanceCount);
-            Assert.Equal(Compared, room.TicksClosed);
-            Assert.Equal(1, back.Slot);
-            Assert.Equal(0b0011, back.HumanMask);
-            // The rejoining client's own world, stepped from the relay's log, is the one the client that stayed has.
-            Assert.Equal(WorldStateHash.ComputeSync(worldA), WorldStateHash.ComputeSync(worldBack));
-            // And the match is not an idle one: the bots and the players moved their tanks. A bot may be back where it
-            // started by now (it goes home to cool after torching its way out through rock), so for a bot having
-            // driven out of its base counts too.
-            var untouched = CreateFourTankWorld(42);
-            for (int slot = 0; slot < 4; slot++)
-            {
-                var tank = worldBack.TankList.Tanks[slot];
-                bool isBot = (back.HumanMask & 1 << slot) == 0;
-                Assert.True(tank.Position != untouched.TankList.Tanks[slot].Position || (isBot && tank.HasLeftBase),
-                    $"the tank in slot {slot} never moved");
-            }
-            Assert.Null(a.DesyncTick);
-            // The first latency sample comes with the first answered ping, which a client sends as soon as it pumps.
-            Wait(() => back.LatencyMs != null, back);
         }
     }
 }

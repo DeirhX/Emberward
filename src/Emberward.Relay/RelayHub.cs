@@ -40,6 +40,13 @@ public sealed class RelayHub(ILogger<RelayHub> logger, IConfiguration configurat
     /// Whether a running room gets a clock that closes its ticks (true, the default). Off, nothing closes a tick
     /// but a call to <see cref="MatchRoom.CloseTicksUpTo"/>: a test then plays a match tick by tick, and what it
     /// plays does not hang on how fast the machine is. Set it before any match starts.
+    /// <para>
+    /// Everything else the clock drives stops with it (<see cref="MatchRoom.AdvanceClock"/>): a late joiner's
+    /// preparation and hold never time out, a started room nobody is in is never deleted after
+    /// <see cref="EmptyRoomGrace"/> (a room is still forgotten when its last client leaves a lobby or a finished
+    /// match), and a finished match is not cut off <see cref="MatchRoom.SecondsPlayedAfterTheEnd"/> seconds after
+    /// its end.
+    /// </para>
     /// </summary>
     public bool RunsClocks { get; set; } = true;
 
