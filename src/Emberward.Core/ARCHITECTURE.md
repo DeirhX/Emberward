@@ -113,6 +113,8 @@ Bots/                        The computer player: produces a ControllerOutput li
   BotRandom.cs               The one random stream a bot and its parts share: a FastRandom, so its state can be
                              hashed and saved (System.Random's cannot)
   BotTrail.cs                The way the bot came, retraced to get home
+  BotSiege.cs, BotLoiter.cs  Laying siege to a base it can break; waiting outside one it cannot
+  BotStuckWatch.cs           Going nowhere near one spot, and the detour taken instead
 Snapshots/                   A match's state for a player who joins it in progress (docs/late-join-design.md §9)
   WorldSnapshot.cs           Save, Load, Compress, Decompress: canonical bytes of the world and the bots beside it
                              Digest: a hash of the raw bytes, which two players with one world agree on
@@ -495,6 +497,15 @@ The bot drives its tank through the same `ControllerOutput` as a player, and ask
   so it needs no torch when it is hot. A return that gets no nearer the base for 20 s (a sealed door, a dead-end
   trail) gives up and roams again, and for the next 30 s low health or heat does not send it home (a kill, or
   standing in its own base, still does); a slow tank on a long way home keeps getting nearer and never gives up.
+- **Going nowhere at all.** Whatever it is after, a bot that stays within `Tweaks.Bot.StuckRadiusCells` of one spot
+  for `StuckWindowSeconds` while roaming out of sight or heading home (`BotStuckWatch`: one anchor and a count) drops
+  its goal: a return is given up as above, and it heads for a point `DetourCells` away along an open heading for up
+  to `DetourSeconds`. Fighting in sight, laying siege, waiting outside a base and anything in its own base are not
+  watched.
+- **Sieges and waiting.** The bot asks `World.CanBreakBase` (the one owner of the answer) whether its gun alone can
+  break the enemy's base in `Tweaks.Bot.SiegeWindowSeconds` of steady fire. Only then does it lay siege (`BotSiege`).
+  While the enemy sits docked in a base it cannot break it waits at a post `LoiterCellsOutsideWall` out from the wall
+  in front of the nearest gate (`BotLoiter`), turret on the base and fire held, and fights once the enemy comes out.
 
 It still has no route planner (moves are scored one step at a time), sees the whole map and always knows where the
 enemy is.

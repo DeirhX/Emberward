@@ -127,9 +127,11 @@ public class BotBehaviorTests
     }
 
     /// <summary>
-    /// The bot's siege of a keep (DESIGN.md §4.9). While the gates are shut it shoots a gate, which wears the gate
-    /// shield down and leaves the core alone. With the gates open (here: rules without the energy network, where
-    /// no gate shuts) it shoots the core, through the gate or from a corner of the courtyard.
+    /// The bot's siege of a keep (DESIGN.md §4.9). A sound keep with its store behind it is more than it can break
+    /// (<see cref="World.CanBreakBase"/>), and it leaves it alone. With no charge to spare for the shield it can: while
+    /// the gates are shut it shoots a gate, which wears the gate shield down and leaves the core alone. With the gates
+    /// open (here: rules without the energy network, where no gate shuts) it shoots the core, through the gate or from
+    /// a corner of the courtyard.
     /// </summary>
     [Theory]
     [InlineData(false)]
@@ -167,33 +169,48 @@ public class BotBehaviorTests
         // where a fight would land stray shells on the core, which has nothing round it: it is respawned cold in its
         // hideout every ten seconds instead.
         var hideout = enemy.Position;
-        for (int tick = 0; tick < Tweaks.Weapon.BotBaseSiegeGraceSeconds * Tweaks.Perf.TargetFps; tick++)
+        int clock = 0;
+        ControllerOutput Step()
         {
-            world.Advance(i => i == 1 ? ai.GetInput(bot, enemy, world) : default);
-            if (tick % (10 * Tweaks.Perf.TargetFps) == 0 || enemyBase.IsInside(enemy.Position))
+            ControllerOutput output = default;
+            world.Advance(i => i == 1 ? output = ai.GetInput(bot, enemy, world) : default);
+            if (clock++ % (10 * Tweaks.Perf.TargetFps) == 0 || enemyBase.IsInside(enemy.Position))
             {
                 enemy.Spawn(world.Terrain.Ledger);
                 enemy.Position = hideout;
             }
+            return output;
         }
+        for (int tick = 0; tick < Tweaks.Weapon.BotBaseSiegeGraceSeconds * Tweaks.Perf.TargetFps; tick++)
+            Step();
         Assert.Equal(1.0, enemyBase.ArmorFill);
         Assert.Equal(shieldBefore, gateShield ? world.BasePowerOf(enemyBase)!.Value.ShieldFill : 1.0);
 
+        if (gateShield)
+        {
+            // A sound keep: the bot does not waste its shells on it.
+            Assert.False(world.CanBreakBase(bot, enemyBase));
+            for (int tick = 0; tick < 10 * Tweaks.Perf.TargetFps; tick++)
+                Step();
+            Assert.Equal(1.0, world.BasePowerOf(enemyBase)!.Value.ShieldFill);
+            Assert.Equal(1.0, enemyBase.ArmorFill);
+
+            // Its store spent down to the reserve, the shield is not bought back: now the keep can be broken.
+            enemyBase.DrawCharge(enemyBase.Charge - Tweaks.Keep.ShieldReserveCharge);
+            Assert.True(world.CanBreakBase(bot, enemyBase));
+        }
+
         double armourBefore = enemyBase.ArmorFill;
         bool shot = false, wentIn = false;
-        int ticks = (gateShield ? 5 : 30) * Tweaks.Perf.TargetFps;
+        // The bot may be anywhere when the grace ends (home cooling, or detouring after chasing its hidden enemy).
+        int ticks = 60 * Tweaks.Perf.TargetFps;
         var path = new System.Text.StringBuilder();
-        for (int tick = 0; tick < ticks && enemyBase.ArmorFill == armourBefore; tick++)
+        bool worn = false;
+        for (int tick = 0; tick < ticks && enemyBase.ArmorFill == armourBefore && !worn; tick++)
         {
-            world.Advance(i =>
-            {
-                if (i != 1)
-                    return default;
-                var output = ai.GetInput(bot, enemy, world);
-                shot |= output.ShootPrimary;
-                return output;
-            });
+            shot |= Step().ShootPrimary;
             wentIn |= enemyBase.IsInside(bot.Position);
+            worn = gateShield && world.BasePowerOf(enemyBase)!.Value.ShieldFill < 1.0;
             if (tick % Tweaks.Perf.TargetFps == 0)
                 path.Append(bot.Position - enemyBase.Position).Append(ai.Mode).Append(' ');
         }

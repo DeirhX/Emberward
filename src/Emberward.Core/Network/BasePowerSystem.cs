@@ -52,6 +52,9 @@ public sealed class BasePowerSystem
     public double ShieldFill(TankBase tankBase) => tankBase.IsDestroyed
         ? 0.0 : Math.Clamp((StateOf(tankBase)?.Shield ?? 0.0) / Tweaks.Keep.ShieldCapacity, 0.0, 1.0);
 
+    /// <summary>Points of shell damage the gate shield holds now; nothing for a destroyed base.</summary>
+    public double ShieldPoints(TankBase tankBase) => tankBase.IsDestroyed ? 0.0 : Math.Max(0.0, StateOf(tankBase)?.Shield ?? 0.0);
+
     /// <summary>
     /// Whether the gates are shut to the enemy: the shield has not been spent since it last came back, and the base
     /// stands. The owner's tank and shells pass either way.
