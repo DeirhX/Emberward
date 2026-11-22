@@ -72,8 +72,11 @@ public enum StepEventKind
     BuildRefused,
 
     /// <summary>
-    /// A tank in its own network's coverage unloaded <see cref="StepEvent.Count"/> units of ore into the network, on
-    /// their way to the base store. <see cref="StepEvent.Position"/> is the tank.
+    /// A tank moved <see cref="StepEvent.Count"/> units from its hold into its base's store this step, touching the core
+    /// or one of its own powered relays. <see cref="StepEvent.Position"/> is the receiver and <see cref="StepEvent.Target"/>
+    /// says which: <see cref="ImpactTarget.Base"/> at the core's centre (the base's
+    /// <see cref="Entities.Bases.TankBase.Position"/>), <see cref="ImpactTarget.Machine"/> at the relay's position.
+    /// <see cref="StepEvent.Color"/> is the tank (a reader finds it by its colour).
     /// </summary>
     OreUnloaded,
 
@@ -111,7 +114,11 @@ public enum StepEventKind
     /// <summary>A base's gate shield is back and its gates are shut to the enemy again. At the base's centre.</summary>
     BaseShieldRestored,
 
-    /// <summary>A docked tank burned <see cref="StepEvent.Count"/> units from its hold to restart its base.</summary>
+    /// <summary>
+    /// A docked tank burned <see cref="StepEvent.Count"/> units from its hold to restart its base.
+    /// <see cref="StepEvent.Position"/> is the core's centre (<see cref="StepEvent.Target"/> is
+    /// <see cref="ImpactTarget.Base"/>), <see cref="StepEvent.Color"/> the tank.
+    /// </summary>
     RestartOreBurned,
 
     /// <summary>

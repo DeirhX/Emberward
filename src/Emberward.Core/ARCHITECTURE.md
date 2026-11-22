@@ -178,13 +178,15 @@ is a new entry, in the place its order needs; the profile picks up its label. Th
 4. **proj**: `ProjectileList.Advance`.
 5. **tanks**: `LinkMap.AgeOreFlow`, then `TankList.Advance` with the world's `SimulationContext` (built once). Per tank (`Tank.Advance`):
    idle heat, base interaction (recharge, heat sink anywhere inside the walls; touching the core, `Tank.TouchesCore`,
-   the hold banks into the store), network coverage (with
+   the hold banks into the store through `TankBase.BankFromHold`, after the dock heat pump, bringing
+   `SimulationSettings.BaseDepositHeatPerOre` a unit into the reactor and recorded as `StepEventKind.OreUnloaded` at the
+   core's centre with `ImpactTarget.Base`), network coverage (with
    `MatchRules.TankReserve` on, a generator nearby holds the off-network floor), the reserve (only with that rule:
    `TankReserveSystem.Advance` burns a unit on the recall key, recorded as `StepEventKind.ReserveBurned`, settles the
    stage, recorded as `ReserveStageChanged` when it changes, and returns the stage's effects, which mask the gun and
    build keys and slow the move, dig and gun below), the relay unload (touching an own powered relay, `MachineBehavior.TakesOre`, `Tank.TouchedRelay`, the hold
-   moves `Ore.RelayUnloadPerSecond` into the base store, booked on the links with `LinkMap.CarryOre` and recorded as
-   `StepEventKind.OreUnloaded`; being in coverage is not enough), turret aim and fire,
+   moves `Ore.RelayUnloadPerSecond` into the base store through `TankBase.BankFromHold`, booked on the links with
+   `LinkMap.CarryOre` and recorded as `StepEventKind.OreUnloaded` at the relay with `ImpactTarget.Machine`; being in coverage is not enough), turret aim and fire,
    `TankDigger.Move`, spawn shield, shooting, `TankBuildController.Advance`, the upgrade keys, the machine upgrade
    key (only when `MatchRules.MachineUpgrades` is on: `MachineUpgradeSystem` buys a level for the nearest own machine
    in reach on a press of `ControllerOutput.UpgradeMachine` with a key, recorded as `StepEventKind.MachineUpgraded`
