@@ -21,7 +21,7 @@ public enum TwitchMode { Start, ExitBaseUp, ExitBaseDown, Twitch, Return, Rechar
 /// from <see cref="World.ProbeTankStep"/>, the answer the tank's own move gets. When it stops making headway it
 /// commits to a short manoeuvre (a sidestep, or a held heading) instead of picking a new move every tick.
 /// </remarks>
-public class BotTankAI
+public partial class BotTankAI
 {
     /// <summary>Distance from the base centre (along Y) at which the bot counts as having left it.</summary>
     private const int OutsideBaseMargin = 5;
@@ -82,6 +82,7 @@ public class BotTankAI
     private readonly BotNavigator _navigator;
     private readonly BotGunner _gunner;
     private readonly BotTrail _trail = new();
+    private readonly BotStuckWatch _stuckWatch = new();
     private TwitchMode _mode = TwitchMode.Start;
     private Offset _move;
     private bool _shoot;
@@ -112,6 +113,9 @@ public class BotTankAI
 
     /// <summary>The mode the bot is in; for tests and diagnostics.</summary>
     public TwitchMode Mode => _mode;
+
+    /// <summary>Where the bot is heading instead of its goal after going nowhere (<see cref="BotStuckWatch"/>); for tests.</summary>
+    public Position? Detour => _stuckWatch.Detour;
 
     /// <summary>
     /// The tank a bot in slot <paramref name="self"/> fights: the nearest other tank that is alive, or the nearest
@@ -179,6 +183,12 @@ public class BotTankAI
         // Roaming, headway is toward the enemy. Heading home it is just moving on: the trail may wind.
         _navigator.UpdateStuckState(tank.Position,
             _mode == TwitchMode.Twitch && enemy is { IsDead: false } ? enemy.Position : null);
+        // Its enemy docked in a base it cannot break, the bot waits outside (BotLoiter); one it can break it lays siege to.
+        bool canSiege = _gunner.BaseSiegeAllowed && enemy?.Base is { IsDestroyed: false } enemyBase &&
+            world.CanBreakBase(tank, enemyBase);
+        bool loiter = _mode == TwitchMode.Twitch && enemy is { IsDockedAtOwnBase: true } && !canSiege;
+        WatchForStuck(tank, enemy, world, canSiege, loiter);
+
         if (_maneuverFrames > 0)
         {
             // A breakout is for roaming out of sight; once the enemy is seen the bot fights, which a manoeuvre's
@@ -197,7 +207,7 @@ public class BotTankAI
             TwitchMode.Start => DoStart(tank, world),
             TwitchMode.ExitBaseUp => DoExit(tank, world, exitY: -1, relX, relY),
             TwitchMode.ExitBaseDown => DoExit(tank, world, exitY: 1, relX, relY),
-            TwitchMode.Twitch => DoTwitch(tank, enemy, world),
+            TwitchMode.Twitch => DoTwitch(tank, enemy, world, canSiege, loiter),
             TwitchMode.Return => DoReturn(tank, world, relX, relY),
             TwitchMode.Recharge => DoRecharge(tank, world, relX, relY),
             _ => default,
@@ -220,6 +230,8 @@ public class BotTankAI
         _returnNearestCells = int.MaxValue;
         _navigator.ResetStuck();
         _navigator.ResetProgress();
+        _stuckWatch.Reset();
+        _stuckWatch.EndDetour();
     }
 
     private ControllerOutput DoStart(Tank tank, World world)
@@ -295,7 +307,7 @@ public class BotTankAI
         return Math.Abs(relX) >= BaseLayout.Lane ? new Offset(0, exitY) : new Offset(relX < 0 ? -1 : 1, 0);
     }
 
-    private ControllerOutput DoTwitch(Tank tank, Tank? enemy, World world)
+    private ControllerOutput DoTwitch(Tank tank, Tank? enemy, World world, bool canSiege, bool loiter)
     {
         var profile = _profiles.Active;
         // A hot load (DESIGN.md §6.3) sends it home to the core before the heat does.
@@ -309,10 +321,13 @@ public class BotTankAI
             return default;
         }
 
-        // Out of the enemy's sight and near its base, the bot works on the base (BotSiege): it shoots what a shot
-        // wears down, a shut gate or the core, and otherwise heads for the place the next shot is fired from.
+        if (loiter)
+            return DoLoiter(tank, enemy!.Base!, world);
+
+        // Out of the enemy's sight and near a base it can break, the bot works on the base (BotSiege): it shoots what a
+        // shot wears down, a shut gate or the core, and otherwise heads for the place the next shot is fired from.
         Position? siegePoint = null;
-        if (_gunner.BaseSiegeAllowed && !_gunner.EnemyInSight && enemy?.Base is { IsDestroyed: false } enemyBase)
+        if (canSiege && !_gunner.EnemyInSight && enemy?.Base is { IsDestroyed: false } enemyBase)
         {
             if (BotSiege.FindTarget(tank, enemyBase, world) is Position weak)
             {
@@ -324,9 +339,12 @@ public class BotTankAI
 
         bool hasTarget = enemy != null && !enemy.IsDead;
         bool hasLos = _gunner.EnemyInSight;
-        var targetPos = siegePoint ?? (hasTarget ? enemy!.Position : (Position?)null);
         if (hasLos)
+        {
             _navigator.ResetProgress(); // Circling an enemy in sight is fighting, not going nowhere.
+            _stuckWatch.EndDetour();
+        }
+        var targetPos = siegePoint ?? _stuckWatch.Detour ?? (hasTarget ? enemy!.Position : (Position?)null);
 
         // A move that has run into rock or a wall is not held to the end of its plan.
         if (world.ProbeTankStep(tank, _move) is StepObstacle.Hard or StepObstacle.Solid)
@@ -602,6 +620,7 @@ public class BotTankAI
         hash = _navigator.MixState(hash);
         hash = _gunner.MixState(hash);
         hash = _trail.MixState(hash);
+        hash = _stuckWatch.MixState(hash);
         hash = Fnv1a.Mix(hash, (int)_mode);
         hash = Fnv1a.Mix(Fnv1a.Mix(hash, _move.X), _move.Y);
         hash = Fnv1a.Mix(hash, _shoot);

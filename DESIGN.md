@@ -428,7 +428,12 @@ A base must not fall to a tank that drives up and shoots it. It is a keep (`Base
   core through an open gate or from the courtyard. Only a destroyed base ends a side; there are no lives. Relays cost 4
   ore, so a cut has to cost the defender time (relink, dearer links), or rebuilding makes attacks pointless.
 - **The bot** (`BotSiege`) shoots a shut gate, fires at the core through it once it opens, and drives in to a
-  corner when it has no shot from outside.
+  corner when it has no shot from outside. It lays siege only to a base it can break (`World.CanBreakBase`: what its
+  gun fires in 60 seconds against the shield, the shield the store can buy back in that time, and the core with its
+  repairs), so a lone bot leaves a sound keep alone and goes for a worn, dark or unshielded one. While its enemy sits
+  docked in a base it cannot break it waits 12 cells out from the wall in front of the nearest gate, fire held
+  (`BotLoiter`), and fights the enemy when it comes out. A bot that stays within 10 cells of one spot for 10 seconds
+  while trying to get somewhere drops its goal for a detour (`BotStuckWatch`).
 - *Still open:* the numbers are untested in play; a turret covers a gate from inside its 24 cells, which may make a
   defended gate too strong; the attacker has no reading of the enemy's shield beyond shut or open.
 
@@ -1096,6 +1101,7 @@ upgrades, throughput, turrets, removing the pylon and the tank's reserve are in)
 | Every heat body is finite: no pinned temperatures or permanent sources; the outside is a loss, not a cell | Decided |
 | Stored heat is the match's supply; what keeps it up over a long match is open (§4.10) | Proposed |
 | Carried pyrite heats the tank linearly, steeply from 20 units and dangerously at 40, with no step or spike, and the hold upgrade insulates the load more than it enlarges the hold; the hold unloads only by touching the own core or a powered relay, and the core has no baffles round it (§6.3, §4.9) | Prototype |
+| A bot sieges only a base it can break and otherwise waits outside while its enemy is docked; emberites hunt bot and player tanks by the same rules, and leave any tank docked in its own base (§4.9, §6.2) | Prototype |
 
 ## 14. Open questions
 

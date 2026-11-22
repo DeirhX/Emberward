@@ -17,6 +17,10 @@ internal static class BotSiege
     /// <summary>Cells from a base's centre, by either axis, within which the bot works on the base instead of roaming.</summary>
     private const int SiegeRange = Tweaks.Weapon.BotBaseAttackRange + BaseLayout.Half;
 
+    /// <summary>Whether <paramref name="at"/> is near enough <paramref name="target"/> for the bot to work on it.</summary>
+    public static bool InSiegeRange(Position at, TankBase target) =>
+        Math.Max(Math.Abs(at.X - target.Position.X), Math.Abs(at.Y - target.Position.Y)) <= SiegeRange;
+
     /// <summary>Cells in front of a gate where the bot lines up before it drives at it.</summary>
     private const int GateApproach = BaseLayout.Half + 6;
 
@@ -103,9 +107,9 @@ internal static class BotSiege
     /// </summary>
     public static Position? Waypoint(Tank tank, TankBase target, World world)
     {
-        int dx = tank.Position.X - target.Position.X, dy = tank.Position.Y - target.Position.Y;
-        if (Math.Max(Math.Abs(dx), Math.Abs(dy)) > SiegeRange)
+        if (!InSiegeRange(tank.Position, target))
             return null;
+        int dx = tank.Position.X - target.Position.X, dy = tank.Position.Y - target.Position.Y;
         if (target.IsInside(tank.Position))
             return target.Position + BaseLayout.NearestCorner(dx, dy);
 
