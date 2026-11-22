@@ -119,6 +119,7 @@ public sealed class DepositQuads
     private long _nextPourId = 1;
     private long _step;
     private bool _held;
+    private float _heldAlpha, _lastAlpha;
 
     private Position? _storeLabel;
     private int _labelStore = -1, _labelRate = -1;
@@ -138,6 +139,7 @@ public sealed class DepositQuads
         ArgumentNullException.ThrowIfNull(ledger);
         _step++;
         _held = false;
+        _lastAlpha = 0f;
         CaptureBases(world);
         _tanks.Clear();
         foreach (var tank in world.TankList.Tanks)
@@ -157,8 +159,17 @@ public sealed class DepositQuads
         CaptureStoreLabel(world, player, ledger);
     }
 
-    /// <summary>The world takes no step: everything holds where it is drawn now.</summary>
-    public void Hold() => _held = true;
+    /// <summary>
+    /// The world takes no step (a pause, or a network tick that carried none): everything holds where it was last
+    /// drawn, at that frame's step progress, until the next step is captured.
+    /// </summary>
+    public void Hold()
+    {
+        if (_held)
+            return;
+        _held = true;
+        _heldAlpha = _lastAlpha;
+    }
 
     private void CaptureBases(World world)
     {
@@ -387,10 +398,13 @@ public sealed class DepositQuads
             if (age < 0f || age >= 1f)
                 continue;
             var to = new PositionF(pour.Receiver.X, pour.Receiver.Y);
+            // Anchored where the step left it and moving on through the step; held, anchored where it was drawn.
             float u0 = (float)(_step - c.LaunchStep) / FlightSteps;
             PositionF at = Arc(c.From, to, c.Side, u0);
             PositionF next = Arc(c.From, to, c.Side, u0 + 1f / FlightSteps);
-            PositionF motion = _held ? default : new PositionF(next.X - at.X, next.Y - at.Y);
+            PositionF motion = new(next.X - at.X, next.Y - at.Y);
+            if (_held)
+                (at, motion) = (new PositionF(at.X + motion.X * _heldAlpha, at.Y + motion.Y * _heldAlpha), default);
             float landing = Math.Clamp((age - 0.7f) / 0.3f, 0f, 1f);
             float spin = c.Seed * 6.2831853f + age * 5f;
             quads.Add(EntityQuads.Centre(at.X), EntityQuads.Centre(at.Y), 1f, 0f, -CrystalHalf, CrystalHalf, -CrystalHalf,
@@ -439,7 +453,13 @@ public sealed class DepositQuads
         }
     }
 
-    private float StepNow(EntityQuads quads) => _step + (_held ? 0f : quads.Alpha);
+    /// <summary>The step and its progress as drawn this frame; held, the progress of the last frame drawn before the hold.</summary>
+    private float StepNow(EntityQuads quads)
+    {
+        if (!_held)
+            _lastAlpha = quads.Alpha;
+        return _step + (_held ? _heldAlpha : quads.Alpha);
+    }
 
     /// <summary>The pours still showing, for tests: units, crystals, receiver, the floater's text (null for a rival's).</summary>
     public IEnumerable<(Position Receiver, int Units, int Crystals, string? Text)> Pours()
