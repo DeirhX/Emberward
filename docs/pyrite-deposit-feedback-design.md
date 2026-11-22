@@ -39,9 +39,10 @@ by 7, the core a disc 5 cells across).
 - **HUD state:** `OreLedgerView` (count-up, drained hold, held UNLOADING, the deposit's units and age) is fed with the
   entity layer's steps; `MaterialsView` turns it and the tank into what MATERIALS shows, and the browser gets the same
   view in `PlayerStatus.Materials`. `BuildSlotView.OreLine` takes the pouring flag; `OrePileFrame` takes a hold count.
-- **MATERIALS layout:** its plate's inside is 20 px (174 to 194), so `LedgerLayout` has its own rows (HOLD 179.2, BASE
-  189), without bars, checked by a layout test; the readout text drops from 22 to 11 art pixels. The `+N` rises in
-  the plate's middle, clear of both numbers.
+- **MATERIALS layout:** its plate's inside is 20 px (174 to 194). It first held two rows (HOLD above BASE, text 11
+  art pixels), which read too small; it now holds one line at 184, `HOLD 23 | 1,234 +18/m BASE` (labels 12, numbers
+  15), the numbers meeting at a split left of the middle, without bars, checked by layout tests. The hold shows its
+  amount alone, not its capacity (the pile shows how full it is). The `+N` rises out of the store's number.
 - **Sound:** `SoundBank.Deposit.cs` is listed in `Emberward.Rendering.csproj` and removed from the desktop's compile
   list. A core bank is `Deposit` once per pour (`CueVoice.Pour`), a relay unit the pickup note, a burn `Deposit`
   pitched down; all `CueHeard.Player`. No refused sound.
@@ -237,20 +238,21 @@ tank stays), so a relay drop-off reads as a counter, not a cloud of `+1`s.
 
 ## 5. HUD
 
-### 5.1 MATERIALS: hold and base, two rows
+### 5.1 MATERIALS: hold and base, one line
 
-The readout plate (`MaterialsPlate`, 186 by 20 art pixels) becomes a two-row ledger like SHIELD/HULL (`LedgerLayout`):
+The readout plate (`MaterialsPlate`, 186 by 20 art pixels) holds one line like SHIELD/HULL (`LedgerLayout`), the
+numbers meeting in the middle. (It was first two rows, `HOLD 23 / 40` above `BASE +18/m 1,234`, which read too small.)
 
 ```
-HOLD            23 / 40
-BASE   +18/m      1,234
+HOLD   23 | 1,234   +18/m BASE
 ```
 
-- **HOLD**: today's readout, in the readout green; deep orange when full.
+- **HOLD**: the ore carried, the amount alone (no capacity: the pile shows how full it is), in the readout green; deep
+  orange when full.
 - **BASE**: the store, thousands separated, in one pale gold (§0: no capacity, bar, `FULL` or colour by level).
 - **Rate** `+18/m`: units a minute into the store for the player's side over the last 30 s (§5.2), dim, hidden at 0.
 - **Deposit tick**: when a pour lands, the BASE number counts up from the old value to the new over the pour's 0.9 s
-  (display only: the store already holds it), a gold `+N` floats up out of the row and fades, and the row flashes gold
+  (display only: the store already holds it), a gold `+N` floats up out of the number and fades, and the number flashes gold
   once. The hold pile drains over the same 0.9 s instead of vanishing in 4 ticks (the pile frame eases toward
   `OrePileFrame`, as the gauges ease).
 - The ore line under the hold window: `UNLOADING` as today, held for at least the pour's length rather than 4 ticks.

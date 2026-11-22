@@ -224,7 +224,9 @@ display's own resolution instead of being stretched by the OS.
   measured on the art (`HudStrip.Plate`), and centres text on the height of the '0' glyph, not on the font's line
   box.
 - **SHIELD/HULL plate.** The title is one status word (`HullStatuses`: SHIELDED, SHIELD DOWN, HULL BREACH,
-  MELTING, SLAG); the readout stacks SHIELD over HULL, each with a hairline bar. The hull's number and bar, and the
+  MELTING, SLAG); the readout is one line, `SHIELD 400 | 1000 HULL`, the numbers meeting in the middle with a
+  hairline bar under each half, filled from the plate's outer edge (with no shield in the match, HULL alone, its
+  number centred and its bar across the plate; `LedgerLayout`). The hull's number and bar, and the
   hot centre the crystal shows through an empty shield, follow the hull heat ramp `HudPalette.HullHeat` (and
   `HullEmber` for glows), the one the tank's hotspot shares. The browser's strip gets the same word and colours
   through `HullPlate` in its frame.
