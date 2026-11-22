@@ -243,6 +243,7 @@ public class BotLoiterTests
         Assert.False(ai.IsWaiting, "fire the shield absorbed is still fire");
     }
     [Fact]
+    [Trait("Category", "Slow")]
     public void APostInRockOrAWall_IsPassedOver_AndWithNoPostLeftTheBotDoesNotWait()
     {
         var world = CreateWorld(width: 160);
@@ -269,6 +270,11 @@ public class BotLoiterTests
         Assert.True(enemy.IsDockedAtOwnBase);
         Assert.False(world.CanBreakBase(bot, enemy.Base!));
         Assert.False(waited, "with no post a tank can stand at, the bot should not wait (and jitter) at the base");
+
+        // The same scene without the rock: the bot waits, so it was the rock that kept it from it.
+        var control = CreateWorld(width: 160);
+        var (_, controlWaited) = Run(control, new BotTankAI(9), 40 * Fps);
+        Assert.True(controlWaited, "without the rock the same bot should wait at a post");
     }
 
     /// <summary>Writes <paramref name="pixel"/> over the square a tank at <paramref name="centre"/> would stand on, and round it.</summary>
@@ -326,5 +332,95 @@ public class BotLoiterTests
         Assert.True(gaveUp, "a bot that gets no nearer its post should give up waiting there");
         Assert.True(Math.Abs(bot.Position.X - boxed.X) <= inner && Math.Abs(bot.Position.Y - boxed.Y) <= inner,
             "the rock should have held it");
+    }
+
+    /// <summary>
+    /// A manoeuvre the bot began while roaming may torch; once its enemy docks and the bot chooses a post, that
+    /// manoeuvre ends, so nothing is fired near the gate.
+    /// </summary>
+    [Fact]
+    public void AManoeuvreBegunWhileRoaming_EndsWhenTheBotStartsWaiting()
+    {
+        var world = CreateWorld(width: 160);
+        var (enemy, bot) = (world.TankList.Tanks[0], world.TankList.Tanks[1]);
+        var enemyBase = enemy.Base!;
+        // The enemy out of its base, sealed in rock out of sight, so the bot roams.
+        var hideout = new Position(25, 8);
+        Fill(world, hideout, TerrainPixel.Rock);
+        enemy.Position = hideout;
+        Assert.False(enemy.IsDockedAtOwnBase);
+        var ai = new BotTankAI(9);
+        void Step()
+        {
+            world.Advance(i => i == 1 ? ai.GetInput(bot, enemy, world) : default);
+            enemy.Heat = 0f;
+        }
+
+        // Out of its own base, the bot is boxed in rock: it begins a manoeuvre that may torch its way out.
+        for (int tick = 0; tick < 30 * Fps && (bot.Base!.IsInside(bot.Position) || bot.Position.X > bot.Base.Position.X - Half - 10); tick++)
+            Step();
+        Assert.False(bot.Base!.IsInside(bot.Position));
+        BoxIn(world, bot.Position);
+        for (int tick = 0; tick < 10 * Fps && !ai.IsInFiringManeuver; tick++)
+            Step();
+        Assert.True(ai.IsInFiringManeuver, "boxed in while roaming, the bot should try to torch its way out");
+        Assert.False(ai.IsWaiting);
+
+        // Its enemy docks: the bot chooses a post, and the manoeuvre that could torch near the gate ends.
+        enemy.Position = enemyBase.Position;
+        Assert.True(enemy.IsDockedAtOwnBase);
+        world.Advance(i => i == 1 ? ai.GetInput(bot, enemy, world) : default);
+        Assert.True(ai.IsWaiting);
+        Assert.False(ai.IsInFiringManeuver, "waiting, the bot should run no manoeuvre that fires");
+    }
+
+    /// <summary>A hit while the bot has given up on its post does not shorten that give-up to the hit's shorter break.</summary>
+    [Fact]
+    public void AHitWhileItHasGivenUpOnItsPost_DoesNotShortenTheGiveUp()
+    {
+        var world = CreateWorld(width: 160);
+        var (enemy, bot) = (world.TankList.Tanks[0], world.TankList.Tanks[1]);
+        var ai = new BotTankAI(9);
+        void Step()
+        {
+            world.Advance(i => i == 1 ? ai.GetInput(bot, enemy, world) : default);
+            enemy.Heat = 0f;
+        }
+
+        // Boxed in on its way to its post, it gives up waiting there (for 20 s).
+        for (int tick = 0; tick < 30 * Fps && !(ai.IsWaiting && !bot.Base!.IsInside(bot.Position) &&
+            bot.Position.X < bot.Base.Position.X - Half - 10); tick++)
+            Step();
+        Assert.True(ai.IsWaiting);
+        // Frost rock, which no torch gets through: it stays where it is, out of its enemy's sight.
+        BoxIn(world, bot.Position, TerrainPixel.FrostRock);
+        for (int tick = 0; tick < (Tweaks.Bot.LoiterApproachSeconds + 5) * Fps && ai.IsWaiting; tick++)
+            Step();
+        Assert.False(ai.IsWaiting, "a bot that gets no nearer its post should give up waiting there");
+
+        // A hit at once: it does not wait again before the give-up runs out, though the hit's own break (5 s) would have.
+        bot.TakeDamage(5, Emberward.Core.Entities.DamageCause.EnemyFire);
+        Step();
+        bool waitedEarly = false;
+        for (int tick = 0; tick < 15 * Fps; tick++)
+        {
+            Step();
+            waitedEarly |= ai.IsWaiting;
+        }
+        Assert.False(waitedEarly, "the hit should not cut the 20 s give-up down to its 5 s");
+    }
+
+    /// <summary>Rock right up to the hull of a tank at <paramref name="at"/>, the cells every facing of it covers left open.</summary>
+    private static void BoxIn(World world, Position at, TerrainPixel pixel = TerrainPixel.Rock)
+    {
+        int inner = TankSpriteShape.Radius;
+        int[] facings = [0, 1, 2, 3, 5, 6, 7, 8];
+        for (int dy = -inner - 3; dy <= inner + 3; dy++)
+            for (int dx = -inner - 3; dx <= inner + 3; dx++)
+            {
+                var cell = at + new Offset(dx, dy);
+                if (world.Terrain.IsInside(cell) && !facings.All(f => TankSpriteShape.Contains(f, at, cell)))
+                    world.Terrain.SetPixel(cell, pixel);
+            }
     }
 }

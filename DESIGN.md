@@ -431,7 +431,8 @@ A base must not fall to a tank that drives up and shoots it. It is a keep (`Base
   ore, so a cut has to cost the defender time (relink, dearer links), or rebuilding makes attacks pointless.
 - **The bot** (`BotSiege`) shoots a shut gate, fires at the core through it once it opens, and drives in to a
   corner when it has no shot from outside. It lays siege only to a base it can break (`World.CanBreakBase` plays the
-  siege forward a second at a time: its gun for up to 60 seconds, or until its off-network clock would send it home,
+  siege forward a second at a time: its gun for up to 60 seconds, or until its off-network clock (run first for the
+  drive there, counted at open-ground pace) would send it home,
   against the shield, the shield the store can buy back while its reactor has room for the heat, gates that shut
   again at a quarter shield, and the core with its repairs while it is damaged), so a lone bot leaves a sound keep
   alone and goes for a worn, dark or unshielded one; a base it can break it roams round until its 240-second opening
@@ -439,7 +440,8 @@ A base must not fall to a tank that drives up and shoots it. It is a keep (`Base
   store at the edge does not flip it every tick. While its enemy sits docked in a base it cannot break it waits 12
   cells out from the wall beside the nearest gate, out of the straight line of fire through it, fire held even to
   torch (`BotLoiter`); a post in rock or a wall is passed over, and a bot that gets no nearer its post for 15 seconds
-  gives up waiting for 20. It stops waiting and fights while it sees the enemy, or for 5 seconds after it is hit. An
+  gives up waiting for 20 (a hit meanwhile does not shorten that); a manoeuvre begun while roaming ends when it starts
+  waiting. It stops waiting and fights while it sees the enemy, or for 5 seconds after it is hit. An
   enemy at the bot's own base is fought before a nearer one docked at home. A bot that
   stays within 10 cells of one spot for 10 seconds while trying to get somewhere drops its goal for a detour
   (`BotStuckWatch`).

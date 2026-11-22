@@ -20,13 +20,13 @@ public class BotSiegeReckoningTests
     private const int Fps = Tweaks.Perf.TargetFps;
 
     /// <summary>Blank ground, tank 0's base on the left and tank 1's (the bot's) on the right.</summary>
-    private static World CreateWorld(SimulationSettings? settings = null)
+    private static World CreateWorld(SimulationSettings? settings = null, int width = 100)
     {
-        var size = new Size(100, 72);
+        var size = new Size(width, 72);
         var ground = new TerrainGrid(size);
         ground.Fill(TerrainPixel.Blank);
         var world = new World(size, rules: new MatchRules { EnergyNetwork = true, TerrainRegrowth = false }, simulationSettings: settings);
-        world.Initialize(ground, [new Position(25, 36), new Position(75, 36)]);
+        world.Initialize(ground, [new Position(25, 36), new Position(width - 25, 36)]);
         return world;
     }
 
@@ -39,12 +39,12 @@ public class BotSiegeReckoningTests
     {
         var world = CreateWorld();
         var bot = world.TankList.Tanks[1];
-        Assert.Equal(Tweaks.Bot.SiegeWindowSeconds * Fps, world.SiegeFireTicks(bot, Tweaks.Tank.TurretDelay));
+        Assert.Equal(Tweaks.Bot.SiegeWindowSeconds * Fps, world.SiegeFireTicks(bot, world.TankList.Tanks[0].Base!, Tweaks.Tank.TurretDelay));
 
         // A clock ten times as fast: the floor reaches the heat the bot turns back at in about 6.5 s.
         var fast = CreateWorld(SimulationSettings.FromTweaks() with { TankOffNetworkHeatPerTick = 10f * Tweaks.Tank.OffNetworkHeatPerSecond / Fps });
         var (target, fastBot) = (fast.TankList.Tanks[0].Base!, fast.TankList.Tanks[1]);
-        int ticks = fast.SiegeFireTicks(fastBot, Tweaks.Tank.TurretDelay);
+        int ticks = fast.SiegeFireTicks(fastBot, target, Tweaks.Tank.TurretDelay);
         Assert.InRange(ticks, 5 * Fps, 7 * Fps);
 
         // A dark base a fresh tank breaks is more than it can fire at before it must head home.
@@ -52,6 +52,36 @@ public class BotSiegeReckoningTests
         Assert.True(fast.IsBaseDark(target));
         Assert.True(world.CanBreakBase(bot, Darkened(world)));
         Assert.False(fast.CanBreakBase(fastBot, target), "a tank that must soon head home cannot shoot a shield away");
+    }
+
+    /// <summary>
+    /// The drive to the base runs the off-network clock before the first shell: the reckoning counts it up front, so the
+    /// bot gets about the same answer at home as when it arrives, and does not decide on a siege it gives up on its way.
+    /// </summary>
+    [Fact]
+    public void TheDriveToTheBase_IsCountedUpFront()
+    {
+        // Bases far enough apart that most of the drive lies beyond the bot's own cover.
+        var world = CreateWorld(SimulationSettings.FromTweaks() with { TankOffNetworkHeatPerTick = 4f * Tweaks.Tank.OffNetworkHeatPerSecond / Fps }, width: 200);
+        var (target, bot) = (world.TankList.Tanks[0].Base!, world.TankList.Tanks[1]);
+        double drive = world.SiegeDriveTicks(bot, target);
+        // A tank steps a cell a tick: from its spawn to the target's wall, the larger of the two distances.
+        int cells = Math.Max(Math.Abs(bot.Position.X - target.Position.X), Math.Abs(bot.Position.Y - target.Position.Y)) - Tweaks.Base.BaseSize / 2;
+        Assert.Equal(cells, drive);
+        int atHome = world.SiegeFireTicks(bot, target, Tweaks.Tank.TurretDelay);
+        Assert.True(atHome > 0);
+
+        // It drives there a cell a tick, its clock running once it leaves its own network's cover.
+        while (world.SiegeDriveTicks(bot, target) > 0)
+        {
+            bot.Position += new Offset(-1, 0);
+            world.Advance(_ => default);
+        }
+        int onArrival = world.SiegeFireTicks(bot, target, Tweaks.Tank.TurretDelay);
+
+        // The leg in its own cover counts as off-network at home, so it arrives with somewhat more than it was told, never
+        // less. Not counting the drive, it would have been told more than it has: its whole off-cover leg's worth.
+        Assert.InRange(onArrival - atHome, 0, (int)drive - 1);
     }
 
     private static TankBase Darkened(World world)

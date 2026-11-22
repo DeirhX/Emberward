@@ -23,10 +23,18 @@ public partial class World
     /// <para>
     /// The attacker fires at its gun's rate (a slowed gun counts slower, one that cannot fire counts nothing,
     /// <see cref="TankReserveEffects"/>) for as long as it would stay out (<see cref="SiegeFireTicks"/>): at most
-    /// <see cref="Tweaks.Bot.SiegeWindowSeconds"/>, and only until its off-network clock sends it home. The drive to the
-    /// base is not counted (the clock as it stands now is), nor are shells that miss, nor the charge the base's
-    /// generators bring in during the siege: these lean the attacker's way, so a base it is told it cannot break it
-    /// surely cannot.
+    /// <see cref="Tweaks.Bot.SiegeWindowSeconds"/>, and only until its off-network clock sends it home, a clock that
+    /// first runs for the drive to the base.
+    /// </para>
+    /// <para>
+    /// It is a reckoning, not a forecast, and what it leaves out does not all lean one way. Toward the attacker: shells
+    /// that miss, the charge the base's generators bring in during the siege, and ground the attacker must dig through
+    /// on its way (the drive is counted at open-ground pace in a straight line). Toward the base: the charge the base's
+    /// own machines and turrets spend meanwhile, which leaves less to buy shield back with; the whole drive counted off
+    /// the attacker's network, though the first of it may lie in coverage; and a generator of the attacker's side near
+    /// the base, which would hold its off-network clock (<see cref="TankReserveSystem.HoldsClock"/>), while the
+    /// reckoning lets the clock run. A bot told it cannot break a base can be wrong near the edge; the margin it holds a
+    /// decision with (<see cref="Tweaks.Bot.SiegeHoldFireFactor"/>) keeps it from changing its mind at every tick there.
     /// </para>
     /// <para>
     /// The base soaks the shells with its gate shield while its gates are shut, and buys shield back as
@@ -53,23 +61,26 @@ public partial class World
             return false;
         int fireDelay = Tweaks.Tank.TurretDelay * gun.FireDelayFactor;
         double damagePerTick = fireFactor * Tweaks.Weapon.BulletDamage / fireDelay;
-        return BaseFallsTo(target, damagePerTick, SiegeFireTicks(attacker, fireDelay));
+        return BaseFallsTo(target, damagePerTick, SiegeFireTicks(attacker, target, fireDelay));
     }
 
     /// <summary>
-    /// Ticks <paramref name="attacker"/> can keep firing at a base before it heads home (the bot's own rule, which ends
-    /// an outing on heat): at most <see cref="Tweaks.Bot.SiegeWindowSeconds"/>. A base it besieges lies off its network,
-    /// so its off-network floor climbs from where it is now, until the heat the bot turns back at
+    /// Ticks <paramref name="attacker"/> can keep firing at <paramref name="target"/> before it heads home (the bot's own
+    /// rule, which ends an outing on heat): at most <see cref="Tweaks.Bot.SiegeWindowSeconds"/>. A base it besieges lies
+    /// off its network, so its off-network floor climbs from where it is now, first for the drive there
+    /// (<see cref="SiegeDriveTicks"/>) and then while it fires, until the heat the bot turns back at
     /// (<see cref="Tweaks.Bot.ReturnHeatBudgetFractionOffNetwork"/> of its budget left, or the off-network clock at
     /// <see cref="Tweaks.Tank.OffNetworkUrgentSeconds"/>). Steady fire holds the tank above its surroundings by what its
     /// shot heat takes to shed into the ground (shot heat a tick times the tank's heat capacity over its ground
     /// conductance), which comes off that room. A gun that fires every <paramref name="fireDelay"/> ticks.
     /// </summary>
     /// <remarks>
-    /// The bot turns back before its reserve reaches the stage that slows its gun (the urgent mark is above
-    /// <see cref="Tweaks.Reserve.DegradedSeconds"/>), so the gun keeps its present rate for the whole outing.
+    /// Counting the drive up front gives the bot the same answer at home as on its way: the clock it spends driving is
+    /// the clock it no longer has once it arrives. The bot turns back before its reserve reaches the stage that slows its
+    /// gun (the urgent mark is above <see cref="Tweaks.Reserve.DegradedSeconds"/>), so the gun keeps its present rate for
+    /// the whole outing.
     /// </remarks>
-    public int SiegeFireTicks(Tank attacker, int fireDelay)
+    public int SiegeFireTicks(Tank attacker, TankBase target, int fireDelay)
     {
         const int window = Tweaks.Bot.SiegeWindowSeconds * Tweaks.Perf.TargetFps;
         var settings = _simulationSettings;
@@ -83,8 +94,24 @@ public partial class World
         double safeMax = Tweaks.Tank.HeatSafeMax;
         double turnBackAt = Math.Min(safeMax * (1.0 - Tweaks.Bot.ReturnHeatBudgetFractionOffNetwork),
             safeMax - Tweaks.Tank.OffNetworkUrgentSeconds * (double)attacker.OffNetworkHeatPerSecond);
-        double ticks = (turnBackAt - firingExcess - attacker.OffNetworkFloor) / rise;
+        double ticks = (turnBackAt - firingExcess - attacker.OffNetworkFloor) / rise - SiegeDriveTicks(attacker, target);
         return (int)Math.Clamp(ticks, 0.0, window);
+    }
+
+    /// <summary>
+    /// Ticks <paramref name="attacker"/> needs to reach <paramref name="target"/>'s wall: the cells to it (a tank steps
+    /// one cell a tick, diagonals included, so the larger of the two distances) at the pace it moves now (slowed by the
+    /// cold, <see cref="Tank.SpeedFactor"/>, and by its reserve, <see cref="TankReserveEffects"/>). Open ground in a
+    /// straight line: digging and detours are not counted.
+    /// </summary>
+    public double SiegeDriveTicks(Tank attacker, TankBase target)
+    {
+        int half = _simulationSettings.BaseSize / 2;
+        int cells = Math.Max(Math.Abs(attacker.Position.X - target.Position.X), Math.Abs(attacker.Position.Y - target.Position.Y)) - half;
+        if (cells <= 0)
+            return 0.0;
+        double pace = attacker.SpeedFactor * (double)TankReserveEffects.For(ReserveOf(attacker).Stage).MoveFactor;
+        return pace > 0.0 ? cells / pace : double.PositiveInfinity;
     }
 
     /// <summary>

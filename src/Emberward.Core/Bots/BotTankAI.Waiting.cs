@@ -158,6 +158,9 @@ public partial class BotTankAI
     /// <summary>Whether the running manoeuvre holds its fire: one on the way to a post never torches near the gate.</summary>
     private bool _maneuverHoldsFire;
 
+    /// <summary>Whether a manoeuvre is running that may torch (one begun while roaming); for tests and diagnostics.</summary>
+    public bool IsInFiringManeuver => _maneuverFrames > 0 && !_maneuverHoldsFire;
+
     /// <summary>Whether the bot holds that it can break its enemy's base; for tests and diagnostics.</summary>
     public bool HoldsBaseBreakable => _breakHeld;
 
@@ -188,7 +191,7 @@ public partial class BotTankAI
     {
         int health = (int)tank.Reactor.Health;
         if (health < _lastHealth || tank.HitFlashTicks >= Tank.HitFlashDuration - 1)
-            _loiterBreakFrames = LoiterBreakFrames;
+            _loiterBreakFrames = Math.Max(_loiterBreakFrames, LoiterBreakFrames); // never cuts a longer give-up short
         else if (_loiterBreakFrames > 0)
             _loiterBreakFrames--;
         _lastHealth = health;

@@ -506,17 +506,19 @@ The bot drives its tank through the same `ControllerOutput` as a player, and ask
   watched.
 - **Sieges and waiting.** The bot asks `World.CanBreakBase` (the one owner of the answer) whether its gun alone can
   break the enemy's base in one outing: at most `Tweaks.Bot.SiegeWindowSeconds` of steady fire, cut short by its
-  off-network clock (`World.SiegeFireTicks`), played forward a second at a time against the rules `BasePowerSystem`
+  off-network clock (`World.SiegeFireTicks`, which first runs it for the drive there, `World.SiegeDriveTicks`, so the
+  answer at home is the answer on arrival), played forward a second at a time against the rules `BasePowerSystem`
   applies (buy-back limited by spare charge and reactor room, gates that shut again at `ShieldRestoreFill`, core
-  repairs only while damaged); the remarks on `CanBreakBase` list what it leaves out. The decision is held
+  repairs only while damaged); the remarks on `CanBreakBase` list what it leaves out, and which way each omission leans. The decision is held
   (`BotTankAI.HoldBreakDecision`): once it can, it keeps to that while fire `SiegeHoldFireFactor` times as strong
   would. Only then does it lay siege (`BotSiege`), once `Tweaks.Weapon.BotBaseSiegeGraceSeconds` are over; before
   that it roams. While the enemy sits docked in a base it cannot break it waits at a post `LoiterCellsOutsideWall`
   out from the wall and `BotLoiter.PostSideStep` to one side of the nearest gate, out of the gate's straight line of
-  fire, turret on the base and fire held (its unstuck manoeuvres too). A post a tank cannot stand at
+  fire, turret on the base and fire held (its unstuck manoeuvres too; one begun while roaming ends once it chooses a
+  post). A post a tank cannot stand at
   (`BotLoiter.CanStandAt`) is passed over; with none it does not wait, and one it gets no nearer for
   `LoiterApproachSeconds` it gives up on for a while. It stops waiting and fights while the enemy is in sight or for
-  5 s after a hit (`BotTankAI.TrackHits`). `BotTankAI.PickEnemy` fights an enemy at the bot's own base before a
+  5 s after a hit (`BotTankAI.TrackHits`; a hit never shortens a longer give-up). `BotTankAI.PickEnemy` fights an enemy at the bot's own base before a
   nearer one.
 
 It still has no route planner (moves are scored one step at a time), sees the whole map and always knows where the
@@ -604,8 +606,12 @@ Which nests a side has discovered is output, like its vision and radar: `SideSen
 side whose vision it tracks, which marks a nest found once that side's vision has explored any of its ground, `Nest.Radius` around its centre (a
 radar echo does not discover a nest; the centre alone would not do, as it lies inside a lump deeper than sight reaches). It keeps what the side last learned of each
 nest (`NestDangerLevel`, or cleared), refreshed only while some of that ground is in sight, so
-the fog hides what a nest does meanwhile; a tick looks at each nest's ground on a grid of every second cell
-(`VisionMap.IsAnyVisibleWithin`), stopping at the first cell in sight. `World.CopyNestDangers(tank)`
+the fog hides what a nest does meanwhile. It looks at each nest's ground on a grid of every second cell
+(`VisionMap.IsAnyVisibleWithin`, and `IsAnyExploredWithin` until it is found), and the cost follows what changes: the
+vision map stamps each tile when a cell in it comes into or goes out of sight, and an area whose tiles kept their
+stamps answers from memory; one in sight looks first at the cell it was last seen by. So a nest out of changing sight
+costs a look at a few tile stamps, and the renderer and the wake alert ask the same remembered answers
+(`NestDangerTests` bounds the cell reads). `World.CopyNestDangers(tank)`
 lists the found nests not last seen cleared, with that level and the ring radius `EmberiteSwarm.DangerRadius(nest.Radius)`, a small ring around the nest;
 a side whose vision is not tracked (no fog) knows every nest as it is.
 

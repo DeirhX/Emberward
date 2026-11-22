@@ -200,6 +200,9 @@ public partial class BotTankAI
         TrackHits(tank);
         Position? post = ChooseLoiterPost(tank, enemy, world, breakable);
         _waiting = post != null;
+        // A manoeuvre begun while roaming may torch; waiting never fires near the gate, so it ends there.
+        if (_waiting && _maneuverFrames > 0 && !_maneuverHoldsFire)
+            _maneuverFrames = 0;
         WatchForStuck(tank, enemy, world, canSiege, _waiting);
 
         if (_maneuverFrames > 0)
