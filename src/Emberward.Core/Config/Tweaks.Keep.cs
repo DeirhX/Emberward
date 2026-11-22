@@ -4,8 +4,8 @@ public static partial class Tweaks
 {
     /// <summary>
     /// The base's keep (DESIGN.md §4.9, <c>BaseLayout</c>, <c>BasePowerSystem</c>): walls nothing gets through, a gate
-    /// in each side, a core at the centre that is the only part to take damage, and baffle plates that hide the core
-    /// from every line through a gate. Distances are cells from the base's centre. Starting values; tune in play.
+    /// in each side, and a core at the centre that is the only part to take damage, open all round so a tank can touch
+    /// it to unload (nothing stands between a gate and the core). Distances are cells from the base's centre. Starting values; tune in play.
     /// </summary>
     public static class Keep
     {
@@ -13,12 +13,7 @@ public static partial class Tweaks
         public const int GateSize = 11;
         // The core is a disc this many cells across (BaseLayout.IsCore).
         public const int CoreSize = 5;
-        // A baffle plate stands this far out, in front of each gate, and reaches this far to either side. The gap
-        // left at each corner between two plates is the only way a shot reaches the core, and only from the corner
-        // of the courtyard (BaseLayoutTests casts every ray from outside to check it).
-        public const int BaffleDistance = 6;
-        public const int BaffleHalfLength = 4;
-        // The middle of the courtyard between the baffles and the wall: where the tank spawns and the bot drives.
+        // The middle of the courtyard between the core and the wall: where the tank spawns and the bot drives.
         public const int LaneDistance = 11;
 
         // The gate shield, in points of shell damage. An enemy shell that hits a gate takes its damage off the

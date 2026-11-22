@@ -21,7 +21,7 @@ public class SectorGoalTests
 
     [Theory]
     [InlineData(BaseUpgrade.Radiator)]
-    [InlineData(BaseUpgrade.CargoHold)]
+    [InlineData(BaseUpgrade.InsulatedHold)]
     [InlineData(BaseUpgrade.Radar)]
     public void Upgrades_CostOreFromTheStore_25_60_140_AndStopAtTheMax(BaseUpgrade upgrade)
     {
@@ -52,27 +52,60 @@ public class SectorGoalTests
         var tracks = Enum.GetValues<BaseUpgrade>().Select(BaseUpgrades.TrackOf).ToArray();
         Assert.Equal(BaseUpgrades.Count, tracks.Length);
         Assert.Equal(5, tracks.Count(t => t == UpgradeTrack.Base));
-        Assert.Equal([BaseUpgrade.CargoHold, BaseUpgrade.Radar],
+        Assert.Equal([BaseUpgrade.InsulatedHold, BaseUpgrade.Radar],
             Enum.GetValues<BaseUpgrade>().Where(u => BaseUpgrades.TrackOf(u) == UpgradeTrack.Tank));
         foreach (BaseUpgrade u in Enum.GetValues<BaseUpgrade>())
             Assert.False(string.IsNullOrEmpty(BaseUpgrades.Describe(u).Effect));
     }
 
     [Fact]
-    public void ACargoHoldLevel_AddsThirtyToTheTanksHold()
+    public void AnInsulatedHoldLevel_AddsTenToTheTanksHold()
     {
         var s = RelayHeatTests.CreateScenario();
-        var press = new ControllerOutput { Upgrade = (int)BaseUpgrade.CargoHold + 1 };
-        int[] expected = [40, 70, 100, 130];
+        var press = new ControllerOutput { Upgrade = (int)BaseUpgrade.InsulatedHold + 1 };
+        int[] expected = [40, 50, 60, 70];
         Assert.Equal(expected[0], s.Tank.OreHoldCapacity);
         for (int level = 1; level <= BaseUpgrades.MaxLevel; level++)
         {
             Fund(s.Base, s.Base.Store.Capacity);
             s.World.Advance(i => i == 0 ? press : default);
             s.World.Advance(_ => default);
-            Assert.Equal(level, s.Base.Upgrades.Level(BaseUpgrade.CargoHold));
+            Assert.Equal(level, s.Base.Upgrades.Level(BaseUpgrade.InsulatedHold));
             Assert.Equal(expected[level], s.Tank.OreHoldCapacity);
         }
+    }
+
+    /// <summary>
+    /// In a world: a tank whose base bought every insulated hold level heats far less with 40 aboard than a stock one, and
+    /// its full hold of 70 heats about as the stock hold's 40 does.
+    /// </summary>
+    [Fact]
+    public void AnInsulatedHold_CoolsTheLoad_InTheWorld()
+    {
+        float HeatAfterASecond(int levels, int ore)
+        {
+            var s = RelayHeatTests.CreateScenario();
+            var press = new ControllerOutput { Upgrade = (int)BaseUpgrade.InsulatedHold + 1 };
+            for (int level = 0; level < levels; level++)
+            {
+                Fund(s.Base, s.Base.Store.Capacity);
+                s.World.Advance(i => i == 0 ? press : default);
+                s.World.Advance(_ => default);
+            }
+            Assert.Equal(levels, s.Base.Upgrades.Level(BaseUpgrade.InsulatedHold));
+            s.Tank.Position = s.RelayPos;
+            ClearArea(s.World.Terrain, s.Tank.Position, radius: 7);
+            SetTankHeat(s.Tank, 0f);
+            s.Tank.Hold.Ore = ore;
+            for (int i = 0; i < Tweaks.Perf.TargetFps; i++)
+                s.World.Advance(_ => default);
+            return s.Tank.Heat;
+        }
+
+        float stock = HeatAfterASecond(0, 40), insulated = HeatAfterASecond(BaseUpgrades.MaxLevel, 40);
+        float fullInsulated = HeatAfterASecond(BaseUpgrades.MaxLevel, 70);
+        Assert.True(insulated < stock * 0.35f, $"40 aboard: stock {stock:0.0}, insulated {insulated:0.0}");
+        Assert.InRange(fullInsulated, stock * 0.85f, stock * 1.15f);
     }
 
     [Fact]

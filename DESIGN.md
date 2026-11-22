@@ -216,8 +216,15 @@ The tank lives in a band around 0. Both ends hurt, and the world has places at b
   crystal shows the shield, the number under it the hull, and the plate names the worst state: SLAG, MELTING (under
   5%), HULL BREACH while it burns, except that an empty shield on a hull only just alight (fire level up to 0.2)
   still reads SHIELD DOWN, then SHIELD DOWN and SHIELDED.
+  **A tank's shield is seen only while it blocks hits.** A hit brings up a translucent plastic dome of swirling blue
+  with raised, shimmering hexagon ridges, a glossy highlight and a brighter rim, thin enough to see the tank through.
+  It fades in over one simulation step (the frame of the hit itself shows nothing yet), stays while hits keep coming,
+  and after the last starts to dissolve at about 0.3 s and is gone at 0.75 s; while the game is paused or waiting on the
+  network it freezes as drawn. How much of it shows is the shield left: the outer edge erodes first as it drains,
+  leaving a thick lit lip, and it turns orange gradually below half the shield.
   **A hit on a shield** is seen and heard: its own zap (and a shatter when it breaks), a pulse that lights the veins of
-  the whole shield, and a red patch where the shot landed; a base's gate shield does the same.
+  what is left of the shield, and a red patch where the shot landed; a break flashes the whole bubble as it collapses.
+  A base's gate shield shows hits the same way.
 - **Below 0 the tank is chilled.** It slows down, linearly to about a third of its speed at -40, and below -25 it
   takes frostbite damage per degree, the same way overheating does. Negative temperatures are unusual, never a
   reserve to stock up on.
@@ -255,7 +262,12 @@ Building has to pay off, and exploring has to lead somewhere.
     - **Sensors:** relays, generators and the base see 8 cells further per level. Relays and generators already see 10
       cells beyond their coverage circle at level 0. Sight is output only (§6.5), so this changes nothing but the ore it cost.
   - The **tank track**, keys 6-7:
-    - **Cargo hold:** +30 ore in the tank's hold per level (40, 70, 100, 130).
+    - **Insulated hold** (key 6, formerly the cargo hold): mostly insulation, a little room. Each level adds 10 ore
+      (40, 50, 60, 70), moves the point where the load starts to cook the tank 5 units later (20, 25, 30, 35) and
+      divides its heat by 1 + 0.25 per level, so a full hold at every level heats exactly as the stock hold does at 40
+      (74 degrees a second): a serious problem, never a worse one. The same load heats less at each level (40 units:
+      74, 45, 26, 12 degrees a second). It reworks the old slot rather than adding one, because the COMMAND keys 1-7
+      are all taken and an eighth would need a wider input encoding.
     - **Radar:** +20% on every radar range and +25% on each ray's heat budget per level (§6.6). The radar is output
       only, so this level changes nothing in the simulation but the ore it cost. A pulse that runs longer than the
       4-second period delays the next one.
@@ -378,12 +390,20 @@ A base must not fall to a tank that drives up and shoots it. It is a keep (`Base
   up. To its owner a gate is open ground, for the tank and for its shells.
 - **The core** is a disc 5 cells across at the centre (21 cells) and the only part of a base that takes damage. Its armor is
   6000 and it repairs 48 a second while the base has power, so damage done stays done for a while.
-- **Baffle plates** stand between each gate and the core. No straight line from outside the walls reaches the core
-  through a gate (`BaseLayoutTests` casts every one). A shot reaches the core only through the gap two plates leave
-  at a corner, so only from a corner of the courtyard, inside the walls.
-- **The courtyard** between the plates and the wall is the dock: the tank spawns there, just inside the gate that
-  faces into the map (a base backs onto the border, §6.7), and unloading, cooling and upgrades work anywhere inside
-  the walls.
+- **Nothing stands round the core.** The floor runs from every gate to the core, so the owner drives straight up to it
+  and touches it to unload (§6.3). The baffle plates that once hid the core from every line through a gate are gone:
+  they also kept the owner's tank from reaching it. The gate shield is now the only thing that keeps enemy shells and
+  tanks off the core; once it falls, a shot through an open gate reaches it. What that costs the defence:
+  - a broken (or never charged) gate shield exposes the core from outside the walls: an attacker in line with an open
+    gate hits it from up to its range away, without driving in (the bot does exactly that);
+  - without the energy rule the gates never shut, so the core is open to fire through them all match;
+  - a fight inside the courtyard lands the shells that miss on the core: defending in your own base wears it down;
+  - the courtyard corners are no longer the only firing positions, so a turret behind a gate covers less of what
+    matters. The gate shield, its recharge from charge, and the core's armour and regeneration are now the whole
+    defence; whether that is enough is untested in play.
+- **The courtyard** between the core and the wall is the dock: the tank spawns there, just inside the gate that
+  faces into the map (a base backs onto the border, §6.7), and cooling, repair and upgrades work anywhere inside the
+  walls. Unloading needs the core itself.
 - **The gate shield** is a pool of 60,000 points of shell damage. An enemy shell that hits a gate stops there and
   takes its damage off the pool; while the pool holds, the gates are also shut to enemy tanks. At nothing the gates
   open to the enemy, and they shut again once the pool is back to a quarter. A tank the gates shut on can always
@@ -397,14 +417,14 @@ A base must not fall to a tank that drives up and shoots it. It is a keep (`Base
 - **Dark** is an empty base store. It ends by itself once income beats drain (with a threshold, so it does not flicker).
   While dark: the gate shield does not recharge, no regen or tank heal, turrets off, harvesters strand, vision
   shrinks, respawn is slowest (about 15 s, against 3 s), and the core takes a quarter more damage.
-- **Restart by hand.** Docking while dark empties the tank's hold (never the base ore store) into the engine until the
+- **Restart by hand.** Touching the core while dark empties the tank's hold (never the base ore store) into the engine until the
   store passes the threshold (about 15 ore, a pocket).
-- **Without the energy rule** there is no gate shield and the gates stop nothing; the walls, the plates and the core
-  are the same.
-- **The fall of a base.** Wear the gate shield down (or cut the supply so that it cannot recharge), get into the
-  courtyard, and shoot the core from a corner. Only a destroyed base ends a side; there are no lives. Relays cost 4
+- **Without the energy rule** there is no gate shield and the gates stop nothing; the walls and the core are the same.
+- **The fall of a base.** Wear the gate shield down (or cut the supply so that it cannot recharge), then shoot the
+  core through an open gate or from the courtyard. Only a destroyed base ends a side; there are no lives. Relays cost 4
   ore, so a cut has to cost the defender time (relink, dearer links), or rebuilding makes attacks pointless.
-- **The bot** (`BotSiege`) shoots a shut gate, drives in when the gates open, and fires at the core from a corner.
+- **The bot** (`BotSiege`) shoots a shut gate, fires at the core through it once it opens, and drives in to a
+  corner when it has no shot from outside.
 - *Still open:* the numbers are untested in play; a turret covers a gate from inside its 24 cells, which may make a
   defended gate too strong; the attacker has no reading of the enemy's shield beyond shut or open.
 
@@ -552,7 +572,7 @@ A sector only completes when it runs without the player, so nothing may depend o
 
 ### 5.3 What the tank needs
 
-- Cargo capacity, as an upgradeable stat (in: the cargo hold upgrade, §4.8).
+- Cargo capacity and cargo insulation, as an upgradeable stat (in: the insulated hold upgrade, §4.8).
 - A placement interface for structures. This is real work: the default match is 320×200 cells, and the game builds with single key
   presses today.
 
@@ -695,15 +715,27 @@ its shell against a relay too.)*
 
 The tank's ordinary dig clears plain ore, slower than dirt; a core cell needs the torch, like rock. A plain cell gives
 1 unit and a core cell 3, into a small hold of 40 units. A full hold leaves ore in the ground (a core cell is taken only
-if all 3 units fit), so mining never destroys ore. Docking at the own base banks the hold into the base's ore store
-quickly (10 units a tick); inside the own network's coverage it unloads there too, slower (§6.4). The hold grows
-with the cargo hold upgrade (§4.8). In the hold, each unit of pyrite warms the tank by 0.1 degrees per second
-before cooling. A full starting hold adds 4 degrees per second, and each unit unloaded or spent reduces that rate.
+if all 3 units fit), so mining never destroys ore. The hold is put down only by touching: a tank whose hull comes
+within 2 cells of its own base's core banks it into the base's ore store quickly (10 units a tick), and one within
+2 cells of one of its own powered relays unloads there, slower (4 a second, §6.4). Being inside the base's walls or
+the network's coverage is not enough. The insulated hold upgrade (§4.8) adds a little room and makes the load heat less.
+
+**Pyrite in the hold is hot** (`Tweaks.Cargo`, `TankHeatModel.ComputeCargoHeat`), linearly in the load, with no
+step or spike. Each unit warms the tank by 0.1 degrees a second before cooling, mild: 1.9 a second at 19 units, about
+what the off-network clock adds. From 20 every further unit adds 3.5 degrees a second more, so the rate is continuous at
+20 and climbs evenly past it: 20 units heat at 2 degrees a second, 30 at 38, 40 at 74, against a full link's 6; an
+insulated hold (§4.8) moves the start later and scales the line down, so its full hold is as hot as the stock one at 40.
+Ground soaks up a hot tank's heat fast, so in play 20 barely shows, 30 is a serious climb (in a tunnel about 50 degrees
+after 5 seconds; in the open past 100 in about 5), and 40 is an emergency: past 100 in about 2 seconds in the open and
+4 in a tunnel, on the network or off it. The heat is the ore's own energy, booked as injected in the ledger. The bot goes home as soon as its load is hot
+and drives up to its core to put it down, as a player must. Hot with
+20 or more aboard, the heat warnings say to unload, and the line under the hold says CARGO HOT.
 When the tank dies its hold spills back into the ground as plain ore in the nearest open or dirt cells around the wreck,
 never under another tank or a machine (ore blocks links, so it would cut a relay); what does not fit within a few cells
 is lost. Torching rock no longer yields anything. The MATERIALS panel shows a pile of Pyrite growing inside the
-hold and the exact ore count against capacity. Beneath the hold window it shows the base's ore store or, while the
-hold empties, a blinking UNLOADING with down arrows. The base panel also shows the store.
+hold and the exact ore count against capacity. Beneath the hold window it says ORE, CARGO HOT with 20 or more
+aboard, TO CORE inside the own base with ore aboard (BURN AT CORE while the base is dark; nothing while its store is full), and while the hold empties a blinking UNLOADING with down
+arrows. The base panel also shows the store.
 
 ### 6.4 Structures and the ore economy *(Prototype)*
 
@@ -713,12 +745,13 @@ walls, haulers, props, heat pumps. The pylon was dropped (§4.9).
 **Ore is the only currency.** Digging dirt only clears it. A relay costs 4 ore, a harvester 30; the
 base store starts with 30. The tank's hold is small (40), so getting ore home is the work, and the network is how:
 
-- **Who pays.** Docked at the own base, or inside the coverage of the own linked network (§4.6), the base store pays;
+- **Who pays.** Docked at the own base (anywhere inside its walls), or inside the coverage of the own linked network (§4.6), the base store pays;
   if it is short, the hold does. Outside the network only the hold counts. The build panel shows each machine's ore
   cost and the stock that would pay (BASE or HOLD), or how far the tank is from affording it; a refused press says
   "not enough ore" apart from "would not link".
-- **Unloading through the network.** Inside linked coverage the hold unloads into the base store at 4 units a
-  second, a unit at a time, while the store has room; docking is faster. Relays are therefore also
+- **Unloading at a relay.** A tank touching one of its own powered relays (hull within 2 cells of its body)
+  unloads into the base store at 4 units a second, a unit at a time, while the store has room, and the units ride
+  the links home; touching the core is faster. Being in the relay's coverage is not enough. Relays are therefore also
   drop-off points: planting one near a dig site saves the trip home.
 - **Harvesters mine ore.** A harvester works the plain ore within 4 cells of itself (6 actions a cell, every 150 ms), crawls
   along the shortest path to plain ore in its work area that it can get within reach of, clearing the dirt in its
@@ -1027,6 +1060,7 @@ upgrades, throughput, turrets, removing the pylon and the tank's reserve are in)
 | Sensors upgrade: relays and generators see 10 cells past coverage, and 8 more per level (the base 8 more per level) | Prototype |
 | Every heat body is finite: no pinned temperatures or permanent sources; the outside is a loss, not a cell | Decided |
 | Stored heat is the match's supply; what keeps it up over a long match is open (§4.10) | Proposed |
+| Carried pyrite heats the tank linearly, steeply from 20 units and dangerously at 40, with no step or spike, and the hold upgrade insulates the load more than it enlarges the hold; the hold unloads only by touching the own core or a powered relay, and the core has no baffles round it (§6.3, §4.9) | Prototype |
 
 ## 14. Open questions
 

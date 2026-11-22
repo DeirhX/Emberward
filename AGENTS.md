@@ -88,7 +88,7 @@ Adding a machine:
 2. A `MachineBehavior` in `MachineBehaviors` (`Entities/Machines/MachineBehavior.cs`), listed in `MachineBehaviors.All`:
    action, interval, colour, build cost, build key, its `Capacitor` (capacity, transfer rate, `PowerTier`, idle draw;
    DESIGN.md §4.9), and the traits Core reads instead of the type (`RunsOnCharge`, `IsLinkNode`,
-   `RequiresLinkToPlant`, `IsMiner`, `IsHeatPump`, `IsGenerator`, `IsTurret`, `HuntsCreatures`, `NeedsEnergyNetwork`), and its `UpgradePaths` if it takes per-machine
+   `RequiresLinkToPlant`, `TakesOre`, `IsMiner`, `IsHeatPump`, `IsGenerator`, `IsTurret`, `HuntsCreatures`, `NeedsEnergyNetwork`), and its `UpgradePaths` if it takes per-machine
    upgrades (`MachineUpgrades.cs` says what each path does). `MachineBehaviorTableTests` must pass.
 3. Cost, interval, colour and capacitor numbers in `Config/Tweaks.cs`, or in a partial of its own beside it
    (`Tweaks.Turrets.cs`) while `Tweaks.cs` is near the file-length cap.

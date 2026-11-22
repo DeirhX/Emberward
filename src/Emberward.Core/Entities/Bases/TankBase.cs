@@ -393,7 +393,7 @@ public class TankBase
     }
 
     /// <summary>
-    /// Writes the keep into the terrain: walls and baffles, gates, floor and core (<see cref="BaseLayout"/>).
+    /// Writes the keep into the terrain: walls, gates, floor and core (<see cref="BaseLayout"/>).
     /// </summary>
     /// <param name="gatesShut">Whether the gates start shut to the enemy: only where a gate shield runs.</param>
     public void CreateInTerrain(ITerrainPixelAccessor terrain, int color, bool gatesShut = false)

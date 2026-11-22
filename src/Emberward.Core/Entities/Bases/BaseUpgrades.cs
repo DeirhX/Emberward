@@ -5,7 +5,7 @@ using Emberward.Core.Types;
 
 /// <summary>
 /// What a base can spend its ore store on (DESIGN.md §4.8), bought while its tank is docked. The first four are the
-/// base track; <see cref="CargoHold"/> and <see cref="Radar"/> are the tank track (<see cref="BaseUpgrades.TrackOf"/>).
+/// base track; <see cref="InsulatedHold"/> and <see cref="Radar"/> are the tank track (<see cref="BaseUpgrades.TrackOf"/>).
 /// </summary>
 public enum BaseUpgrade
 {
@@ -19,8 +19,11 @@ public enum BaseUpgrade
     Insulation,
     /// <summary>Link nodes and the base see further than they cool. Presentation only: it changes no simulation result.</summary>
     Sensors,
-    /// <summary>A bigger ore hold on the tank.</summary>
-    CargoHold,
+    /// <summary>
+    /// An insulated ore hold on the tank: the load heats it less and later (<see cref="Tweaks.Cargo.InsulationPerLevel"/>),
+    /// and the hold takes a little more.
+    /// </summary>
+    InsulatedHold,
     /// <summary>Longer radar ranges and more heat budget per ray. Presentation only: it changes no simulation result.</summary>
     Radar,
 }
@@ -40,7 +43,7 @@ public sealed class BaseUpgrades
     private readonly int[] _levels = new int[Count];
 
     public static UpgradeTrack TrackOf(BaseUpgrade upgrade) =>
-        upgrade is BaseUpgrade.CargoHold or BaseUpgrade.Radar ? UpgradeTrack.Tank : UpgradeTrack.Base;
+        upgrade is BaseUpgrade.InsulatedHold or BaseUpgrade.Radar ? UpgradeTrack.Tank : UpgradeTrack.Base;
 
     public int Level(BaseUpgrade upgrade) => _levels[(int)upgrade];
 
@@ -81,8 +84,11 @@ public sealed class BaseUpgrades
     public float OffNetworkHeatFactor =>
         Math.Max(0.1f, 1f - Level(BaseUpgrade.Insulation) * Tweaks.Upgrades.InsulationPerLevel);
 
-    /// <summary>The ore hold of this base's tank: <see cref="Tweaks.Ore.TankHold"/> plus the cargo hold levels.</summary>
-    public int TankHoldCapacity => Tweaks.Ore.TankHold + Level(BaseUpgrade.CargoHold) * Tweaks.Upgrades.CargoHoldPerLevel;
+    /// <summary>The ore hold of this base's tank: <see cref="Tweaks.Ore.TankHold"/> plus the insulated hold levels.</summary>
+    public int TankHoldCapacity => Tweaks.Ore.TankHold + Level(BaseUpgrade.InsulatedHold) * Tweaks.Upgrades.InsulatedHoldOrePerLevel;
+
+    /// <summary>The insulated hold level of this base's tank: how much less its load heats it (<c>TankHeatModel.ComputeCargoHeat</c>).</summary>
+    public int CargoInsulationLevel => Level(BaseUpgrade.InsulatedHold);
 
     /// <summary>What every radar range of this base's tank is multiplied by.</summary>
     public float RadarRangeScale => 1f + Level(BaseUpgrade.Radar) * Tweaks.Upgrades.RadarRangePerLevel;
@@ -98,7 +104,7 @@ public sealed class BaseUpgrades
         BaseUpgrade.Engine => ("Engine", $"+{Tweaks.Upgrades.EngineEfficiencyPerLevel * 100:0}% max efficiency, better on warm ground"),
         BaseUpgrade.Insulation => ("Insulation", $"off-network clock {Tweaks.Upgrades.InsulationPerLevel * 100:0}% slower"),
         BaseUpgrade.Sensors => ("Sensors", $"+{Tweaks.Upgrades.SensorCellsPerLevel} cells of sight around relays and base"),
-        BaseUpgrade.CargoHold => ("Cargo hold", $"+{Tweaks.Upgrades.CargoHoldPerLevel} ore in the tank's hold"),
+        BaseUpgrade.InsulatedHold => ("Insulated hold", $"load heats less, +{Tweaks.Upgrades.InsulatedHoldOrePerLevel} ore: a full hold no hotter"),
         BaseUpgrade.Radar => ("Radar", $"+{Tweaks.Upgrades.RadarRangePerLevel * 100:0}% range, +{Tweaks.Upgrades.RadarHeatBudgetPerLevel * 100:0}% heat budget"),
         _ => (upgrade.ToString(), ""),
     };

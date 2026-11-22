@@ -11,8 +11,8 @@ using Emberward.Core.Types;
 
 /// <summary>
 /// The shape of a base (DESIGN.md §4.9, <see cref="BaseLayout"/>): walls with a gate in each side, the core at the
-/// centre behind baffle plates. What the shape promises is checked here by walking it, so a change to a number in
-/// <see cref="Tweaks.Keep"/> that opens a line to the core, or shuts the owner out, fails with the cell to look at.
+/// centre with open floor all round it. What the shape promises is checked here by walking it, so a change to a number
+/// in <see cref="Tweaks.Keep"/> that walls the core off, or shuts the owner out, fails with the cell to look at.
 /// </summary>
 public class BaseLayoutTests
 {
@@ -79,8 +79,9 @@ public class BaseLayoutTests
             Assert.Equal(BasePart.Gate, BaseLayout.PartAt(gate.X * Half, gate.Y * Half));
             Assert.Equal(BasePart.Gate, BaseLayout.PartAt(gate.X * Half + gate.Y * BaseLayout.GateHalf, gate.Y * Half + gate.X * BaseLayout.GateHalf));
             Assert.Equal(BasePart.Wall, BaseLayout.PartAt(gate.X * Half + gate.Y * (BaseLayout.GateHalf + 1), gate.Y * Half + gate.X * (BaseLayout.GateHalf + 1)));
-            // A baffle plate stands between each gate and the core, and the courtyard lane runs between them.
-            Assert.Equal(BasePart.Wall, BaseLayout.PartAt(gate.X * Tweaks.Keep.BaffleDistance, gate.Y * Tweaks.Keep.BaffleDistance));
+            // Nothing stands between a gate and the core: floor all the way in from the lane.
+            for (int step = BaseLayout.CoreHalf + 1; step < Half; step++)
+                Assert.Equal(BasePart.Floor, BaseLayout.PartAt(gate.X * step, gate.Y * step));
             Assert.Equal(BasePart.Floor, BaseLayout.PartAt(gate.X * BaseLayout.Lane, gate.Y * BaseLayout.Lane));
         }
         Assert.Equal(BasePart.Wall, BaseLayout.PartAt(Half, Half));
@@ -88,53 +89,52 @@ public class BaseLayoutTests
     }
 
     /// <summary>
-    /// The promise the whole keep rests on: with every gate open, no straight shot from outside the walls reaches the
-    /// core. Every point round the outside (in quarter cells, out to well past the bot's range) is aimed at every cell
-    /// of the core and at its corners.
+    /// The core has no barrier of its own (DESIGN.md §4.9): a shot through an open gate, or from anywhere in the
+    /// courtyard, reaches it. The gate shield is what keeps an enemy out.
     /// </summary>
     [Fact]
-    public void NoShotFromOutsideTheWalls_ReachesTheCore()
+    public void AShotThroughAGate_OrFromTheCourtyard_ReachesTheCore()
     {
-        int far = Half + Tweaks.Weapon.BotBaseAttackRange;
-        var from = new List<(double X, double Y)>();
-        // Just outside each gate, where the angles are widest, and rings farther out.
-        foreach (int ring in new[] { Half + 1, Half + 2, Half + 4, Half + 8, Half + 16, far })
-            for (double along = -ring; along <= ring; along += 0.25)
-            {
-                from.Add((along, -ring));
-                from.Add((along, ring));
-                from.Add((-ring, along));
-                from.Add((ring, along));
-            }
-
-        double edge = BaseLayout.CoreHalf + 0.45;
-        var aims = new List<(double X, double Y)>();
-        for (double ty = -edge; ty <= edge + 1e-9; ty += edge / 4)
-            for (double tx = -edge; tx <= edge + 1e-9; tx += edge / 4)
-                aims.Add((tx, ty));
-
-        foreach (var (x, y) in from)
-            foreach (var (tx, ty) in aims)
-                Assert.False(FirstStop(x, y, tx, ty) == BasePart.Core,
-                    $"A shot from ({x}, {y}) aimed at ({tx:0.##}, {ty:0.##}) reaches the core.");
-    }
-
-    [Fact]
-    public void AShotFromACourtyardCorner_ReachesTheCore_AndOneFromBesideAGateDoesNot()
-    {
+        foreach (var gate in BaseLayout.GateDirections)
+        {
+            Assert.Equal(BasePart.Core, FirstStop(gate.X * (Half + 8), gate.Y * (Half + 8), 0, 0));
+            var inside = BaseLayout.InsideGate(gate);
+            Assert.Equal(BasePart.Core, FirstStop(inside.X, inside.Y, 0, 0));
+        }
         foreach (int sx in new[] { -1, 1 })
             foreach (int sy in new[] { -1, 1 })
             {
                 var corner = BaseLayout.NearestCorner(sx, sy);
                 Assert.Equal(BasePart.Floor, BaseLayout.PartAt(corner.X, corner.Y));
                 Assert.Equal(BasePart.Core, FirstStop(corner.X, corner.Y, 0, 0));
-                // A cell off the diagonal still has the shot; the lane beside a gate does not.
-                Assert.Equal(BasePart.Core, FirstStop(corner.X - sx, corner.Y + sy, 0, 0));
             }
+    }
+
+    /// <summary>
+    /// The owner's tank drives in from every gate straight up to the core and touches it (where it unloads,
+    /// <see cref="Tank.TouchesCore"/>); from the courtyard lane it does not.
+    /// </summary>
+    [Fact]
+    public void TheOwnersTank_DrivesFromEveryGateUpToTheCore_AndTouchesIt()
+    {
+        var world = CreateWorld();
+        var tank = world.TankList.Tanks[0];
+        var home = tank.Base!;
         foreach (var gate in BaseLayout.GateDirections)
         {
-            var inside = BaseLayout.InsideGate(gate);
-            Assert.Equal(BasePart.Wall, FirstStop(inside.X, inside.Y, 0, 0));
+            var heading = new Offset(-gate.X, -gate.Y);
+            int dir = TankSpriteShape.DirectionOf(heading);
+            int step = Half + 4;
+            // Drive in until the hull meets the core.
+            while (CollisionSolver.TestTankTerrain(world.Terrain,
+                       home.Position + new Offset(gate.X * (step - 1), gate.Y * (step - 1)), dir) == StepObstacle.None)
+                step--;
+            Assert.True(step <= BaseLayout.CoreHalf + TankSpriteShape.Radius + 1, $"gate {gate}: stopped {step} cells out");
+            tank.Direction = dir;
+            tank.Position = home.Position + new Offset(gate.X * step, gate.Y * step);
+            Assert.True(tank.TouchesCore(home), $"gate {gate}: against the core at {step} but not touching it");
+            tank.Position = home.Position + new Offset(gate.X * BaseLayout.Lane, gate.Y * BaseLayout.Lane);
+            Assert.False(tank.TouchesCore(home), $"gate {gate}: touching the core from the lane");
         }
     }
 

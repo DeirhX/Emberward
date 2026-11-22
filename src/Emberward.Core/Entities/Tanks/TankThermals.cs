@@ -35,6 +35,11 @@ internal sealed class TankThermals
     public bool IsOverheating { get; private set; }
     public bool IsFreezing { get; private set; }
 
+    private int InsulationLevel => _tank.Base?.Upgrades.CargoInsulationLevel ?? 0;
+
+    /// <summary>Whether the load is past the point where each unit heats the tank hard (<see cref="TankHeatModel.CargoHeatStartOre"/>).</summary>
+    public bool IsCargoHot => _tank.OreHeld >= TankHeatModel.CargoHeatStartOre(in _settings, InsulationLevel);
+
     public void BeginTick()
     {
         IsOverheating = false;
@@ -168,7 +173,7 @@ internal sealed class TankThermals
         var position = _tank.Position;
         int radius = _settings.TankDigRadius;
         var contact = heat.SampleTankContact(position, radius);
-        float cargoHeat = _tank.OreHeld * _settings.TankHeatPerOrePerTick;
+        float cargoHeat = TankHeatModel.ComputeCargoHeat(in _settings, _tank.OreHeld, InsulationLevel);
         // A burning hull (TankShieldSystem.FireLevelOf) heats the tank and, more, the air around it. External sources.
         float fire = _tank.FireLevel;
         float fireHeat = fire > 0f ? fire * _settings.TankFireHeatPerTickMax : 0f;
