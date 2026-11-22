@@ -74,7 +74,7 @@ public class TankFireQuadsTests
         Assert.Equal(1, CountKind(quads, EntityShape.KindTankFireLight));
         Assert.Equal(1, CountKind(quads, EntityShape.KindTankFire));
         int particles = CountKind(quads, EntityShape.KindFireParticle);
-        Assert.Equal(TankFireQuads.SmokeCount(1f) + TankFireQuads.EmberCount(1f), particles);
+        Assert.Equal(TankFireQuads.MaxSmoke + TankFireQuads.MaxEmbers, particles);
         Assert.InRange(particles, 1, 36);
     }
 
@@ -90,8 +90,8 @@ public class TankFireQuadsTests
             Assert.True(particles >= previous, $"level {level}: {particles} particles after {previous}");
             previous = particles;
         }
-        Assert.Equal(0, TankFireQuads.EmberCount(0.2f));
-        Assert.True(TankFireQuads.EmberCount(0.5f) > 0);
+        Assert.Equal(0f, FireOnset.EmberShare(0.2f));
+        Assert.True(FireOnset.EmberShare(0.5f) > 0f);
     }
 
     [Fact]
@@ -163,8 +163,8 @@ public class TankFireQuadsTests
             {
                 motion.CaptureTanks([Tank(100, 100, color: 0), Tank(200, 150, color: 1)]);
                 fire.BeginCapture(2);
-                fire.CaptureTank(0, new Position(100, 100), burningSlot == 0 ? 0.8f : 0f);
-                fire.CaptureTank(1, new Position(200, 150), burningSlot == 1 ? 0.8f : 0f);
+                fire.CaptureTank(0, new Position(100, 100), burningSlot == 0 ? 1f : 0f);
+                fire.CaptureTank(1, new Position(200, 150), burningSlot == 1 ? 1f : 0f);
             }
             motion.UpdateHullHeading(0, East, 0f, snap: true);
             motion.UpdateHullHeading(1, East, 0f, snap: true);

@@ -6,6 +6,7 @@ using Emberward.Core.Entities.Tanks;
 using Emberward.Core.Terrain;
 using Emberward.Core.Types;
 using Emberward.Desktop.Config;
+using Emberward.Desktop.Rendering.Entities;
 using Emberward.Desktop.Gui.Guidance;
 
 /// <summary>Where <see cref="SoundDirector"/> sends what to play: the desktop's mixer, or the browser's frame.</summary>
@@ -47,6 +48,7 @@ public sealed class SoundDirector
         public int LastPickupStep, PickupStreak;
         public int EngineLoop, DigLoop, TorchLoop, TreadLoop, FireLoop;
         public bool EngineOn, DigOn, TorchOn, TreadOn, FireOn;
+        public float Fire;      // the fire level as heard: following the tank's, so a hit or a repair never snaps it
 
         /// <summary>Distance from the listener at the last step (negative before the first), and how fast it changes.</summary>
         public float Distance, Approach;
@@ -65,6 +67,9 @@ public sealed class SoundDirector
     private int _lastDebrisStep = -1000;
     private bool _runningHot, _lowShield;
     private int _nextWarningStep, _lastWarningStep = -1000, _lastWarningRank;
+
+    // The world last heard: a new match (or a late join's copy) starts each tank's fire from silence.
+    private WeakReference<World>? _world;
 
     /// <param name="log">Where to describe each sound started and each loop turned on or off, or null.</param>
     public SoundDirector(ISoundSink sink, Action<string>? log = null)
@@ -92,6 +97,12 @@ public sealed class SoundDirector
     public void AfterStep(World world, int localSlot)
     {
         ArgumentNullException.ThrowIfNull(world);
+        if (_world == null || !_world.TryGetTarget(out World? last) || !ReferenceEquals(last, world))
+        {
+            for (int i = 0; i < _tanks.Length; i++)
+                _tanks[i].Fire = 0f;
+            _world = new WeakReference<World>(world);
+        }
         _step++;
         _terrain = world.Terrain;
         _localSlot = localSlot;
@@ -233,10 +244,18 @@ public sealed class SoundDirector
         _sink.SetLoop(track.TorchLoop, torchOn ? gain * AudioTweaks.TorchGain : 0f, pan, 1f, muffle);
         _sink.SetLoop(track.TreadLoop, treadOn ? gain * AudioTweaks.TreadGain : 0f, pan,
             (1f - 0.05f * index) * approachRate, muffle);
-        float fire = dead ? 0f : tank.FireLevel;
+        // A dead tank's fire dies down too, as the drawn one does.
+        track.Fire += ((dead ? 0f : tank.FireLevel) - track.Fire) * FireOnset.StepFollow;
+        if (track.Fire < 0.001f)
+            track.Fire = 0f;
+        float fire = track.Fire;
         bool fireOn = fire > 0f && audible;
-        _sink.SetLoop(track.FireLoop, fireOn ? gain * AudioTweaks.HullFireGain * (0.35f + 0.65f * fire) : 0f, pan,
-            0.9f + (0.2f * fire), muffle);
+        // The fire fades in as it catches, rises in pitch with its level, and sizzles higher still once the exposed
+        // core sags (the level of a hull below 25%).
+        float sizzle = Math.Clamp((fire - (2f / 3f)) * 3f, 0f, 1f);
+        _sink.SetLoop(track.FireLoop,
+            fireOn ? gain * AudioTweaks.HullFireGain * (0.35f + 0.65f * fire) * FireOnset.Sound(fire) : 0f, pan,
+            0.9f + (0.2f * fire) + (0.25f * sizzle), muffle);
         LogLoop(SoundEffect.FireLoop, index, ref track.FireOn, fireOn);
         LogLoop(SoundEffect.EngineLoop, index, ref track.EngineOn, engineOn);
         LogLoop(SoundEffect.DigLoop, index, ref track.DigOn, digOn);

@@ -86,9 +86,9 @@ float4 main(PSIn input) : SV_Target
     else if (kind < kKindTankShield + 0.5)
         result = TankShield(p, input.color.rgb, input.params, aa);
     else if (kind < kKindTankFire + 0.5)
-        result = TankFire(p, input.params, aa);
+        result = TankFire(p, input.params, input.color.rgb, aa);
     else if (kind < kKindTankFireLight + 0.5)
-        result = TankFireLight(p, input.params);
+        result = TankFireLight(p, input.params, input.color.r);
     else // kKindFireParticle
         result = FireParticle(p, input.params, aa);
     return result;

@@ -221,4 +221,27 @@ public class SpatialSoundTests
         Assert.Equal(SoundSpace.CutoffHz(1f), frame.Play[0].Cutoff);
         Assert.Equal(SoundSpace.ClearCutoffHz, frame.Play[1].Cutoff);
     }
+
+    [Fact]
+    public void TheFireLoop_EasesIn_AndStartsFromSilence_InANewMatch()
+    {
+        var burning = TestHelpers.CreateSeededWorld(enableTerrainRegrowth: false, tankShield: true);
+        var tank = burning.TankList.Tanks[0];
+        tank.TakeDamage(Emberward.Core.Config.Tweaks.TankShield.Capacity + tank.Reactor.Health - 1,
+            Emberward.Core.Entities.DamageCause.EnemyFire);
+        var sink = new RecordingSink();
+        var director = new SoundDirector(sink);
+
+        director.AfterStep(burning, 0);
+        float first = sink.Loop(0, SoundEffect.FireLoop).Gain;
+        for (int step = 0; step < 48; step++)
+            director.AfterStep(burning, 0);
+        float settled = sink.Loop(0, SoundEffect.FireLoop).Gain;
+        Assert.InRange(first, 0f, 0.5f * settled);       // it catches, rather than starting at full
+        Assert.True(settled > 0f);
+
+        // The next match: its tank is not burning, and the last match's fire is not heard dying down in it.
+        director.AfterStep(TestHelpers.CreateSeededWorld(enableTerrainRegrowth: false, tankShield: true), 0);
+        Assert.Equal(0f, sink.Loop(0, SoundEffect.FireLoop).Gain);
+    }
 }

@@ -5,6 +5,7 @@ using Emberward.Core.Sensing;
 using Emberward.Core.Terrain;
 using Emberward.Core.Types;
 using Emberward.Desktop.Config;
+using Emberward.Desktop.Rendering.Entities;
 using Emberward.Core.Entities.Tanks;
 
 public sealed class TerrainAuxBuilder
@@ -15,12 +16,15 @@ public sealed class TerrainAuxBuilder
     public TerrainGrowthFade GrowthFade { get; } = new();
 
     /// <param name="tankPositions">Where each tank is drawn this frame (cell coordinates), indexed like <paramref name="tanks"/>.</param>
+    /// <param name="fireLevels">Each tank's fire level as drawn (<c>TankFireQuads.DrawnLevels</c>, easing after Core's),
+    /// indexed like <paramref name="tanks"/>; a tank past its end shimmers at Core's level.</param>
     public int BuildGpuTankHeatGlowData(
         IReadOnlyList<Tank> tanks,
         ReadOnlySpan<PositionF> tankPositions,
         in RenderView view,
         float[] target,
-        VisionMap? vision = null)
+        VisionMap? vision = null,
+        ReadOnlySpan<float> fireLevels = default)
     {
         int camPixelX = view.CameraPixels.X;
         int camPixelY = view.CameraPixels.Y;
@@ -50,10 +54,9 @@ public sealed class TerrainAuxBuilder
                 float damageVisual = 0.85f + 0.15f * MathF.Sqrt(Math.Clamp(damageFrac * 8.0f, 0.0f, 1.0f));
                 visibleT = Math.Max(visibleT, damageVisual);
             }
-            // A burning hull shimmers the air above it through the same haze.
-            float fire = tank.FireLevel;
-            if (fire > 0f)
-                visibleT = Math.Max(visibleT, 0.55f + (0.4f * fire));
+            // A burning hull shimmers the air above it through the same haze, eased in with the fire.
+            float fire = i < fireLevels.Length ? fireLevels[i] : tank.FireLevel;
+            visibleT = Math.Max(visibleT, (0.55f + (0.4f * fire)) * FireOnset.Light(fire));
             if (visibleT <= 0.0f) continue;
 
             float radiusFactor = (0.55f + 0.45f * MathF.Sqrt(visibleT)) * 1.35f;
