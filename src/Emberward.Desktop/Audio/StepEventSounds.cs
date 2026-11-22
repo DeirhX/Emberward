@@ -31,10 +31,15 @@ public enum CueVoice
 
     /// <summary>Rate-limited per tank, rising in pitch over a quick run of them.</summary>
     PickupStreak,
+
+    /// <summary>Once per pour: events of the same tank within <see cref="StepEventSounds.PourJoinSteps"/> of each other
+    /// are one sound (a bank at the core is four events a tick apart).</summary>
+    Pour,
 }
 
 /// <summary>The one-shot a simulation event plays: what, how loud, for whom, and how it varies.</summary>
-public readonly record struct StepEventCue(SoundEffect Effect, float Gain, CueHeard Heard, CueVoice Voice = CueVoice.Plain);
+public readonly record struct StepEventCue(SoundEffect Effect, float Gain, CueHeard Heard, CueVoice Voice = CueVoice.Plain,
+    float Pitch = 1f);
 
 /// <summary>
 /// Which one-shot effect a simulation event (<see cref="World.StepEvents"/>) plays. This is the one table of event
@@ -44,13 +49,29 @@ public readonly record struct StepEventCue(SoundEffect Effect, float Gain, CueHe
 /// </summary>
 public static class StepEventSounds
 {
+    /// <summary>Pour cues of one tank this close together (steps) are heard once (DepositQuads.JoinSteps).</summary>
+    public const int PourJoinSteps = 6;
+
     /// <summary>
     /// The one-shot of <paramref name="e"/>: as <see cref="CueFor(StepEventKind, MachineType)"/>, except that ore banked
-    /// at the core (<see cref="ImpactTarget.Base"/>, ten units a tick) makes no pickup note of its own: base service
-    /// already sounds there. A unit unloaded at a relay keeps its note.
+    /// at the core (<see cref="ImpactTarget.Base"/>) is a deposit, louder for a bigger load, and ore burned to restart a
+    /// dark base the same deposit pitched down. At a relay a unit is still the pickup streak's quieter note.
     /// </summary>
-    public static StepEventCue? CueFor(in StepEvent e) =>
-        e.Kind == StepEventKind.OreUnloaded && e.Target == ImpactTarget.Base ? null : CueFor(e.Kind, e.Machine);
+    public static StepEventCue? CueFor(in StepEvent e) => e.Kind switch
+    {
+        StepEventKind.OreUnloaded when e.Target == ImpactTarget.Base =>
+            new(SoundEffect.Deposit, DepositGain(e.Count), CueHeard.Player, CueVoice.Pour),
+        StepEventKind.RestartOreBurned =>
+            new(SoundEffect.Deposit, DepositGain(e.Count), CueHeard.Player, CueVoice.Pour, AudioTweaks.DepositBurnPitch),
+        _ => CueFor(e.Kind, e.Machine),
+    };
+
+    /// <summary>
+    /// A deposit's gain for a pour of <paramref name="units"/>: 0.6 to 1 of <see cref="AudioTweaks.DepositGain"/>. The
+    /// director passes the whole pour (the first event's units and what the hold still has to bank), since a bank's
+    /// first event carries only a tick's worth.
+    /// </summary>
+    public static float DepositGain(int units) => AudioTweaks.DepositGain * (0.6f + 0.4f * Math.Min(units, 40) / 40f);
 
     public static StepEventCue? CueFor(StepEventKind kind, MachineType machine) => kind switch
     {

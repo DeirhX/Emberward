@@ -170,9 +170,9 @@ off the network. There is no new meter: the TEMP gauge is the only thing to watc
 - **What stops spamming relays.** A relay is only useful where it can see the network. Cooling strength falls with
   each link hop from the base, so the far end of a long chain barely holds the tank. Every node also loads the
   shared radiator. Going much further means a forward base: a big, planned decision.
-- **The network is also a drop-off** *(Prototype)*. Inside coverage the tank's ore hold unloads into the base store
-  at 4 units a second, and the base store pays for what the tank builds there (§6.4). An unlinked node accepts
-  nothing.
+- **The network is also a drop-off** *(Prototype)*. Touching one of its own powered relays, the tank's ore hold unloads
+  into the base store at 4 units a second (coverage alone is not enough), and inside coverage the base store pays for
+  what the tank builds there (§6.4). An unlinked node accepts nothing.
 - **Direction (Proposed, §4.9).** The relay becomes the only node, with pumping and coverage one circle. The off-network
   clock is the tank's reserve: burning a carried unit of pyrite extends it and takes its warmth out of the tank,
   and running out is staged (warning, degraded, stranded, then heat death), not a cliff. Relays and generators push
@@ -200,7 +200,8 @@ The tank lives in a band around 0. Both ends hurt, and the world has places at b
   burning tank warms its surroundings more than itself (the energy is booked as injected in the ledger). The fire
   does no damage of its own; it hurts through the heat (overheating, being seen by emberites). Only the base puts it
   out, by repairing the hull (a dark base repairs nothing, so a fire there stays, held down by the base's cooling).
-  The fire is drawn on the tank: the exposed core glowing at the hull's centre in a ring of soot (1.5 cells across at
+  The fire is drawn on the tank: the exposed core glowing at the hull's centre, its rough edge melting into a smudge
+  of soot with no rim (1.5 cells across at
   75% hull to 3.5 at none, dark red through orange and yellow to white-hot on the hull-heat ramp; below 25% it sags and
   drips slag, below 5% it pulses white; a regenerated shield hides it), a flickering light in the core's colour on the
   ground around it, heat shimmer over it, and the fire itself as particles, the way a shot's burst throws glowing
@@ -430,10 +431,12 @@ A base must not fall to a tank that drives up and shoots it. It is a keep (`Base
 - **The bot** (`BotSiege`) shoots a shut gate, fires at the core through it once it opens, and drives in to a
   corner when it has no shot from outside. It lays siege only to a base it can break (`World.CanBreakBase`: what its
   gun fires in 60 seconds against the shield, the shield the store can buy back in that time, and the core with its
-  repairs), so a lone bot leaves a sound keep alone and goes for a worn, dark or unshielded one. While its enemy sits
-  docked in a base it cannot break it waits 12 cells out from the wall in front of the nearest gate, fire held
-  (`BotLoiter`), and fights the enemy when it comes out. A bot that stays within 10 cells of one spot for 10 seconds
-  while trying to get somewhere drops its goal for a detour (`BotStuckWatch`).
+  repairs), so a lone bot leaves a sound keep alone and goes for a worn, dark or unshielded one; a base it can break
+  it roams round until its 240-second opening grace is over. While its enemy sits docked in a base it cannot break it
+  waits 12 cells out from the wall beside the nearest gate, out of the straight line of fire through it, fire held
+  (`BotLoiter`). It stops waiting and fights while it sees the enemy, or for 5 seconds after it is hit. A bot that
+  stays within 10 cells of one spot for 10 seconds while trying to get somewhere drops its goal for a detour
+  (`BotStuckWatch`).
 - *Still open:* the numbers are untested in play; a turret covers a gate from inside its 24 cells, which may make a
   defended gate too strong; the attacker has no reading of the enemy's shield beyond shut or open.
 
@@ -662,7 +665,9 @@ Pyrite pockets and lumps at least 60 cells from every base hold a nest (a pocket
   on ground at 35 degrees or hotter (the scent threshold, so a tank cannot keep its ground that hot by itself once it
   has cooled) is kept by creatures within 48 cells of it whatever its own heat and whether they see it, unless it is
   docked in its own base.
-  A tank in its base, or just respawned, is not bitten.
+  A tank in its base, or just respawned, is not bitten. A tank docked in its own base wakes no nest and is not hunted:
+  creatures after it give it up and turn for home, and one heading home with a full charge takes up the hunt again on
+  any tank it sees within 220 cells, line clear of rock.
 - *Kills heat the ground.* A killed creature spills the charge it carries where it dies, so holding one choke point
   cooks it. One bullet, round or fragment kills. Creatures do not block tanks.
 - *Kills pay a little.* Every fourth death of a nest's creatures (counted on the creatures it has left) drops one unit
@@ -771,7 +776,13 @@ and drives up to its core to put it down, as a player must. Hot with
 When the tank dies its hold spills back into the ground as plain ore in the nearest open or dirt cells around the wreck,
 never under another tank or a machine (ore blocks links, so it would cut a relay); what does not fit within a few cells
 is lost. Torching rock no longer yields anything. The MATERIALS panel shows a pile of Pyrite growing inside the
-hold and the exact ore count against capacity. Beneath the hold window it says ORE, CARGO HOT with 20 or more
+hold and two rows under it: HOLD, the ore aboard against capacity, and BASE, the base store (which every relay
+shares) with how fast it has grown over the last 30 seconds (banked and harvested). Banking is shown where it
+happens: crystals pour from the hold into the core or relay, the core glows with its reactor's heat and pulses as
+they land, a `+N` rises for the player's own side (a rival's pour shows in sight, without numbers), and the nearest
+powered relay carries a BASE STORE label. On the HUD the hold drains and the store counts up over the pour (0.9 s),
+the BASE row flashes gold once, a short cascade of clinks plays once per pour, and the first bank of a match is toasted.
+Beneath the hold window it says ORE, CARGO HOT with 20 or more
 aboard, TO CORE inside the own base with ore aboard (BURN AT CORE while the base is dark; nothing while its store is full), and while the hold empties a blinking UNLOADING with down
 arrows. The base panel also shows the store.
 
@@ -1108,7 +1119,7 @@ upgrades, throughput, turrets, removing the pylon and the tank's reserve are in)
 | Stored heat is the match's supply; what keeps it up over a long match is open (§4.10) | Proposed |
 | Carried pyrite heats the tank linearly, steeply from 20 units and dangerously at 40, with no step or spike, and the hold upgrade insulates the load more than it enlarges the hold; the hold unloads only by touching the own core or a powered relay, and the core has no baffles round it (§6.3, §4.9) | Prototype |
 | Each unit a tank banks (core or relay) brings 250 energy into its reactor, booked as injected, after the tank's dock cooling; harvested and burned ore bring none (§6.3) | Prototype |
-| A bot sieges only a base it can break and otherwise waits outside while its enemy is docked; emberites hunt bot and player tanks by the same rules, and leave any tank docked in its own base (§4.9, §6.2) | Prototype |
+| A bot sieges only a base it can break, and waits beside a gate (out of its line of fire) only while its enemy is docked in a base it cannot break; emberites hunt bot and player tanks by the same rules, and leave any tank docked in its own base (§4.9, §6.2) | Prototype |
 
 ## 14. Open questions
 

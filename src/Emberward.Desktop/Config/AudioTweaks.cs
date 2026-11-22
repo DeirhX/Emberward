@@ -87,6 +87,10 @@ public static class AudioTweaks
     public const float EmberiteKilledGain = 0.30f;
     // A unit of ore unloaded into the network: a quieter pickup, about four a second.
     public const float UnloadGain = 0.18f;
+    // Pyrite banked at the core: one cascade of clinks and a warm thump for the whole pour, louder for a bigger load.
+    public const float DepositGain = 0.42f;
+    // Ore burned to restart a dark base: the same sound, pitched down.
+    public const float DepositBurnPitch = 0.75f;
     public const float WarningGain = 0.38f;
     public const float EngineIdleGain = 0.10f;
     public const float EngineMovingGain = 0.22f;

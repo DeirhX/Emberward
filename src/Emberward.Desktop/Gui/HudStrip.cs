@@ -32,6 +32,10 @@ public sealed class HudStrip
     private const uint OreLineColor = 0xFF78E6FFu, OreLineFullColor = 0xFF2880FFu, OreLineUnloadColor = 0xFF60FF90u;
     private const uint OreLineGlow = 0x2840B0FFu;
 
+    // The MATERIALS rows: the labels' warm grey, the rate's dim gold, the store's pale gold and its deposit flash.
+    private const uint MaterialsLabelColor = 0xFF9AC8E8u, MaterialsRateColor = 0xFF5AA0C8u;
+    private const uint StoreColor = 0xFFB8F0FFu, StoreFlashColor = 0xFF40C4FFu;
+
     /// <summary>
     /// A panel's plates, measured on the art (art pixels): the centre both lines share, the title plate's centre, and
     /// the readout plate's inner edges. The readout is centred in its plate. The levels themselves show in the art
@@ -80,7 +84,8 @@ public sealed class HudStrip
     }
 
     /// <param name="reserve">The reserve's stage tag beside OFF NETWORK (<see cref="ReserveTags.Of"/>), if any.</param>
-    public void Draw(Tank player, float time, MatchRules rules, TankShieldView shield, ReserveTag? reserve = null)
+    /// <param name="ledger">The player's ore as the HUD tells it (the base store's rate, a deposit's pour).</param>
+    public void Draw(Tank player, float time, MatchRules rules, TankShieldView shield, OreLedgerView ledger, ReserveTag? reserve = null)
     {
         var displaySize = ImGui.GetIO().DisplaySize;
         var dl = ImGui.GetForegroundDrawList();
@@ -113,24 +118,21 @@ public sealed class HudStrip
         // SHIELD and HULL: two stacked rows, each with its number and a hairline bar.
         DrawLedger(dl, player, shield);
 
-        // MATERIALS: the ore in the tank's hold against what it takes, the currency structures are built from. The
-        // pile is a sheet of 8 x 5 frames drawn by tools/hud/make_hold_pyrite.py; each stone carries its own corona.
-        int pileFrame = BuildSlotView.OrePileFrame(player);
-        if (pileFrame >= 0)
+        // MATERIALS: the hold and the base store (MaterialsView). The pile is a sheet of 8 x 5 frames drawn by
+        // tools/hud/make_hold_pyrite.py; each stone carries its own corona.
+        var materials = MaterialsView.Of(player, ledger);
+        if (materials.PileFrame >= 0)
         {
             var cell = new Vector2(1f / 8f, 1f / 5f);
-            var uv = new Vector2(pileFrame % 8, pileFrame / 8) * cell;
+            var uv = new Vector2(materials.PileFrame % 8, materials.PileFrame / 8) * cell;
             dl.AddImage(_orePileTex, At(MaterialsX + 51f, 48f), At(MaterialsX + 195f, 108f), uv, uv + cell);
         }
-        DrawReadout(dl, MaterialsPlate, string.Create(System.Globalization.CultureInfo.InvariantCulture,
-            $"{player.OreHeld} / {player.OreHoldCapacity}"));
+        DrawMaterials(dl, materials);
         // The hold emptying into the base (docked, or through the network), else a plain ORE label.
-        string oreLine = BuildSlotView.OreLine(player);
-        DrawStripText(dl, oreLine, OreLineX, OreLineY, OreLineSize,
-            player.IsUnloadingOre ? OreLineUnloadColor : player.IsOreHoldFull ? OreLineFullColor : OreLineColor,
-            glow: OreLineGlow);
+        uint oreColor = materials.Unloading ? OreLineUnloadColor : materials.HoldFull ? OreLineFullColor : OreLineColor;
+        DrawStripText(dl, materials.OreLine, OreLineX, OreLineY, OreLineSize, oreColor, glow: OreLineGlow);
 
-        if (player.IsUnloadingOre)
+        if (materials.Unloading)
         {
             // Down arrows either side of the word, bobbing: the ore is going down into the base.
             float bob = (time * 3f) % 1f * 5f;
@@ -200,6 +202,31 @@ public sealed class HudStrip
         uint hullColor = player.IsDead ? HudPalette.TextDim : HudPalette.HullHeat(hull);
         DrawLedgerRow(dl, hullRow, "HULL", HudPalette.HullNeutral, health.ToString(inv), hullColor, hull, hullColor,
             HudTheme.WithAlphaByte(HudPalette.HullEmber(HudPalette.HullHeatStart), 0x90), numberGlow: 0x30106AFFu);
+    }
+
+    /// <summary>
+    /// The MATERIALS readout: HOLD above BASE (<see cref="LedgerLayout"/>), a label left and a number right. The hold is
+    /// in the readout green, deep orange when full; the store in pale gold, flashing gold as a deposit lands, with its
+    /// rate after the label and the deposit's <c>+N</c> rising out of the row.
+    /// </summary>
+    private void DrawMaterials(ImDrawListPtr dl, MaterialsView view)
+    {
+        float left = MaterialsX + LedgerLayout.MaterialsLeft, right = MaterialsX + LedgerLayout.MaterialsRight;
+        DrawStripText(dl, "HOLD", left, LedgerLayout.HoldRowY, LedgerLayout.LabelSize, MaterialsLabelColor, align: 0f);
+        DrawStripText(dl, view.HoldText, right, LedgerLayout.HoldRowY, LedgerLayout.NumberSize,
+            view.HoldFull ? OreLineFullColor : ReadoutColor, align: 1f);
+        DrawStripText(dl, "BASE", left, LedgerLayout.BaseRowY, LedgerLayout.LabelSize, MaterialsLabelColor, align: 0f);
+        if (view.RateText != null)
+            DrawStripText(dl, view.RateText, MaterialsX + LedgerLayout.MaterialsRateX, LedgerLayout.BaseRowY,
+                LedgerLayout.RateSize, MaterialsRateColor, align: 0f);
+        uint storeColor = HudPalette.Lerp(StoreColor, StoreFlashColor, view.Flash);
+        DrawStripText(dl, view.BaseText, right, LedgerLayout.BaseRowY, LedgerLayout.NumberSize, storeColor,
+            view.Flash > 0f ? HudTheme.WithAlpha(StoreFlashColor, 0.3f * view.Flash) : 0u, align: 1f);
+        if (view.DeltaText != null)
+            // In the plate's middle, clear of both numbers, rising past the HOLD row's gap.
+            DrawStripText(dl, view.DeltaText, MaterialsX + LedgerLayout.MaterialsDeltaX,
+                LedgerLayout.BaseRowY - 2f - 14f * view.DeltaRise, LedgerLayout.NumberSize,
+                HudTheme.WithAlpha(StoreFlashColor, view.DeltaAlpha));
     }
 
     /// <summary>One ledger row centred on art y <paramref name="y"/>: label left, number right, bar beneath.</summary>

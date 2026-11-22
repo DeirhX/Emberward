@@ -18,6 +18,7 @@
     <Compile Include="../Emberward.Desktop/Audio/SoundDirector.cs" Link="Audio/SoundDirector.cs" />
     <Compile Include="../Emberward.Desktop/Audio/SoundSpace.cs" Link="Audio/SoundSpace.cs" />
     <Compile Include="../Emberward.Desktop/Audio/SoundBank.cs" Link="Audio/SoundBank.cs" />
+    <Compile Include="../Emberward.Desktop/Audio/SoundBank.Deposit.cs" Link="Audio/SoundBank.Deposit.cs" />
     <Compile Include="../Emberward.Desktop/Rendering/Entities/*.cs" Link="Entities/%(Filename)%(Extension)" />
     <Compile Include="../Emberward.Desktop/Rendering/EntityLayerBuilder.cs" Link="EntityLayerBuilder.cs" />
     <Compile Include="../Emberward.Desktop/Rendering/IGameRenderBackend.cs" Link="IGameRenderBackend.cs" />
@@ -42,6 +43,7 @@
     <Compile Include="../Emberward.Desktop/Gui/MachineUpgradeView.cs" Link="Gui/MachineUpgradeView.cs" />
     <Compile Include="../Emberward.Desktop/Gui/ReserveTags.cs" Link="Gui/ReserveTags.cs" />
     <Compile Include="../Emberward.Desktop/Gui/OreLedgerView.cs" Link="Gui/OreLedgerView.cs" />
+    <Compile Include="../Emberward.Desktop/Gui/MaterialsView.cs" Link="Gui/MaterialsView.cs" />
     <Compile Include="../Emberward.Desktop/Gui/Guidance/*.cs" Link="Gui/Guidance/%(Filename)%(Extension)" />
     <Compile Include="../Emberward.Desktop/SlotStepper.cs" Link="SlotStepper.cs" />
     <Compile Include="../Emberward.Desktop/Config/NetworkTweaks.cs" Link="Config/NetworkTweaks.cs" />

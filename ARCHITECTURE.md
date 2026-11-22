@@ -184,7 +184,7 @@ updates it after each step on the match's time (`BrowserSession.HudSeconds`) and
   A step can name a world cell to point at.
 - `GameEventWatcher` compares the player's side of the world with the previous frame and posts toasts to a
   `NotificationFeed` (relay linked or lost, harvester started, stalled or out of charge, ore
-  store full, charge low, off network, radar scattered by heat, engine running, harvester ore deliveries). The
+  store full, charge low, off network, radar scattered by heat, engine running, harvester ore deliveries, the first pyrite banked). The
   deliveries are counted from `StepEventKind.OreHarvested` after every step (`AfterStep`), not from the store, so a
   tank unloading in the same frame is not mistaken for them. The feed de-duplicates by key with a cooldown.
 - `HintSelector` picks the one context hint for the build keys (what E will do now, or why a carried machine will not
@@ -194,7 +194,10 @@ updates it after each step on the match's time (`BrowserSession.HudSeconds`) and
   an edge arrow with the distance off screen). `GameHud.Goal` draws the sector goal lines, the upgrade list while
   docked (base track on keys 1-4, tank track on 5-6) and the sector-complete banner. The build panel asks
   `Tank.QuoteBuild` for each machine's ore cost and payer. The MATERIALS panel shows Pyrite piling up inside
-  the hold, the exact count and capacity, and the base store or UNLOADING (`Tank.IsUnloadingOre`).
+  the hold and two rows, HOLD (count over capacity) above BASE (the base store, which every relay shares, with its
+  growth a minute), and UNLOADING (`Tank.IsUnloadingOre`). `MaterialsView` (shared with the browser) says what it
+  shows: a deposit is stretched over its pour, the hold draining as the store counts up, the BASE row flashing once
+  and a `+N` rising out of it.
 
 Every overlay (tutorial card, toasts, status and upgrade panels, warning banners, pause and controls menus, tags) is
 drawn with `HudTheme`, which follows the bottom HUD art: chamfered gunmetal plates, a bronze frame with an amber inner
@@ -232,7 +235,10 @@ step's sounds into the frame, and the page plays them with the bank's samples (`
   (`MatchRoomTests`, `LockstepRoomTests`, `SnapshotHoldTests`), client sessions and joining in progress
   (`NetSessionTests`, `NetSessionJoinTests`), recordings, and a relay over real
   sockets (`RelayOverSocketsTests`; the tests that wait on a timer or a paced match are its nested classes in
-  `TimedTestGroup`, which never run in parallel with the rest, and the quick run skips them).
+  `TimedTestGroup`, which never run in parallel with the rest, and the quick run skips them). The tests that play a
+  match through it, a rejoin included, turn the relay's clock off (`RelayHub.RunsClocks`) and close each tick
+  themselves once every client has stepped the one before and every player's input has arrived
+  (`MatchRoom.HasInputFromEveryPlayer`), so every run plays the same match.
   The network menu: `LaunchArgumentsTests` (the command line and the arguments of the next run, the secret kept out
   of them), `NetMenuModelTests`, `PlayerSettingsTests`, `TextInputSuppressesHotkeysTests` and `NetMenuRefusalTests`
   (what the real relay says to a refused launch).

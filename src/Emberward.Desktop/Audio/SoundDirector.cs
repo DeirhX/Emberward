@@ -46,6 +46,7 @@ public sealed class SoundDirector
         public bool Moved, Dug, Torched;
         public int MoveHold, DigHold, TorchHold;
         public int LastPickupStep, PickupStreak;
+        public int LastPourStep;
         public int EngineLoop, DigLoop, TorchLoop, TreadLoop, FireLoop;
         public bool EngineOn, DigOn, TorchOn, TreadOn, FireOn;
         public float Fire;      // the fire level as heard: following the tank's, so a hit or a repair never snaps it
@@ -150,7 +151,12 @@ public sealed class SoundDirector
                 default:
                     if (StepEventSounds.CueFor(e) is { } cue &&
                         StepEventSounds.Hears(cue, tracked: index >= 0, isPlayer: e.Color == playerColor))
+                    {
+                        // A pour sounds once, on its first event: loud for the whole load, what is left aboard included.
+                        if (cue.Voice == CueVoice.Pour && index >= 0)
+                            cue = cue with { Gain = StepEventSounds.DepositGain(e.Count + tanks[index].OreHeld) };
                         PlayCue(cue, e.Position, index, ref impacts);
+                    }
                     break;
             }
         }
@@ -192,6 +198,12 @@ public sealed class SoundDirector
                 break;
             case CueVoice.PickupStreak when index >= 0:
                 PlayPickup(index, position, cue);
+                break;
+            case CueVoice.Pour when index >= 0:
+                ref TankTrack track = ref _tanks[index];
+                if (track.LastPourStep == 0 || _step - track.LastPourStep > StepEventSounds.PourJoinSteps)
+                    Play(cue.Effect, position, cue.Gain, cue.Pitch, index);
+                track.LastPourStep = _step;
                 break;
             default:
                 Play(cue.Effect, position, cue.Gain, 1f, index);

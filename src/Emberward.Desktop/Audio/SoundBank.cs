@@ -7,7 +7,7 @@ using Emberward.Desktop.Config;
 /// out as mono samples at <see cref="AudioTweaks.SampleRate"/>. There are no sound files. The noise generator is
 /// seeded per effect, so the bank is the same on every run.
 /// </summary>
-public sealed class SoundBank
+public sealed partial class SoundBank
 {
     private const int Rate = AudioTweaks.SampleRate;
     private const float Tau = MathF.Tau;
@@ -53,6 +53,7 @@ public sealed class SoundBank
             SoundEffect.Plant => Plant(ref noise),
             SoundEffect.PlantRefused => PlantRefused(),
             SoundEffect.Pickup => Pickup(),
+            SoundEffect.Deposit => Deposit(ref noise),
             SoundEffect.WarnOverheat => WarnOverheat(),
             SoundEffect.WarnShield => WarnShield(),
             SoundEffect.WarnEnergy => WarnEnergy(),

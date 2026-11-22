@@ -14,12 +14,13 @@ The worms make *staying loud in one place* the thing that is punished:
 - Every loud act (digging, torching, shooting, shells bursting, machines working) leaves **unrest** in the ground
   where it happened. Unrest only rises while a place is noisy and only falls once it has been quiet.
 - The more unrest a place holds, the **farther away it is heard**. Worms sleep in lairs spread over the map; each
-  one whose lair is inside a place's reach wakes and comes. So a short noise calls nothing, half a minute of
-  torching calls the nearest worm, and a long siege calls several, which arrive one after another as their travel
+  one whose lair is inside a place's reach wakes and comes. So a short noise calls nothing, ten seconds of
+  torching in one place (the loudest thing a tank does, §2.1) calls the nearest worm, and a long siege calls several, which arrive one after another as their travel
   time allows. Time spent is what lets them catch up.
 - The answers are the behaviours we want: **move on** (a new place starts from nothing and the old one becomes a
   decoy while it fades), **go quiet** (a worm strikes only what it feels moving, digging or shooting), **retreat
-  down a tunnel you already dug** (a worm is slower than a driving tank and faster than a digging one), or **make
+  down a tunnel you already dug** (a worm is slower than a driving or torching tank and faster than one digging
+  without the torch), or **make
   noise somewhere else** (a shell burst is louder than the shot that made it).
 
 Emberites punish heat; worms punish noise and dwell. The two meet in the ground: a worm's burrowing warms it, it
@@ -41,7 +42,7 @@ polled, so a step with no loud event costs the walk over a short list and nothin
 | --- | --- | --- |
 | `TankMoved` | 1 | 24 a second, spread along the drive (32 per block crossed) |
 | `TankDug`, no torch | `Count / 2`, rounded up | 40 a second |
-| `TankDug`, torch | `Count` | 80 a second |
+| `TankDug`, torch | `Count` | 170 to 300 a second: the torch clears the face (7 cells going straight, up to 13 on a diagonal) and the tank moves on in the same tick |
 | `ShotFired` | 3 | 24 a second at the tank |
 | `Explosion` (a shell burst, a death, a wreck) | 12 | 96 a second where the shells land |
 | `TurretFired` (turret or gatling) | 2 | 16 a second for a gatling |
@@ -52,9 +53,21 @@ An idling engine, a turning turret, relays, generators and links are silent: the
 system that polled them would cost by machine count. Events inside a base (`Pixel.IsAnyBaseCell` at the event's
 cell) are ignored, so a docked tank is silent. Emberite events are not noise.
 
+**How an event is counted.** Each event counts once, in the block that holds its `Position`; nothing spreads to
+other blocks. A tank passing through leaves only what it recorded inside the block: about 32 driving across it, 160
+digging, 260 torching (more on a diagonal). That is heard from 10 to 16 cells at most, so travel calls nothing
+unless it passes over a lair. A worm's own movement is not noise, so a worm passing through or under a block adds
+nothing.
+
 Machine noise (`TurretFired`, `OreHarvested`) stops adding once its block holds `MachineUnrestCap` (1600, heard
 from 100 cells). Lairs stand at least 150 cells from every base, so the machinery around a base never calls a worm
-by itself; a tank fighting or torching there can.
+by itself; a tank fighting or torching there can. On a small map the lair distance shrinks by
+`OreDeposits.DistanceScale` (down to 0.4: 60 cells), inside the 100 cells a capped block is heard from, so the cap
+shrinks by the same scale (640 at 0.4, heard from 40 cells) and keeps the 100-to-150 margin on every map.
+
+A machine event refreshes its block's `LastNoiseTick` only while the block is below `MachineUnrestCap`. Otherwise a
+working gatling would hold a block a tank had torched up to the cap there for ever; with the rule, such a block
+decays to the machine cap and the machines hold it there.
 
 The per-second column depends on how often the tank code records each event (`TankDigger` records one `TankDug`
 per dig step, with the cells cleared as `Count`). `NoiseMapTests` pins the rates, so that a change to the tank
@@ -63,8 +76,8 @@ does not silently retune the worms.
 ### 2.2 The noise map
 
 `NoiseMap` cuts the map into blocks of `BlockCells` = 32 (a 1500 by 750 map is 47 by 24 = 1128 blocks). Per block
-it holds three numbers in flat arrays: `Unrest` (int), `LastNoiseTick` (int) and `LastAt` (the cell of the last
-event, which is where a worm heads). A `List<int>` holds the indices of the blocks whose unrest is not zero, in the
+it holds three numbers in flat arrays: `Unrest` (int), `LastNoiseTick` (int, an absolute tick, so it is saved in the
+snapshot and mixed in `MixLatent`) and `LastAt` (the cell of the last event, which is where a worm heads). A `List<int>` holds the indices of the blocks whose unrest is not zero, in the
 order they became noisy.
 
 Unrest is settled lazily, in integers, when a block is written or read at tick `t`:
@@ -86,17 +99,17 @@ A block is heard from `Unrest / UnrestPerCell` cells (16 unrest per cell), and n
 
 | What the tank does in one place | Heard from 150 cells after | 300 cells after | Cap (400 cells) after |
 | --- | --- | --- | --- |
-| Torch-mines without a pause | 30 s | 60 s | 80 s |
+| Torch-mines without a pause | 8 to 14 s | 16 to 28 s | 21 to 38 s |
 | Digs or widens without a pause | 60 s | 120 s | 160 s |
 | Fires without a pause at something close (shots and bursts in one block) | 20 s | 40 s | 53 s |
 | Fires without a pause at something far (bursts land elsewhere) | 100 s | 200 s | 267 s |
 
-and the decay: after 3 quiet seconds the reach shrinks 4.5 cells a second, so 30 seconds of torching is forgotten
-36 seconds after it stops and a place at the cap in 92.
+and the decay: after 3 quiet seconds the reach shrinks 4.5 cells a second, so 10 seconds of torching (1700 to 3000
+unrest) is forgotten 27 to 45 seconds after it stops, and a place at the cap in 92.
 
-Driving or tunnelling straight through leaves about 30 to 110 unrest per block, under the wake threshold: travel
+Driving or tunnelling straight through is heard from 16 cells at most (§2.1, how an event is counted): travel
 calls nothing. With about one lair per 100 000 cells (eleven on the standard map) the nearest lair is typically
-100 to 200 cells away, so the first worm sets out after roughly half a minute of loud work and needs 5 to 15
+100 to 200 cells away, so the first worm sets out after 8 to 14 seconds of torching, or about a minute of plain digging, and needs 5 to 15
 seconds to arrive; a second and a third follow as the reach passes their lairs. That is the convergence asked
 for, with no timer of its own: it falls out of reach growing with dwell and worms travelling at a fixed speed.
 
@@ -126,10 +139,13 @@ Machines of the tank's side may keep working; they draw the worm to themselves, 
   left behind keeps calling worms to an empty tunnel while it fades.
 - **Go quiet.** Three seconds of silence start the decay, and a silent tank is not felt. Going quiet where the
   noise was made is the risky version, because that is exactly where the worm arrives and prowls; move off first.
-- **Retreat.** A worm burrows at 0.8 cells a tick; a tank drives at 1 and digs at about 0.5. A tunnel already dug
-  is an escape route; digging a new one with a worm behind is not. Past 40 cells the tank is no longer felt.
+- **Retreat.** A worm burrows at 0.8 cells a tick; a tank drives at 1, torches through soil at 1 and digs without
+  the torch at about 0.5. A tunnel already dug is an escape route, and so is the torch: it outruns a worm in soil,
+  though it keeps the tank felt while the worm is within 40 cells, and it heats the tank. Digging without the torch
+  with a worm behind is not. Past 40 cells the tank is no longer felt.
 - **Decoy.** A shell burst adds 12 where it lands against 3 at the gun. Shelling a far wall builds unrest there
-  four times as fast as at the tank, and a worm goes to the louder call. The old work site is a decoy by itself.
+  four times as fast as at the tank, and a worm goes to the louder call, but only a worm more than `FeelRange` (40
+  cells) away: nearer, the gun's own `ShotFired` makes the tank felt, and a felt tank overrides the call. The old work site is a decoy by itself.
   Later, the thumper (§10, phase 6) is a decoy that can be planted.
 - **Kill it.** §6. A dead worm's lair is silent for four minutes.
 
@@ -145,8 +161,8 @@ step.
   cells from every base and `MinLairSpacing` = 120 from another lair, by rejection sampling with a fixed number of
   tries. The distances shrink on small maps by `OreDeposits.DistanceScale`, as the ore rules do.
 - **Waking.** A lair whose hearing check finds a call wakes: `StepEventKind.WormWoke`, and its worm appears at the
-  lair with all segments on one cell and uncoils as it leaves. Nothing wakes in the first `GraceSeconds` = 120 of a
-  match (the opening and the tutorial), as the bot's siege waits.
+  lair with all segments on one cell and uncoils as it leaves. Nothing wakes in the first `GraceSeconds` = 240 of a
+  match (the opening and the tutorial), as long as the bot's siege waits (`Tweaks.Weapon.BotBaseSiegeGraceSeconds`).
 - **Out.** Travelling to a call, hunting a felt tank, prowling a place that went quiet (`ProwlTicks` = 6 s on a
   circle of 12 cells around `LastAt`), venting (§5.4) or going home.
 - **Home.** With no call and no felt tank for `LoseInterestTicks` = 8 s it burrows back to its lair, puts the heat
@@ -175,7 +191,8 @@ is the warning. Radar shows a worm that is out (§8.1).
   rock, hot and frost rock, concrete, ore, base cells and the map edge, which a tank can put between itself and a
   worm. A worm caught in a pocket of rock gives up after `StuckTicks` (§3).
 - **Speed.** `SoilSpeed` 0.8 cells a tick, `OpenSpeed` 0.55, `LungeSpeed` 2.5 for at most 8 ticks. It is a
-  burrower: slower and exposed in the open, where a tank outruns it, and faster than a tank can dig. The steering
+  burrower: slower and exposed in the open, where a tank outruns it, and faster than a tank digs without the torch;
+  a torching tank (1 cell a tick) outruns it in soil too. The steering
   keeps it in soil beside a tunnel when it has the choice, which is why it comes out of the wall.
 - **What it does to the ground.** Burrowing writes no pixels, as with the emberites: the worm passes through soil
   and the soil closes behind it. Tunnels stay as the player dug them, so the map is not honeycombed over a match,
@@ -262,7 +279,9 @@ about 115 cells), a chase down a tunnel, or a trip to a decoy and back. A worm c
 second and third to come, §2.3) is due to vent as it arrives or on the way. After a vent it is at `RestHeat` and
 the next is 200 cells off, so a worm kept moving vents about every ten seconds of burrowing. The burst window is
 something the player makes, by making the worm travel. And a vent site is hot
-ground, which is what spent emberites drink from (`TryFindHotspot`), so a worm fight near a nest feeds the nest.
+ground, which is what spent emberites drink from (`TryFindHotspot`), so a worm fight near a nest can feed the nest:
+only a site at `HotspotHeat` (20 degrees) or more, within `HotspotSearchCells` (24) of where an emberite bit a tank,
+or within `HomeScanCells` (20) of a spent one on its way home, at a detour of at most `HomeDetourCells` (12).
 
 ## 6. Killing a worm
 
@@ -276,7 +295,8 @@ does:
 | Head, maw open (wind-up, hold, venting) | 1.5 | 240 | 17 |
 
 A tank fires a shell every 3 ticks, so 25 shells is three seconds of fire that all lands. Gatling rounds and
-turret shots do their own `Projectile.Damage` by the same factors; shrapnel does what it does to a tank.
+turret shots do their own `Projectile.Damage` by the same factors. Shrapnel does nothing to a worm, as it does nothing
+to a tank (`ProjectileList.AdvanceShrapnel` kills only emberites).
 
 - **In the open** the body is in view: circle it and fire into the flank. A cavern is where a worm is killed.
 - **In a tunnel** the tank sees the head, end on, and shells do a quarter damage. What is left is the half second
@@ -287,8 +307,10 @@ turret shots do their own `Projectile.Damage` by the same factors; shrapnel does
   cavern), a crossing of open ground at 0.55 cells a tick, the wind-up (0.5 s).
 - **Shots find it** as they find emberites: `SandwormPack.IndexSegments` files the segments of the worms out by
   sector at the start of the step (`CollisionSolver.Update`), `CollisionSolver.TestPoint(onSandworm:)` is asked
-  only while one is out, and a shell that hits bursts as on a tank. A segment under soil is hit only by what
-  reaches it: a shell bursts on the dirt in front, a gatling round passes its 3 cells of soil.
+  only while one is out, and a shell that hits bursts as on a tank. The worm is tested **before the terrain**, as
+  shrapnel tests emberites before the pixel: a shot entering a cell covered by any segment's disc hits the worm,
+  whatever the pixel. So a head in or against a tunnel is always exposed, and a segment buried deeper than its
+  radius stays behind its soil.
 - **Death.** `StepEventKind.WormKilled`, the heat spills, the body is gone, the lair is spent for four minutes. The
   reward in the first version is that quiet: a region where loud work is safe for a while (§11).
 
@@ -302,6 +324,13 @@ today and two clients with different rules refuse to start. `World` builds a `Sa
 `BuildSystems` adds `"sandworms"` **after `"machines"`**, so that the step's events from projectiles, tanks and
 machines are all recorded before the pack reads them. Nothing that counts as noise is recorded later in the step;
 a test pins that (§9).
+
+This changes the contract of `StepEventLog`. Its summary says nothing in the simulation reads it back and its
+`[NotSaved]` reason says "output only"; both are already untrue (`EmberiteSwarm.WatchForThieves` reads
+`OreCollected`), and with worms the log is input to the step. The reason becomes "scratch: cleared before each step
+and filled before the systems that read it (emberites, worms)", with its entry in `SnapshotCoverageTests` changed to
+match. And every noise event must always be recorded: today each site records through `?.Record`, so a context
+built without a log records nothing. With the rule on the log is always passed, and a test checks it.
 
 State lives in the pack, not on `Tank`: which tank a worm holds and each tank's last-noise tick are arrays in the
 pack, and the tank's step asks `SimulationContext.Sandworms?.Holds(tank)`. A hold made in one step stops the tank
@@ -361,7 +390,7 @@ area only as memory, not as work.
 | `LoseInterestTicks` / `StuckTicks` | 192 / 72 | `HeatCapacity` / `BurrowEnergyPerCell` | 400 / 40 |
 | `CellsPerLair` | 100 000 | `VentHeat` / `RestHeat` / `VentTicks` | 30 / 10 / 72 |
 | `MinLairDistanceFromBase` / `MinLairSpacing` | 150 / 120 | `OpenShedDegreesPerSecond` | 0.5 |
-| `GraceSeconds` | 120 | `RebirthTicks` | 5760 |
+| `GraceSeconds` | 240 | `RebirthTicks` | 5760 |
 | `MaxOut` | 6 | `FeelerCells` | 8 |
 
 Thermal code reads the heat numbers through `SimulationSettings`, as the guard test requires.
@@ -421,7 +450,7 @@ worm is a loop whose gain is the proximity strength; `SoundDirector` needs a loo
 - `NoiseMapTests`: each event adds its amount to the right block; unrest holds while noisy and falls after the
   grace; the cap; machine noise stops at its cap; base cells are silent; the per-second rates of driving, digging,
   torching and firing; a silent step writes no block.
-- `SandwormCallTests`: the ramp table of §2.3 (torch for 30 s: the lair at 150 cells wakes and the one at 300
+- `SandwormCallTests`: the ramp table of §2.3 (torch for 10 s: the lair at 100 cells wakes and the one at 250
   does not); a second lair wakes later; a quiet place stops calling; a moved tank leaves the call behind; a shell
   burst far away outcalls the gun; nothing wakes in the grace period; no system stepped after `"sandworms"`
   records an event that counts as noise.
@@ -504,3 +533,13 @@ key and a wider input encoding. Kept last because it is the only part that touch
 7. **Both tanks share the ground.** One side's noise calls worms that may meet the other side first. Is noise as
    a weapon wanted (shelling the ground beside the enemy to call worms onto him), or should a worm prefer the
    tank whose colour made the noise?
+8. **Worms and emberites.** Does either hurt or block the other? The plan has them pass through each other (§4),
+   and a worm's vent feeds emberites (§5.4); nothing else is decided.
+9. **Machines in the way.** Do machines block a worm? They are not in its obstacle list (§4) now, so it passes
+   under them.
+10. **More calls than `MaxOut`.** Which lairs wake once `MaxOut` worms are out: are calls queued, the nearest lair
+    first, or dropped?
+11. **Whose burst.** `Explosion` is recorded without a colour, so a burst cannot be put down to a side. That matters
+    for question 7.
+12. **Where `IgnoreTicks` lives.** Per worm or per lair, kept as a list of block and expiry tick; either way it is
+    saved in the snapshot and mixed in the hash.

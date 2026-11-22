@@ -45,6 +45,9 @@ public sealed class BrowserScene
     }
 
     public BrowserTerrain Terrain { get; }
+
+    /// <summary>The player's ore as the HUD tells it, counted from the steps this scene captured.</summary>
+    public Emberward.Desktop.Gui.OreLedgerView OreLedger => _entities.OreLedger;
     public RenderView View { get; private set; }
 
     /// <summary>The last frame, laid out as the remarks describe. Valid until the next <see cref="Render"/>.</summary>

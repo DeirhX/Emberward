@@ -1,6 +1,7 @@
 namespace Emberward.Core.Bots;
 
 using Emberward.Core.Collision;
+using Emberward.Core.Config;
 using Emberward.Core.Entities.Bases;
 using Emberward.Core.Entities.Tanks;
 using Emberward.Core.Input;
@@ -48,8 +49,9 @@ public partial class BotTankAI
 
     /// <summary>
     /// Waits for an enemy docked in <paramref name="target"/>, a base the bot cannot break: it drives to its post
-    /// outside the gate nearest it (<see cref="BotLoiter"/>) and stands there with its turret on the base. It does not
-    /// fire, at the base or at the enemy inside; a manoeuvre round something in its way may torch it.
+    /// outside the gate nearest it and to one side of the gate's line of fire (<see cref="BotLoiter"/>), and stands
+    /// there with its turret on the base. It does not fire, at the base or at the enemy inside; a manoeuvre round
+    /// something in its way may torch it. Seeing the enemy, or hit, it stops waiting (<see cref="TrackHits"/>).
     /// </summary>
     private ControllerOutput DoLoiter(Tank tank, TankBase target, World world)
     {
@@ -59,6 +61,7 @@ public partial class BotTankAI
         {
             _timeToChange = 0;
             _navigator.ResetStuck();
+            _navigator.ResetProgress();
             return new ControllerOutput { AimDirection = BotGunner.AimTowardsOffset(target.Position - tank.Position) };
         }
 
@@ -77,4 +80,30 @@ public partial class BotTankAI
 
     /// <summary>Ticks a move toward the loiter post is held before it is chosen again.</summary>
     private const int LoiterReplanFrames = 6;
+
+    /// <summary>Ticks after a hit in which the bot does not wait at a post: it fights or roams as when there is no post.</summary>
+    private const int LoiterBreakFrames = 5 * Tweaks.Perf.TargetFps;
+
+    /// <summary>Whether the bot chose to wait outside its enemy's base (<see cref="BotLoiter"/>) on its last tick.</summary>
+    private bool _waiting;
+
+    /// <summary>Whether the bot waited outside its enemy's base on its last tick; for tests and diagnostics.</summary>
+    public bool IsWaiting => _waiting;
+
+    /// <summary>The tank's health last tick, to tell a hit.</summary>
+    private int _lastHealth;
+
+    /// <summary>Ticks left in which the bot does not wait at a post (see <see cref="LoiterBreakFrames"/>).</summary>
+    private int _loiterBreakFrames;
+
+    /// <summary>Notes a hit (health lower than last tick), which keeps the bot from waiting at a post for a while.</summary>
+    private void TrackHits(Tank tank)
+    {
+        int health = (int)tank.Reactor.Health;
+        if (health < _lastHealth)
+            _loiterBreakFrames = LoiterBreakFrames;
+        else if (_loiterBreakFrames > 0)
+            _loiterBreakFrames--;
+        _lastHealth = health;
+    }
 }
