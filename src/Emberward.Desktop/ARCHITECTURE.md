@@ -125,7 +125,7 @@ Core decides what is seen; the renderer only shows it.
   for a few ticks when the beam finds it, which is what shows the sweep, then fades over the contact's life. A blip
   whose cell has come into sight is not drawn. A return that crossed warm ground is smaller and dimmer (the
   contact's strength, sent in the vertex colour), and a `Heat` contact is drawn as a red dot whose opacity is how hot
-  the cell is (its strength). `GameEventWatcher` posts "Radar scattered by heat" when `Radar.HeatLoss` passes `RadarScatteredShare`.
+  the cell is (its strength). `RadarWatch` (in `GameEventWatcher`) posts "Radar scattered by heat" when `Radar.HeatLoss` passes `RadarScatteredShare`.
   The pulse ring is drawn at `Radar.PulseFront` (moving `Radar.PulseSpeed` a tick, faster with the radar upgrade)
   and fades out at `Radar.PulseRange`, which the upgrade lengthens.
 - **Ore on the network.** Links carry two beams: heat home (orange, `KindLink`) and ore home (`KindOreBeam`, `OreBeam` in `Shaders/Entity/Beams.hlsli`: gold crystals with a pale
@@ -195,10 +195,9 @@ The loop around it (polling, fixed simulation steps, composing) is described in 
 5. Uploads everything in one `GamePixelsUpload` (`UploadGamePixels`): the composed world image (only when a step
    changed it), the aux and coverage dirty rects, tank glow and entity vertices. `TerrainAuxUploader.Commit` then
    clears the terrain's heat dirty rect if it was packed.
-6. Adjusts the native-continuous sample count to the time steps 3 and 5 took.
-7. `ClearFrame`; if the backend supports UI, `NewFrame` and the HUD: `GameHud.Draw` and the session overlay in a
+6. `ClearFrame`; if the backend supports UI, `NewFrame` and the HUD: `GameHud.Draw` and the session overlay in a
    match, `GameHud.DrawTerrainTest` in the terrain test.
-8. `Render`.
+7. `Render`.
 
 ## Display density and the HUD
 
@@ -251,12 +250,17 @@ display's own resolution instead of being stretched by the OS.
 
 - `[Draw]`: `terrain` (`DrawChangesToSurface` after each step), `objects` (composing), `screen` (steps 3-6 above)
   and `total` (the whole loop iteration).
-- `[Screen]`: `hiresTerrain` (step 3), `hiresEntities` (step 4), `upload` (step 5), `ui` (step 7) and
-  `imguiRender` (step 8).
+- `[Screen]`: `hiresTerrain` (step 3), `hiresEntities` (step 4), `upload` (step 5), `ui` (step 6) and
+  `imguiRender` (step 7).
 - `[Screen+]`: `backendUpload`, `auxBuild` (the first full pack), `auxTerrain` and `auxHeat` (the partial packs),
-  `tankGlowBuild`, `qualityAdjust`, `clear`, `newFrame` and `hud`.
+  `tankGlowBuild`, `clear`, `newFrame` and `hud`.
 
 `--perf` (`PerfCaptureSession`) measures whole frame times separately and writes them to the console or a CSV file.
+It also waits for the GPU after each frame (`IGameRenderBackend.MeasureGpuTime`) and splits each frame into
+`swapchainWait`, `submit`, `gpu` and `cpu`. Read `gpu` and `cpu`: a hidden window, or a window on a display that is off
+or locked, has its presents held back by the OS, which shows up as a long swapchain wait or submit (frames land on
+multiples of about 250 ms), not as work. Waiting for the GPU gives up the overlap of CPU and GPU work, so a capture's
+frame times are an upper bound on a normal frame.
 
 ## Display options (CLI)
 

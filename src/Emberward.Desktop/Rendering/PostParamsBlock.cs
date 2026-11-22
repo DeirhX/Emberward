@@ -28,7 +28,7 @@ public unsafe struct PostParamsBlock
     public float _padReserved3, TerrainMaskRimLift, _padReserved4, Quality;
     public float MaterialScorchedR, MaterialScorchedG, MaterialScorchedB, MaterialScorchedStrength;
     public float MaterialPulseFreq, MaterialPulseMin, MaterialPulseRange, MaterialPulsePad;
-    public float NativeSmoothingEnabled, _padReserved5, NativeSampleFactor, NativeCurvingEnabled;
+    public float NativeSmoothingEnabled, _padReserved5, _padReserved6, NativeCurvingEnabled;
     public float LightDirX, LightDirY, LightDirZ, LightNormalStrength;
     public float HalfVecX, HalfVecY, HalfVecZ, LightMicroNormalStrength;
     public float LightAmbient, LightDiffuseWeight, LightShininess, LightSpecularIntensity;
@@ -94,9 +94,6 @@ public unsafe struct PostParamsBlock
         cb.MaterialPulseRange = DesktopScreenTweaks.PostMaterialEmissivePulseRange;
         cb.MaterialPulsePad = 0f;
         cb.NativeSmoothingEnabled = BoolToFloat(HasPass(passes, PostProcessPassFlags.NativeTerrainSmoothing));
-        cb.NativeSampleFactor = upload.NativeContinuous.SampleCount <= 1
-            ? 0f
-            : upload.NativeContinuous.SampleCount <= 2 ? 0.5f : 1f;
         cb.NativeCurvingEnabled = BoolToFloat(HasPass(passes, PostProcessPassFlags.NativeEdgeCurving));
 
         float lx = DesktopScreenTweaks.LightDirX, ly = DesktopScreenTweaks.LightDirY, lz = DesktopScreenTweaks.LightDirZ;

@@ -1,5 +1,6 @@
 namespace Emberward.Desktop.Rendering.SdlGpu;
 
+using System.Diagnostics;
 using ImGuiNET;
 using SDL3;
 using Emberward.Core.Types;
@@ -41,6 +42,8 @@ public sealed unsafe partial class SdlGpuBackend : IGameRenderBackend
     public nint GameTextureId => _displayTexture;
     public Size GameTextureSize => new(Math.Max(1, _scene.Width), Math.Max(1, _scene.Height));
     public bool SupportsUi => _imgui != null;
+    public bool MeasureGpuTime { get; set; }
+    public RenderTiming LastFrameTiming { get; private set; }
 
     /// <param name="window">The SDL3 window (SDL_Window*) to present to.</param>
     public SdlGpuBackend(nint window)
@@ -127,7 +130,7 @@ public sealed unsafe partial class SdlGpuBackend : IGameRenderBackend
         {
             if (SupportsUi)
                 ImGui.Render();
-            SubmitFrame(screenshotPath: null);
+            _ = SubmitFrame(screenshotPath: null);
             return;
         }
 
@@ -164,8 +167,10 @@ public sealed unsafe partial class SdlGpuBackend : IGameRenderBackend
         if (screenshotPath != null)
             QueueScreenshotDownload(cmd);
 
-        if (SDL.WaitAndAcquireGPUSwapchainTexture(cmd, _window, out nint swapchain, out uint swapW, out uint swapH) &&
-            swapchain != nint.Zero)
+        long acquireStart = Stopwatch.GetTimestamp();
+        bool acquired = SDL.WaitAndAcquireGPUSwapchainTexture(cmd, _window, out nint swapchain, out uint swapW, out uint swapH);
+        double swapchainWaitMs = Stopwatch.GetElapsedTime(acquireStart).TotalMilliseconds;
+        if (acquired && swapchain != nint.Zero)
         {
             var blit = new SDL.GPUBlitInfo
             {
@@ -177,7 +182,10 @@ public sealed unsafe partial class SdlGpuBackend : IGameRenderBackend
             SDL.BlitGPUTexture(cmd, in blit);
         }
 
-        SubmitFrame(screenshotPath);
+        long submitStart = Stopwatch.GetTimestamp();
+        double gpuMs = SubmitFrame(screenshotPath);
+        double submitMs = Stopwatch.GetElapsedTime(submitStart).TotalMilliseconds - gpuMs;
+        LastFrameTiming = new RenderTiming(swapchainWaitMs, submitMs, gpuMs);
     }
 
     public void RequestScreenshot(string? label = null)
@@ -197,25 +205,37 @@ public sealed unsafe partial class SdlGpuBackend : IGameRenderBackend
         return _frameCommandBuffer;
     }
 
-    private void SubmitFrame(string? screenshotPath)
+    /// <returns>How long the GPU took after the submit, when this waited for it (<see cref="MeasureGpuTime"/>); else 0.</returns>
+    private double SubmitFrame(string? screenshotPath)
     {
         nint cmd = _frameCommandBuffer;
         _frameCommandBuffer = nint.Zero;
-        if (screenshotPath == null)
+        if (screenshotPath == null && !MeasureGpuTime)
         {
             SDL.SubmitGPUCommandBuffer(cmd);
-            return;
+            return 0;
         }
 
         nint fence = SDL.SubmitGPUCommandBufferAndAcquireFence(cmd);
+        if (screenshotPath == null)
+        {
+            if (fence == nint.Zero)
+                return 0;
+            long gpuStart = Stopwatch.GetTimestamp();
+            SDL.WaitForGPUFences(_device, true, [fence], 1);
+            SDL.ReleaseGPUFence(_device, fence);
+            return Stopwatch.GetElapsedTime(gpuStart).TotalMilliseconds;
+        }
+
         if (fence == nint.Zero)
         {
             Console.WriteLine($"[Render] Screenshot failed: {screenshotPath} ({SDL.GetError()})");
-            return;
+            return 0;
         }
         SDL.WaitForGPUFences(_device, true, [fence], 1);
         SDL.ReleaseGPUFence(_device, fence);
         WriteScreenshot(screenshotPath);
+        return 0;
     }
 
     private void QueueScreenshotDownload(nint cmd)

@@ -99,8 +99,7 @@ public readonly record struct FogUpload(
 /// <param name="SourceChanged">False when <paramref name="SourcePixels"/> is the same image as the last upload.</param>
 public readonly record struct NativeContinuousUpload(
     uint[]? SourcePixels,
-    bool SourceChanged,
-    int SampleCount);
+    bool SourceChanged);
 
 /// <summary>Quads for the entity layer (tanks, projectiles), drawn over the finished terrain frame.</summary>
 public readonly record struct EntityLayerUpload(
@@ -148,5 +147,21 @@ public interface IGameRenderBackend : IDisposable
 
     void Render();
 
+    /// <summary>
+    /// When set, <see cref="Render"/> waits for the GPU to finish each frame so <see cref="LastFrameTiming"/> can say
+    /// how long the GPU took. That gives up the overlap of CPU and GPU work, so only perf captures set it.
+    /// </summary>
+    bool MeasureGpuTime { get; set; }
+
+    /// <summary>Where the last <see cref="Render"/> waited: for a swapchain image, in submit and present, and on the GPU.</summary>
+    RenderTiming LastFrameTiming { get; }
+
     void RequestScreenshot(string? label = null);
 }
+
+/// <param name="SwapchainWaitMs">Blocked waiting for a swapchain image: vsync, frames in flight, or an OS throttling the
+/// presents of a window that is hidden or on a display that is off.</param>
+/// <param name="SubmitMs">The submit call, which on some drivers also presents.</param>
+/// <param name="GpuMs">From submit until the GPU finished the frame; zero unless
+/// <see cref="IGameRenderBackend.MeasureGpuTime"/> is set.</param>
+public readonly record struct RenderTiming(double SwapchainWaitMs, double SubmitMs, double GpuMs);

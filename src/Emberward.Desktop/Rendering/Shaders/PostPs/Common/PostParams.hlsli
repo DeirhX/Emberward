@@ -64,7 +64,7 @@ cbuffer PostParams : POST_PARAMS_UNIFORMS
     float4 MaterialEmissivePulse;   // .x = speed, .y = base, .z = amplitude, .w = unused
 
     // ---- TerrainPs native-continuous rendering ----------------------------
-    float4 NativeContinuousParams;  // .x = SmoothingEnabled, .y = unused, .z = SampleFactor, .w = CurvingEnabled
+    float4 NativeContinuousParams;  // .x = SmoothingEnabled, .y = unused, .z = unused, .w = CurvingEnabled
 
     // ---- Directional lighting (material shading) --------------------------
     float4 LightDir;                // .xyz = light direction, .w = NormalStrength

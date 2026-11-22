@@ -112,7 +112,8 @@ Removing a system (the gold pickup was the first; its commit is a worked example
    its `StepEventKind` values; its `TerrainPixel` rows (and the name list in `SimulationTableGuardTests`); its
    level-generation step. Delete what only it called (gold was the only pickup, so the pickup step went too) and
    rewrite comments that list it beside other things.
-3. Desktop: the HUD, guidance, sound (`StepEventSounds`) and presentation that read it. In the renderer: its material
+3. Desktop: the HUD, guidance (its watch in `Gui/Guidance/Events` and its line in `GameEventWatcher`), sound
+   (`StepEventSounds`) and presentation that read it. In the renderer: its material
    code in `TerrainAuxBuilder` and `Constants.hlsli`, its shader files and their `#include`, and any `PostParams`
    row. Remove a row from `PostParamsBlock` and `PostParams.hlsli` together and raise the layout version on both
    (`PostParamsLayoutGuardTests`).

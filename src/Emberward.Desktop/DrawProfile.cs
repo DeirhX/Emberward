@@ -12,7 +12,6 @@ public class DrawProfile
     public TimeSpan ScreenAuxBuild;
     public TimeSpan AuxTerrainPack;
     public TimeSpan AuxHeatPack;
-    public TimeSpan ScreenQualityAdjust;
     public TimeSpan ScreenClearFrame;
     public TimeSpan ScreenNewFrame;
     public TimeSpan ScreenHudDraw;
@@ -39,7 +38,7 @@ public class DrawProfile
         Console.WriteLine($"[Screen+] backendUpload={Avg(ScreenBackendUpload):F3} auxBuild={Avg(ScreenAuxBuild):F3} " +
             $"auxTerrain={Avg(AuxTerrainPack):F3} auxHeat={Avg(AuxHeatPack):F3} " +
             $"tankGlowBuild={Avg(ScreenTankGlowBuild):F3} " +
-            $"qualityAdjust={Avg(ScreenQualityAdjust):F3} clear={Avg(ScreenClearFrame):F3} newFrame={Avg(ScreenNewFrame):F3} hud={Avg(ScreenHudDraw):F3} ms");
+            $"clear={Avg(ScreenClearFrame):F3} newFrame={Avg(ScreenNewFrame):F3} hud={Avg(ScreenHudDraw):F3} ms");
         Reset();
     }
 
@@ -51,7 +50,7 @@ public class DrawProfile
         ScreenHiResTerrain = ScreenHiResEntities = ScreenUpload = TimeSpan.Zero;
         ScreenBackendUpload = ScreenAuxBuild = AuxTerrainPack = AuxHeatPack = TimeSpan.Zero;
         ScreenTankGlowBuild = TimeSpan.Zero;
-        ScreenQualityAdjust = ScreenClearFrame = ScreenNewFrame = ScreenHudDraw = TimeSpan.Zero;
+        ScreenClearFrame = ScreenNewFrame = ScreenHudDraw = TimeSpan.Zero;
         ScreenUi = ScreenImGuiRender = TimeSpan.Zero;
         FrameCount = 0;
     }

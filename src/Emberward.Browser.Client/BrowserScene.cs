@@ -93,7 +93,7 @@ public sealed class BrowserScene
             new PostProcessUploadOptions(_session.ThermalView, PostProcessPassFlags.All & ~PostProcessPassFlags.ThermalRegions, default, time),
             new TankGlowUpload(_glows, glowCount),
             new TerrainAuxUpload(Terrain.Texture(BrowserTerrain.Aux).Data, null, Terrain.Texture(BrowserTerrain.Coverage).Data, null),
-            new NativeContinuousUpload(null, false, DesktopScreenTweaks.NativeContinuousSampleHigh), default,
+            new NativeContinuousUpload(null, false), default,
             new FogUpload(Terrain.Texture(BrowserTerrain.Fog).Data, null),
             _screenEffects.Update(_session.Player, delta));
         PostParamsBlock block = PostParamsBlock.Build(upload, time);

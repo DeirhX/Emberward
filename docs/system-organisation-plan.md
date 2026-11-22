@@ -25,18 +25,15 @@ merge, before starting new work on top.
 
 ### 1. One watcher per system in the guidance
 
-`Gui/Guidance/GameEventWatcher.cs` keeps a flag for every system (relays, harvesters, stores, charge, coverage,
-radar, ore, upgrades, the core) and every new system edits it. Split it into small watchers, one per system, each
-with its own state and messages, behind one interface that the feed calls. `TutorialDirector` (one list of steps for
-every system), `HintSelector` and the `StepEventSounds` switch have the same shape and can follow the same way.
-
-Done when adding or removing a system's notifications touches only that system's watcher and the list of watchers.
+Done for the toasts: `GameEventWatcher` holds one `IEventWatch` per system in `Gui/Guidance/Events` (base attack,
+upgrades, sector goal, network, base power, ore, radar, nests), each with its own state and messages. Still to do:
+`TutorialDirector` (one list of steps for every system), `HintSelector` and the `StepEventSounds` switch have the same
+shape and can follow the same way.
 
 ### 2. Vision and radar tracking out of `World`
 
-`World` still holds `TrackVision`, `TrackRadar`, `RadarOf` and the per-step update of each side's sight (about 100
-lines). Move them to a `Sensing` class that `World` owns and runs as the `vision` entry of `BuildSystems`, the way
-the sector goal moved to `Match/`. `World` keeps thin queries for Desktop.
+Done: `Sensing/SideSensing` owns tracking and the per-step update; `World` keeps thin queries (`TrackVision`,
+`TrackRadar`, `RadarOf`) for Desktop.
 
 ### 3. Split `Tweaks.World`
 
