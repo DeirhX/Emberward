@@ -20,7 +20,7 @@ using Emberward.Relay;
 /// The real relay on a local port, with real WebSocket clients. These tests wait with generous limits, so they run
 /// beside the rest; those that time a connection closely are in <see cref="TimingSensitive"/>.
 /// </summary>
-public class RelayOverSocketsTests
+public partial class RelayOverSocketsTests
 {
     private static readonly Size MapSize = new(320, 200);
 
@@ -43,7 +43,10 @@ public class RelayOverSocketsTests
         return (app, new Uri($"ws://127.0.0.1:{http.Port}/play"));
     }
 
-    private static NetLaunchOptions Options(Uri play, string name) => new(play, "test-room", name, Players: 2);
+    /// <summary>The room the tests play in, unless they name another.</summary>
+    private const string RoomName = "test-room";
+
+    private static NetLaunchOptions Options(Uri play, string name) => new(play, RoomName, name, Players: 2);
 
     private static MatchConfig Config(int seed) =>
         NetMatch.ProposeConfig(seed, MapSize, Core.LevelGen.LevelGenMode.Deterministic, players: 2);
@@ -63,34 +66,6 @@ public class RelayOverSocketsTests
         }
     }
 
-    /// <summary>
-    /// Waits for a match to play on, for as long as it keeps moving: the wait fails after <paramref name="stall"/> with
-    /// no change in <paramref name="progress"/> (ticks played, say), not after a fixed time, so a slow build machine
-    /// passes and a stuck match still fails, saying where it stuck (<paramref name="where"/>). An overall cap ends
-    /// a match that crawls without ever stopping.
-    /// </summary>
-    private static void WaitForProgress(Func<bool> condition, Func<long> progress, Func<string> where, params RelayConnection[] pump)
-    {
-        TimeSpan stall = TimeSpan.FromSeconds(10), cap = TimeSpan.FromSeconds(90);
-        var total = Stopwatch.StartNew();
-        var sinceProgress = Stopwatch.StartNew();
-        long seen = progress();
-        while (!condition())
-        {
-            long now = progress();
-            if (now != seen)
-            {
-                seen = now;
-                sinceProgress.Restart();
-            }
-            Assert.True(sinceProgress.Elapsed < stall && total.Elapsed < cap,
-                $"The match stopped moving ({sinceProgress.Elapsed.TotalSeconds:0.#} s without a tick, {total.Elapsed.TotalSeconds:0.#} s in all): {where()}");
-            Thread.Sleep(5);
-            foreach (var connection in pump)
-                connection.Pump();
-        }
-    }
-
     [Fact]
     public async Task ClientOfAnotherBuildOrProtocol_IsRefusedWithAReason()
     {
@@ -98,7 +73,7 @@ public class RelayOverSocketsTests
         await using var _ = app;
         using var first = NetLaunch.Join(Options(play, "Ann"), Config(seed: 42));
 
-        var otherBuild = new Hello(MessageCodec.ProtocolVersion, "some-other-build", "Eve", "test-room", Config(1));
+        var otherBuild = new Hello(MessageCodec.ProtocolVersion, "some-other-build", "Eve", RoomName, Config(1));
         var refused = Assert.Throws<RelayException>(
             () => RelayConnection.Connect(play, otherBuild, TimeSpan.FromSeconds(5)));
         Assert.Contains("some-other-build", refused.Message, StringComparison.Ordinal);
@@ -182,7 +157,7 @@ public class RelayOverSocketsTests
     }
 
     private static Hello HelloFor(string name) =>
-        new(MessageCodec.ProtocolVersion, NetMatch.BuildId, name, "test-room", Config(seed: 42));
+        new(MessageCodec.ProtocolVersion, NetMatch.BuildId, name, RoomName, Config(seed: 42));
 
     /// <summary>
     /// A relay that completes the handshake and says welcome, then never says anything again and does not answer
@@ -523,148 +498,6 @@ public class RelayOverSocketsTests
             // Everything so far, and at most the few ticks of the moments since: no stall to make up, no jump.
             Assert.InRange(caughtUp, seen, seen + 8);
             Assert.Null(back.Failure);
-        }
-    }
-
-    /// <summary>
-    /// The tests that play a match through the relay. The relay paces a match by the clock, and with every core busy
-    /// a client falls seconds behind it, so these run on their own too (<see cref="TimedTestGroup"/>). They play at
-    /// the fastest tick rate the protocol allows, so that the ticks they need take a fraction of the time.
-    /// </summary>
-    [Collection(TimedTestGroup.Name)]
-    [Trait("Category", "Slow")]
-    public class MatchPlayTests
-    {
-        private static MatchConfig Fast(MatchConfig config) =>
-            config with { TicksPerSecond = MessageCodec.MaxTicksPerSecond };
-
-        [Fact]
-        public async Task TwoClients_PlayTheSameMatchThroughTheRelay()
-        {
-            var (app, play) = await StartRelayAsync();
-            await using var _ = app;
-            // The second client proposes another seed; the room's settings, from the first, win.
-            using var a = NetLaunch.Join(Options(play, "Ann"), Fast(Config(seed: 42)));
-            using var b = NetLaunch.Join(Options(play, "Bob"), Fast(Config(seed: 77)));
-            Assert.Equal((0, 1), (a.Slot, b.Slot));
-            Assert.Equal(42, b.Config.Seed);
-
-            var connections = new[] { a, b };
-            var worlds = connections.Select(c => TestHelpers.CreateSeededWorld(MapSize, c.Config.Seed)).ToArray();
-            var sessions = connections.Select((c, i) => new NetSession(c, worlds[i])).ToArray();
-            WaitFor(() => a.Roster.Count(n => n.Length > 0) == 2, a);
-            Assert.Equal("Waiting for players: 2 of 2 here.", a.Status);
-            foreach (var (c, i) in connections.Select((c, i) => (c, i)))
-                c.SendReady(WorldStateHash.ComputeReady(worlds[i]));
-            WaitFor(() => a.Started && b.Started, a, b);
-            Assert.Null(a.Status);
-
-            // Each client drives its tank and steps whatever ticks have arrived, like the game loop does.
-            const int Ticks = 60;
-            WaitFor(() =>
-            {
-                for (int i = 0; i < sessions.Length; i++)
-                {
-                    sessions[i].Receive();
-                    while (worlds[i].AdvanceCount < Ticks && sessions[i].TryStep())
-                        sessions[i].SendInput(new ControllerOutput
-                        {
-                            MoveSpeed = new Offset(i == 0 ? 1 : -1, worlds[i].AdvanceCount / 10 % 2),
-                            ShootPrimary = worlds[i].AdvanceCount % 7 == 0,
-                        });
-                }
-                return worlds.All(w => w.AdvanceCount == Ticks);
-            }, a, b);
-
-            Assert.Equal(WorldStateHash.Compute(worlds[0]), WorldStateHash.Compute(worlds[1]));
-            // The inputs went round: the tanks are not where an idle match would have left them.
-            var idle = TestHelpers.CreateSeededWorld(MapSize, 42);
-            TestSimulation.AdvanceIdle(idle, Ticks);
-            Assert.NotEqual(WorldStateHash.Compute(idle), WorldStateHash.Compute(worlds[0]));
-            Assert.Null(a.DesyncTick);
-            Assert.Null(a.Failure);
-        }
-
-        [Fact]
-        [Trait("Category", "Slow")]
-        public async Task PlayerWhoDropsOut_RejoinsAndCatchesUpToTheSameWorld()
-        {
-            var (app, play) = await StartRelayAsync();
-            await using var _ = app;
-            // Two players and two bots: the bots must run alike on the client that stayed and the one that came back.
-            var config = Fast(NetMatch.ProposeConfig(42, FourPlayerMap, Core.LevelGen.LevelGenMode.Deterministic, players: 4));
-            using var a = NetLaunch.Join(Options(play, "Ann"), config);
-            var b = NetLaunch.Join(Options(play, "Bob"), config);
-            var worldA = CreateFourTankWorld(42);
-            var worldB = CreateFourTankWorld(42);
-            var sessionA = new NetSession(a, worldA);
-            var sessionB = new NetSession(b, worldB);
-            a.SendReady(WorldStateHash.ComputeReady(worldA));
-            b.SendReady(WorldStateHash.ComputeReady(worldB));
-            a.RequestStart();
-
-            const int WarmUp = 20;
-
-            // Steps what has arrived, up to a tick; the bots are chosen when the relay says the match has started.
-            void Play(NetSession session, RelayConnection connection, World world, int limit = int.MaxValue)
-            {
-                session.Receive();
-                if (connection.Started && world.AdvanceCount == 0 && session.HumanMask != connection.HumanMask)
-                    session.StartSeats(connection.Config.Seed, connection.HumanMask);
-                while (world.AdvanceCount < limit && session.TryStep())
-                    session.SendInput(new ControllerOutput
-                    {
-                        MoveSpeed = new Offset(connection.Slot == 0 ? 1 : -1, world.AdvanceCount / 15 % 2),
-                        ShootPrimary = true,
-                    });
-            }
-
-            WaitForProgress(() =>
-            {
-                Play(sessionA, a, worldA);
-                Play(sessionB, b, worldB);
-                return worldB.AdvanceCount >= WarmUp;
-            }, () => worldA.AdvanceCount + worldB.AdvanceCount,
-                () => $"Ann at tick {worldA.AdvanceCount}, Bob at {worldB.AdvanceCount}, started {a.Started}", a, b);
-            b.Dispose();
-
-            // Bob starts the game again: a fresh world, the same room and name. Ann's world stops at the tick the two are
-            // compared at, however long the relay takes to see Bob go.
-            const int Compared = 60;
-            WaitForProgress(() => { Play(sessionA, a, worldA, Compared); return a.PlayersHere == 1; },
-                () => worldA.AdvanceCount, () => $"Ann at tick {worldA.AdvanceCount}, {a.PlayersHere} players here", a);
-            using var back = NetLaunch.Join(Options(play, "Bob"), config with { Seed = 1 });
-            var worldBack = CreateFourTankWorld(back.Config.Seed);
-            var sessionBack = new NetSession(back, worldBack);
-            WaitForProgress(() =>
-            {
-                Play(sessionA, a, worldA, Compared);
-                Play(sessionBack, back, worldBack, Compared);
-                return worldBack.AdvanceCount == Compared && worldA.AdvanceCount == Compared;
-            }, () => worldA.AdvanceCount + worldBack.AdvanceCount,
-                () => $"Ann at tick {worldA.AdvanceCount}, the returning Bob at {worldBack.AdvanceCount} of {Compared}, rejoined {back.Rejoined}",
-                a, back);
-
-            Assert.True(back.Rejoined);
-            Assert.Equal(1, back.Slot);
-            Assert.Equal(0b0011, back.HumanMask);
-            // The rejoining client's own world, stepped from the relay's log, is the one the client that stayed has.
-            Assert.Equal(WorldStateHash.ComputeSync(worldA), WorldStateHash.ComputeSync(worldBack));
-            // And the match is not an idle one: the bots and the players moved their tanks. A bot may be back where it
-            // started by now (it goes home to cool after torching its way out through rock), so for a bot having
-            // driven out of its base counts too.
-            var untouched = CreateFourTankWorld(42);
-            for (int slot = 0; slot < 4; slot++)
-            {
-                var tank = worldBack.TankList.Tanks[slot];
-                bool isBot = (back.HumanMask & 1 << slot) == 0;
-                Assert.True(tank.Position != untouched.TankList.Tanks[slot].Position || (isBot && tank.HasLeftBase),
-                    $"the tank in slot {slot} never moved");
-            }
-            Assert.Null(a.DesyncTick);
-            // The match is short at this pace; the first latency sample comes with the first answered ping.
-            WaitFor(() => back.LatencyMs != null, back);
-            Assert.NotNull(back.LatencyMs);
         }
     }
 }

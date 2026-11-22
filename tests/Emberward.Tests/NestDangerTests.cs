@@ -12,9 +12,8 @@ namespace Emberward.Tests;
 
 /// <summary>
 /// The danger ring over a discovered nest (<see cref="World.CopyNestDangers"/>, <see cref="NestDangerQuads"/>): a nest
-/// the side has seen or found by radar, and that still has creatures, gets a ring at the distance from which it senses
-/// the side's tank and a title; an undiscovered nest gets nothing, nor does a cleared one; discovery outlasts the sight
-/// or the blip that made it.
+/// the side has seen, and that still has creatures, gets a small ring around its ground and a title; an undiscovered
+/// nest gets nothing (a radar echo does not discover one), nor does one seen cleared; discovery outlasts the sight.
 /// </summary>
 public class NestDangerTests
 {
@@ -115,24 +114,40 @@ public class NestDangerTests
     }
 
     [Fact]
-    public void ANestFoundByRadar_StaysMarked_AfterItsBlipFades()
+    public void ANestOnlyTheRadarFound_HasNoRing()
     {
         var (world, tank) = Arena(halfWidth: 4);
         // Wide enough for the radar's rays to find it, out of the tank's sight through the dirt.
         var nest = world.Emberites!.AddNest(Centre + new Offset(40, 0), radius: 12, creatures: 6);
         world.TrackRadar(tank);
 
-        Tick(world, tank, 8);
+        Tick(world, tank, 8 + Tweaks.Radar.PulsePeriodTicks);
         Assert.False(world.TrackVision(tank).IsExplored(nest.Centre));
-        Tick(world, tank, Tweaks.Radar.PulsePeriodTicks);
+        var radar = world.RadarOf(tank)!;
+        Assert.Contains(Enumerable.Range(0, radar.ContactCount),
+            i => radar.ContactAt(i).Echo == Emberward.Core.Sensing.RadarEcho.Life && radar.ContactAt(i).Position == nest.Centre);
+        Assert.Empty(Dangers(world, tank));
+    }
+
+    [Fact]
+    public void ANestClearedOutOfSight_KeepsItsRing_UntilTheTankSeesItCleared()
+    {
+        var (world, tank) = Arena();
+        var nest = world.Emberites!.AddNest(Centre + new Offset(8, 0), radius: 4, creatures: 6);
+        Tick(world, tank, 2);
         Assert.Single(Dangers(world, tank));
 
-        // The tank goes out of the radar's life range and the blip fades: the nest stays discovered.
-        tank.Position = Centre + new Offset(-50, 0);
-        Tick(world, tank, Tweaks.Radar.ContactLifetimeTicks + Tweaks.Radar.PulsePeriodTicks);
-        var radar = world.RadarOf(tank)!;
-        Assert.DoesNotContain(Enumerable.Range(0, radar.ContactCount), i => radar.ContactAt(i).Echo == Emberward.Core.Sensing.RadarEcho.Life);
+        tank.Position = Centre + new Offset(-40, 0);
+        Tick(world, tank, 2);
+        Assert.False(world.TrackVision(tank).IsVisible(nest.Centre));
+        nest.NeverReleased = 0;
+        Tick(world, tank, 1);
+        Assert.True(nest.IsCleared);
         Assert.Single(Dangers(world, tank));
+
+        tank.Position = Centre;
+        Tick(world, tank, 1);
+        Assert.Empty(Dangers(world, tank));
     }
 
     [Fact]
@@ -149,42 +164,6 @@ public class NestDangerTests
         Assert.True(nest.IsCleared);
         Assert.Empty(Dangers(world, tank));
         Assert.Empty(Emitted(world).Rings);
-    }
-
-    [Fact]
-    public void ACreatureOrTankBlipBesideANest_DoesNotDiscoverIt_TheNestsOwnEchoDoes()
-    {
-        var world = TestHelpers.CreateSeededWorld(enableTerrainRegrowth: false, emberites: true);
-        for (int y = 80; y <= 120; y++)
-            for (int x = 10; x <= 110; x++)
-                world.Terrain.SetPixel(new Position(x, y), TerrainPixel.Dirt);
-        var at = new Position(60, 100);
-        world.Emberites!.AddNest(at, radius: 12, creatures: 6);
-        var vision = new Emberward.Core.Sensing.VisionMap(world.Terrain);
-        var radar = new Emberward.Core.Sensing.Radar(vision);
-        var discovery = new Emberward.Core.Sensing.NestDiscovery();
-        var origin = new Position(20, 100);
-        int life = 0;
-        void Pulse(Emberward.Core.Sensing.RadarTarget[] targets)
-        {
-            for (int i = 0; i < Tweaks.Radar.PulsePeriodTicks; i++)
-            {
-                radar.Advance(world.Terrain, world.Terrain, origin, ownColor: 0, targets);
-                discovery.Update(world.Emberites, vision, radar);
-                for (int c = 0; c < radar.ContactCount; c++)
-                    if (radar.ContactAt(c).Echo == Emberward.Core.Sensing.RadarEcho.Life && radar.ContactAt(c).BornTick == radar.Tick)
-                        life++;
-            }
-        }
-
-        // A creature and a tank right beside the nest: their echoes sit on their own cells.
-        Pulse([new(at + new Offset(-4, 3), 1, Alive: true), new(at + new Offset(-5, -4), 3, Alive: true)]);
-        Assert.True(life > 0, "the creature and the tank should have echoed");
-        Assert.False(discovery.IsFound(0));
-
-        // The nest's own echo, on its centre.
-        Pulse([new(at, 6, Alive: true)]);
-        Assert.True(discovery.IsFound(0));
     }
 
     [Fact]

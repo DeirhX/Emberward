@@ -6,16 +6,10 @@ using Emberward.Core.Types;
 
 /// <summary>
 /// Which nests one side has discovered, and what it last learned of each. A nest is found once the side has seen its
-/// centre (in sight, or ground it has explored) or its radar has returned the nest's own life echo, and stays found.
-/// What the side knows of it (asleep, awake, its creatures out, cleared) is brought up to date only while it sees the
-/// centre or the nest's echo comes back, so the fog keeps what goes on there. Output only, like the vision and the radar
-/// it reads; <see cref="SideSensing"/> keeps one per side it tracks.
+/// centre (in sight, or ground it has explored), and stays found: a radar echo does not discover a nest. What the side
+/// knows of it (asleep, awake, its creatures out, cleared) is brought up to date only while it sees the centre, so
+/// the fog keeps what goes on there, and a nest it saw cleared loses its ring. Output only, like the vision it reads; <see cref="SideSensing"/> keeps one per side it tracks.
 /// </summary>
-/// <remarks>
-/// A tick looks at each nest's centre once and at the radar's contacts born that tick, never at the map. Only an echo
-/// on the nest's centre cell, where the radar records the nest's own echo, counts: a creature or a tank beside a nest
-/// echoes on its own cell, so it tells nothing of the nest.
-/// </remarks>
 public sealed class NestDiscovery
 {
     /// <summary>What the side last learned of a nest: <see cref="NestDangerLevel"/>, or <see cref="Cleared"/>.</summary>
@@ -40,8 +34,8 @@ public sealed class NestDiscovery
         return true;
     }
 
-    /// <summary>Looks at what the side learns this tick through <paramref name="vision"/> and <paramref name="radar"/> (null when it has none).</summary>
-    public void Update(EmberiteSwarm swarm, VisionMap vision, Radar? radar)
+    /// <summary>Looks at what the side learns this tick through <paramref name="vision"/>: it sees a nest only by looking at its centre.</summary>
+    public void Update(EmberiteSwarm swarm, VisionMap vision)
     {
         var nests = swarm.Nests;
         if (_found.Length < nests.Count)
@@ -60,20 +54,6 @@ public sealed class NestDiscovery
                 _found[i] = true;
                 _known[i] = (byte)NestDangerLevel.Dormant;
             }
-        }
-        if (radar is null)
-            return;
-        // Contacts are kept oldest first, so this tick's are read from the end, stopping at the first older one.
-        for (int c = radar.ContactCount - 1; c >= 0; c--)
-        {
-            RadarContact contact = radar.ContactAt(c);
-            if (contact.BornTick != radar.Tick)
-                break;
-            if (contact.Echo != RadarEcho.Life)
-                continue;
-            for (int i = 0; i < nests.Count; i++)
-                if (nests[i].Centre == contact.Position)
-                    Learn(swarm, i);
         }
     }
 

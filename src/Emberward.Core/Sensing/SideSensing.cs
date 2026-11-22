@@ -97,15 +97,14 @@ internal sealed class SideSensing(TerrainGrid terrain, MachineList machines, Tan
                 tank.Base?.Position);
         }
 
-        // After the radars, so that a life echo born this tick counts.
         if (emberites != null)
             foreach (var (tank, nests) in _discoveries)
-                nests.Update(emberites, TrackVision(tank), RadarOf(tank));
+                nests.Update(emberites, TrackVision(tank));
     }
 
     /// <summary>
     /// Writes the nests <paramref name="tank"/>'s side has discovered and did not last see cleared, each as the side
-    /// last learned it (<see cref="NestDiscovery"/>) with its danger ring for that tank's heat; returns how many. A side
+    /// last learned it (<see cref="NestDiscovery"/>) with its danger ring; returns how many. A side
     /// whose vision is not tracked plays without fog of war and knows every nest as it is.
     /// </summary>
     public int CopyNestDangers(Tank tank, Span<NestDanger> destination)

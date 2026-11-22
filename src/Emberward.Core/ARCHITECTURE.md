@@ -591,10 +591,9 @@ Desktop:
 ### The emberites
 
 Which nests a side has discovered is output, like its vision and radar: `SideSensing` keeps a `NestDiscovery` for each
-side whose vision it tracks, which marks a nest found once that side's vision has explored its centre or its radar
-has returned the nest's own life echo this tick (a life contact on the nest's centre cell, read from the newest
-contacts back; a creature or tank beside it echoes on its own cell). It keeps what the side last learned of each
-nest (`NestDangerLevel`, or cleared), refreshed only while the centre is in sight or the nest's echo comes back, so
+side whose vision it tracks, which marks a nest found once that side's vision has explored its centre (a radar echo
+does not discover a nest). It keeps what the side last learned of each
+nest (`NestDangerLevel`, or cleared), refreshed only while the centre is in sight, so
 the fog hides what a nest does meanwhile; a tick looks at each nest's centre once. `World.CopyNestDangers(tank)`
 lists the found nests not last seen cleared, with that level and the ring radius `EmberiteSwarm.DangerRadius(nest.Radius)`, a small ring around the nest;
 a side whose vision is not tracked (no fog) knows every nest as it is.
