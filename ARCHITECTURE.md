@@ -179,9 +179,11 @@ hold: they call `AfterStep` after every step and `Update` with their HUD clock, 
 updates it after each step on the match's time (`BrowserSession.HudSeconds`) and sends it with the frame.
 
 - `TutorialDirector` is an ordered list of next logical steps (leave the base, mine ore, unload, build and link a relay,
-  stay on the network, power from hot rock, harvester, relay beside it, power for it, frost). Each step knows from the world
-  when it is done, so a player who acts early skips ahead; explainer steps also finish after a few seconds on screen.
-  A step can name a world cell to point at.
+  stay on the network, power from hot rock, harvester, relay beside it, power for it, upgrades, turret, gatling, frost,
+  the core). Each system has its steps in `Guidance/Tutorial` (`TutorialStep`); the director only orders them. Each
+  step knows from the world when it is done, and watches for what the player has done (`Observe`), so a player who
+  acts early skips ahead; explainer steps also finish after a few seconds on screen. A step can name a world cell to
+  point at.
 - `GameEventWatcher` posts toasts to a `NotificationFeed` through one watch per system in `Guidance/Events`
   (`IEventWatch`): base attacks, upgrades, the sector goal, the network (relays linking or lost, harvesters started,
   stalled or out of charge, off network), the base's power (heat store, low charge, engine), ore (first ore, first pyrite banked,

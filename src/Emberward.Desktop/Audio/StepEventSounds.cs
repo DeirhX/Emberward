@@ -2,7 +2,6 @@ namespace Emberward.Desktop.Audio;
 
 using Emberward.Core;
 using Emberward.Core.Entities.Machines;
-using Emberward.Desktop.Config;
 
 /// <summary>Whose event a one-shot is heard for.</summary>
 public enum CueHeard
@@ -43,69 +42,24 @@ public readonly record struct StepEventCue(SoundEffect Effect, float Gain, CueHe
 
 /// <summary>
 /// Which one-shot effect a simulation event (<see cref="World.StepEvents"/>) plays. This is the one table of event
-/// sounds: <see cref="GameAudio"/> plays what it says. Events that make no one-shot of their own (moving, digging,
-/// base service and spent shrapnel, which drive loops and the debris rattle in <see cref="GameAudio"/>) and events
-/// with no sound yet have no cue. The browser client shares this file and plays the cues it picks with its own tones.
+/// sounds: <see cref="GameAudio"/> plays what it says. Each system has its rows in a partial of its own
+/// (<c>StepEventSounds.Tanks.cs</c>, <c>.Base.cs</c>, <c>.Machines.cs</c>, <c>.Ore.cs</c>, <c>.Emberites.cs</c>), and
+/// <see cref="CueFor(StepEventKind, MachineType)"/> asks each in turn: a new system's sounds are a new partial and a
+/// line there; retiring a system deletes its partial and that line. Events that make no one-shot of their own
+/// (moving, digging, base service and spent shrapnel, which drive loops and the debris rattle in
+/// <see cref="GameAudio"/>) and events with no sound yet have no cue. The browser client shares these files and plays
+/// the cues they pick with its own tones.
 /// </summary>
-public static class StepEventSounds
+public static partial class StepEventSounds
 {
-    /// <summary>Pour cues of one tank this close together (steps) are heard once (DepositQuads.JoinSteps).</summary>
-    public const int PourJoinSteps = 6;
-
     /// <summary>
-    /// The one-shot of <paramref name="e"/>: as <see cref="CueFor(StepEventKind, MachineType)"/>, except that ore banked
-    /// at the core (<see cref="ImpactTarget.Base"/>) is a deposit, louder for a bigger load, and ore burned to restart a
-    /// dark base the same deposit pitched down. At a relay a unit is still the pickup streak's quieter note.
+    /// The one-shot of <paramref name="e"/>: as <see cref="CueFor(StepEventKind, MachineType)"/>, except for the
+    /// events whose sound depends on more than their kind (<see cref="OreCueFor(in StepEvent)"/>).
     /// </summary>
-    public static StepEventCue? CueFor(in StepEvent e) => e.Kind switch
-    {
-        StepEventKind.OreUnloaded when e.Target == ImpactTarget.Base =>
-            new(SoundEffect.Deposit, DepositGain(e.Count), CueHeard.Player, CueVoice.Pour),
-        StepEventKind.RestartOreBurned =>
-            new(SoundEffect.Deposit, DepositGain(e.Count), CueHeard.Player, CueVoice.Pour, AudioTweaks.DepositBurnPitch),
-        _ => CueFor(e.Kind, e.Machine),
-    };
+    public static StepEventCue? CueFor(in StepEvent e) => OreCueFor(in e) ?? CueFor(e.Kind, e.Machine);
 
-    /// <summary>
-    /// A deposit's gain for a pour of <paramref name="units"/>: 0.6 to 1 of <see cref="AudioTweaks.DepositGain"/>. The
-    /// director passes the whole pour (the first event's units and what the hold still has to bank), since a bank's
-    /// first event carries only a tick's worth.
-    /// </summary>
-    public static float DepositGain(int units) => AudioTweaks.DepositGain * (0.6f + 0.4f * Math.Min(units, 40) / 40f);
-
-    public static StepEventCue? CueFor(StepEventKind kind, MachineType machine) => kind switch
-    {
-        StepEventKind.ShotFired => new(SoundEffect.Fire, AudioTweaks.FireGain, CueHeard.Anywhere, CueVoice.ShotCycle),
-        StepEventKind.TurretFired => MachineBehaviors.Get(machine).HuntsCreatures
-            ? new(SoundEffect.GatlingFire, AudioTweaks.GatlingFireGain, CueHeard.Anywhere, CueVoice.Burst)
-            : new(SoundEffect.TurretFire, AudioTweaks.TurretFireGain, CueHeard.Anywhere, CueVoice.Burst),
-        StepEventKind.BulletImpact => new(SoundEffect.Impact, AudioTweaks.ImpactGain, CueHeard.Anywhere, CueVoice.Burst),
-        StepEventKind.OreCollected => new(SoundEffect.Pickup, AudioTweaks.PickupGain, CueHeard.Anywhere, CueVoice.PickupStreak),
-        StepEventKind.TankHit => new(SoundEffect.TankHit, AudioTweaks.TankHitGain, CueHeard.TrackedTank),
-        StepEventKind.TankShieldHit => new(SoundEffect.ShieldHit, AudioTweaks.ShieldHitGain, CueHeard.TrackedTank, CueVoice.Burst),
-        StepEventKind.TankShieldBroken => new(SoundEffect.ShieldBreak, AudioTweaks.ShieldBreakGain, CueHeard.TrackedTank),
-        StepEventKind.BaseDamaged => new(SoundEffect.TankHit, AudioTweaks.BaseHitGain, CueHeard.Player, CueVoice.Burst),
-        // A gate hit is the base's shield taking a hit: the shield's own sound, its breaking the shatter.
-        StepEventKind.BaseShieldHit => new(SoundEffect.ShieldHit, AudioTweaks.ShieldHitGain, CueHeard.Player, CueVoice.Burst),
-        StepEventKind.BaseShieldBroken => new(SoundEffect.ShieldBreak, AudioTweaks.ShieldBreakGain, CueHeard.Player),
-        StepEventKind.BaseDestroyed => new(SoundEffect.TankDeath, AudioTweaks.TankDeathGain, CueHeard.Player),
-        StepEventKind.TankDied => new(SoundEffect.TankDeath, AudioTweaks.TankDeathGain, CueHeard.TrackedTank),
-        StepEventKind.TankRespawned => new(SoundEffect.Respawn, AudioTweaks.RespawnGain, CueHeard.TrackedTank),
-        StepEventKind.MachineBuilt => new(BuildSound(machine), AudioTweaks.BuildGain, CueHeard.TrackedTank),
-        StepEventKind.MachinePlanted => new(SoundEffect.Plant, AudioTweaks.PlantGain, CueHeard.TrackedTank),
-        StepEventKind.MachineUpgraded => new(SoundEffect.Plant, AudioTweaks.PlantGain, CueHeard.Player),
-        StepEventKind.PlantRefused or StepEventKind.BuildRefused or StepEventKind.MachineUpgradeRefused =>
-            new(SoundEffect.PlantRefused, AudioTweaks.RefusedGain, CueHeard.Player),
-        StepEventKind.OreUnloaded or StepEventKind.ReserveBurned => new(SoundEffect.Pickup, AudioTweaks.UnloadGain, CueHeard.Player),
-        StepEventKind.Docked => new(SoundEffect.Dock, AudioTweaks.DockGain, CueHeard.Player),
-        // Emberites: a nest waking is an alarm for whoever is near enough to hear it, and its stir before each wave a
-        // quieter one; a bite is a hit on a tank; a kill is a small burst.
-        StepEventKind.NestWoke => new(SoundEffect.WarnOverheat, AudioTweaks.NestWakeGain, CueHeard.Anywhere),
-        StepEventKind.NestStirred => new(SoundEffect.WarnEnergy, AudioTweaks.NestStirGain, CueHeard.Anywhere),
-        StepEventKind.EmberiteBit => new(SoundEffect.TankHit, AudioTweaks.EmberiteBiteGain, CueHeard.TrackedTank, CueVoice.Burst),
-        StepEventKind.EmberiteKilled => new(SoundEffect.Impact, AudioTweaks.EmberiteKilledGain, CueHeard.Anywhere, CueVoice.Burst),
-        _ => null,
-    };
+    public static StepEventCue? CueFor(StepEventKind kind, MachineType machine) =>
+        TankCue(kind) ?? BaseCue(kind) ?? MachineCue(kind, machine) ?? OreCue(kind) ?? EmberiteCue(kind);
 
     /// <summary>
     /// Whether <paramref name="cue"/> is heard for an event of a tank that is <paramref name="tracked"/> or not, and
@@ -117,25 +71,4 @@ public static class StepEventSounds
         CueHeard.TrackedTank => tracked,
         _ => tracked && isPlayer,
     };
-
-    /// <summary>The sound of building a machine of <paramref name="type"/>; each machine has its own.</summary>
-    public static SoundEffect BuildSound(MachineType type) =>
-        (uint)type < (uint)BuildSounds.Length ? BuildSounds[(int)type] : throw new ArgumentOutOfRangeException(nameof(type));
-
-    private static readonly SoundEffect[] BuildSounds = BuildSoundTable(
-        (MachineType.Relay, SoundEffect.BuildRelay),
-        (MachineType.Harvester, SoundEffect.BuildHarvester),
-        (MachineType.Generator, SoundEffect.BuildGenerator),
-        (MachineType.Turret, SoundEffect.BuildTurret),
-        (MachineType.Gatling, SoundEffect.BuildGatling));
-
-    private static SoundEffect[] BuildSoundTable(params (MachineType Type, SoundEffect Sound)[] entries)
-    {
-        var table = new SoundEffect?[Enum.GetValues<MachineType>().Length];
-        foreach (var (type, sound) in entries)
-            table[(int)type] = sound;
-        if (Array.IndexOf(table, null) >= 0)
-            throw new InvalidOperationException("Every MachineType needs a build sound.");
-        return Array.ConvertAll(table, s => s!.Value);
-    }
 }
