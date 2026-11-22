@@ -30,6 +30,8 @@
 //                   color.r = what heat left of the ray (0..1), color.g = a per-cell seed
 //  14 radar pulse — .x = front radius (cells), .y = fade (1 just sent, 0 at full range)
 //                   (machine flags: 1 stalled, 2 carried, 4 held back by a full base)
+//  16 power label — .xy = packed 5x7 glyph bitmap (low 20 bits, then high 15), .z = dots per cell
+//                   (0 for a solid bar), .w = opacity
 //  18 emberite  — .x = charge (1 carrying its heat, 0 spent), .y = burrowing (1 in soil: a dim glow under the
 //                   ground), .z = animation phase (the wriggle), .w = 0. With .w = 1 the quad is a nest's
 //                   resting embers instead: .x = 1 while creatures rest in it (2 while it stirs before a wave: they
@@ -49,8 +51,6 @@
 //  25 fire particle — .x = age (0 born, 1 gone), .y = 0 ember, 1 smoke, .z = fire level (0..1), .w = a per-particle seed (0..1)
 //  26 danger ring — .x = radius (cells), .y = level (NestDangerLevel: 0 dormant, 1 awake, 2 swarming: it pulses),
 //                   .z = phase, .w = opacity; color.rgb = the ring's colour
-//  16 power label — .xy = packed 5x7 glyph bitmap (low 20 bits, then high 15), .z = dots per cell
-//                   (0 for a solid bar), .w = opacity
 //
 // color.rgb is the team colour (tank hull, turret), the body colour (hot shot),
 // the tint (reach area, coverage, power label) or data (radar blip). Every other kind owns its colours

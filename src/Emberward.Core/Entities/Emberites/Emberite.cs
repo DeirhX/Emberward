@@ -61,6 +61,9 @@ public struct Emberite
     /// <summary>Ticks left: of the run to <see cref="Hotspot"/> before it gives up, of the drink there, or (going home) to its next look for hot ground on the way.</summary>
     public int Timer { get; set; }
 
+    /// <summary>Times since it last filled up that it found no hot ground, could not reach it, or drank too little (<see cref="Config.Tweaks.Emberites.MaxFailedSeeks"/>).</summary>
+    public int FailedSeeks { get; set; }
+
     /// <summary>Killed or back in its nest this step; removed before the next one.</summary>
     public bool Gone { get; set; }
 }

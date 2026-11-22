@@ -71,6 +71,24 @@ public class RadarLifeTests
     }
 
     [Fact]
+    public void ALivingBlipInARocksShadow_Stays_EvenIfWhatLeftItHasMoved()
+    {
+        var terrain = Dirt();
+        var radar = new Radar(new VisionMap(terrain));
+        Pulse(radar, terrain, [new RadarTarget(new Position(240, 200), 3, Alive: true)]);
+        Assert.Equal(new Position(240, 200), Assert.Single(Life(radar)).Position);
+
+        // Rock now hides it, and it moves on behind the rock: the next pulse cannot reach the blip, so it learns nothing
+        // of the move and the blip stays until it fades.
+        for (int y = 180; y <= 225; y++)
+            for (int x = 220; x <= 222; x++)
+                terrain.SetPixelRaw(new Position(x, y), TerrainPixel.Rock);
+        Pulse(radar, terrain, [new RadarTarget(new Position(240, 212), 3, Alive: true)]);
+
+        Assert.Equal(new Position(240, 200), Assert.Single(Life(radar)).Position);
+    }
+
+    [Fact]
     public void ALivingTargetThatStays_KeepsItsBlip_AndNoSecond()
     {
         var terrain = Dirt();

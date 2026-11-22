@@ -1,65 +1,85 @@
 namespace Emberward.Core.Sensing;
 
 using Emberward.Core.Entities.Emberites;
+using Emberward.Core.Rendering;
+using Emberward.Core.Types;
 
 /// <summary>
-/// Which nests one side has discovered: a nest is found once the side has seen its centre (sight, or ground it has
-/// explored) or its radar has returned a life echo from it, and stays found. Output only, like the vision and the radar
+/// Which nests one side has discovered, and what it last learned of each. A nest is found once the side has seen its
+/// centre (in sight, or ground it has explored) or its radar has returned the nest's own life echo, and stays found.
+/// What the side knows of it (asleep, awake, its creatures out, cleared) is brought up to date only while it sees the
+/// centre or the nest's echo comes back, so the fog keeps what goes on there. Output only, like the vision and the radar
 /// it reads; <see cref="SideSensing"/> keeps one per side it tracks.
 /// </summary>
 /// <remarks>
-/// Costs what is still undiscovered: once every nest is found an update returns at once. Until then it looks at each
-/// unfound nest's centre and at the radar's contacts born this tick, never at the map.
+/// A tick looks at each nest's centre once and at the radar's contacts born that tick, never at the map. Only an echo
+/// on the nest's centre cell, where the radar records the nest's own echo, counts: a creature or a tank beside a nest
+/// echoes on its own cell, so it tells nothing of the nest.
 /// </remarks>
 public sealed class NestDiscovery
 {
-    /// <summary>A life blip within this many cells of a nest's centre, beyond half its radius, is the nest's.</summary>
-    public const int BlipSlack = 3;
+    /// <summary>What the side last learned of a nest: <see cref="NestDangerLevel"/>, or <see cref="Cleared"/>.</summary>
+    private const byte Cleared = byte.MaxValue;
 
     private bool[] _found = [];
-    private int _foundCount;
+    private byte[] _known = [];
 
     /// <summary>Whether nest <paramref name="index"/> (an index into <see cref="EmberiteSwarm.Nests"/>) has been found.</summary>
     public bool IsFound(int index) => index >= 0 && index < _found.Length && _found[index];
 
-    /// <summary>Looks for nests found this tick through <paramref name="vision"/> and <paramref name="radar"/> (null when the side has none).</summary>
-    public void Update(IReadOnlyList<Nest> nests, VisionMap vision, Radar? radar)
+    /// <summary>
+    /// What the side last learned of a found nest: its danger level, or false once it saw the nest cleared (or has not
+    /// found it).
+    /// </summary>
+    public bool TryGetKnownLevel(int index, out NestDangerLevel level)
     {
+        level = default;
+        if (!IsFound(index) || _known[index] == Cleared)
+            return false;
+        level = (NestDangerLevel)_known[index];
+        return true;
+    }
+
+    /// <summary>Looks at what the side learns this tick through <paramref name="vision"/> and <paramref name="radar"/> (null when it has none).</summary>
+    public void Update(EmberiteSwarm swarm, VisionMap vision, Radar? radar)
+    {
+        var nests = swarm.Nests;
         if (_found.Length < nests.Count)
+        {
             Array.Resize(ref _found, nests.Count);
-        if (_foundCount == nests.Count)
-            return;
+            Array.Resize(ref _known, nests.Count);
+        }
         for (int i = 0; i < nests.Count; i++)
         {
-            if (_found[i])
-                continue;
-            Nest nest = nests[i];
-            if (vision.IsExplored(nest.Centre) || vision.IsVisible(nest.Centre) || EchoedThisTick(radar, nest))
+            Position centre = nests[i].Centre;
+            if (vision.IsVisible(centre))
+                Learn(swarm, i);
+            else if (!_found[i] && vision.IsExplored(centre))
             {
+                // Ground it remembers: it knows the nest is there, not what it is doing now.
                 _found[i] = true;
-                _foundCount++;
+                _known[i] = (byte)NestDangerLevel.Dormant;
             }
+        }
+        if (radar is null)
+            return;
+        // Contacts are kept oldest first, so this tick's are read from the end, stopping at the first older one.
+        for (int c = radar.ContactCount - 1; c >= 0; c--)
+        {
+            RadarContact contact = radar.ContactAt(c);
+            if (contact.BornTick != radar.Tick)
+                break;
+            if (contact.Echo != RadarEcho.Life)
+                continue;
+            for (int i = 0; i < nests.Count; i++)
+                if (nests[i].Centre == contact.Position)
+                    Learn(swarm, i);
         }
     }
 
-    /// <summary>
-    /// Whether one of the radar's contacts born this tick is a life echo on <paramref name="nest"/>. Contacts are kept
-    /// oldest first, so the newest are read from the end and the walk stops at the first older one.
-    /// </summary>
-    private static bool EchoedThisTick(Radar? radar, Nest nest)
+    private void Learn(EmberiteSwarm swarm, int index)
     {
-        if (radar is null)
-            return false;
-        int reach = BlipSlack + Math.Max(2, nest.Radius / 2);
-        for (int i = radar.ContactCount - 1; i >= 0; i--)
-        {
-            RadarContact contact = radar.ContactAt(i);
-            if (contact.BornTick != radar.Tick)
-                break;
-            if (contact.Echo == RadarEcho.Life && Math.Abs(contact.Position.X - nest.Centre.X) <= reach &&
-                Math.Abs(contact.Position.Y - nest.Centre.Y) <= reach)
-                return true;
-        }
-        return false;
+        _found[index] = true;
+        _known[index] = swarm.TryGetDangerLevel(index, out NestDangerLevel level) ? (byte)level : Cleared;
     }
 }

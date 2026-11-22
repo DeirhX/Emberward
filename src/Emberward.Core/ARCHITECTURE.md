@@ -437,8 +437,10 @@ still there, the ore not yet mined, the ground still hot, a target still covers 
 whatever its ray stopped at is not checked, so the radar never learns what it could not reach; it fades instead.
 A living target (`RadarTarget.Alive`: another tank, an occupied nest, an emberite out of its nest) is recorded at its
 centre, not at the cell where the ray met its square, so one thing gives one blip however many rays meet it. Since
-that cell lies past the face where its ray stopped, a living contact from an earlier pulse is checked whenever the
-front passes it, and holds only while a living target is still centred on it (`LivesAt`).
+that cell lies past the face where its ray stopped, a living contact from an earlier pulse is checked when the front
+passes it if its ray got that far or stopped on a living target whose square covers it (`Ray.OnLife`: the shadow is
+that thing's own), and holds only while a living target is still centred on it (`LivesAt`); in any other shadow it
+stays. Targets are gathered only for a tick that walks a pulse (`Radar.NeedsTargets`).
 A tick of a pulse walks about `RaysPerPulse * FrontCellsPerTick` cells and looks at each contact once; ticks
 between pulses only age contacts. Neither depends on the size of the map.
 
@@ -575,10 +577,12 @@ Desktop:
 
 Which nests a side has discovered is output, like its vision and radar: `SideSensing` keeps a `NestDiscovery` for each
 side whose vision it tracks, which marks a nest found once that side's vision has explored its centre or its radar
-has returned a life echo from it this tick (read from the newest contacts back), and costs nothing once every nest is
-found. `World.CopyNestDangers(tank)` lists the discovered nests that are not cleared, with the ring radius
-`EmberiteSwarm.DangerRadius(tank.Heat)` and a `NestDangerLevel`; a side whose vision is not tracked (no fog) knows
-every nest.
+has returned the nest's own life echo this tick (a life contact on the nest's centre cell, read from the newest
+contacts back; a creature or tank beside it echoes on its own cell). It keeps what the side last learned of each
+nest (`NestDangerLevel`, or cleared), refreshed only while the centre is in sight or the nest's echo comes back, so
+the fog hides what a nest does meanwhile; a tick looks at each nest's centre once. `World.CopyNestDangers(tank)`
+lists the found nests not last seen cleared, with that level and the ring radius `EmberiteSwarm.DangerRadius(tank.Heat)`;
+a side whose vision is not tracked (no fog) knows every nest as it is.
 
 `EmberiteSwarm` (`Entities/Emberites`) exists only when `MatchRules.Emberites` is on and is stepped as `"emberites"` after `"tanks"`.
 `Initialize` seeds a nest in each pocket and lump of `World.OreDeposits` that is far enough from every base. A nest is
@@ -587,11 +591,13 @@ counters (creatures never released, resting, out, stored charge); only creatures
 looks at each tank once in six ticks; digging a nest's ore (read from `OreCollected` step events) wakes it at once.
 A creature out is a small state machine (`EmberiteState`): `Hunting` with a charge, a bite, then `Seeking` the hot cell
 `TryFindHotspot` found near where it bit (one fixed scan per bite, `Emberite.Hotspot`, straight steering, given up after
-`HotspotSeekTicks`), `Recharging` there for `HotspotRechargeTicks` (`Emberite.Timer`) before it takes a full charge with
+`HotspotSeekTicks`; after `MaxFailedSeeks` failures since it last filled up, `Emberite.FailedSeeks`, it looks no more and goes
+home, so every trip ends), `Recharging` there for `HotspotRechargeTicks` (`Emberite.Timer`) before it takes a full charge with
 `ExtractEnergyInRadiusArea` and hunts again, and `Returning` home when it has lost its tank or found no hot ground
 (`EmberiteSwarm.Hotspots.cs`). A creature going home short of a full charge looks for hot ground on its way
 (`TryFindHotspotOnWayHome`: a fixed scan of `HomeScanCells` around it, at once and then once in `HomeScanTicks`, within
-`HomeDetourCells` of detour and away from the `Emberite.Hotspot` it last drained) and seeks it as above. A tank on ground at `HotZoneHeat` is kept whatever its heat (one heat read per hunting creature).
+`HomeDetourCells` of detour and away from the `Emberite.Hotspot` it last drained) and seeks it as above. A tank on ground at `HotZoneHeat`, within `HotZoneKeepCells` of the creature and not docked in its own base, is kept
+whatever its heat (one heat read per hunting creature).
 A woken nest lets its creatures out in pulses (`Nest.Phase`, `AdvancePulse`): a stir of `StirTicks` (`StepEventKind.NestStirred`,
 the warning), a group sized by the hunted tank's heat (`EmberiteSwarm.PulseSize`), then a lull. A resting creature leaves
 only with a full charge, and while the nest cannot fill one for `StarveTicks` its hungry creatures die one by one

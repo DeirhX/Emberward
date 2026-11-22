@@ -21,10 +21,24 @@ public sealed partial class EmberiteSwarm
     {
         if (!TryFindHotspot((Position)emberite.Position, _nests[emberite.Nest], out Position spot))
         {
-            GoHome(ref emberite);
+            TurnHome(ref emberite);
             return;
         }
         StartSeeking(ref emberite, spot);
+    }
+
+    /// <summary>
+    /// A creature that found no hot ground, could not reach it or drank too little turns for home: one more failure
+    /// counted (<see cref="Emberite.FailedSeeks"/>; past <see cref="Tweaks.Emberites.MaxFailedSeeks"/> it looks for no
+    /// more hot ground until it next fills up), and its next look on the way waits <see cref="Tweaks.Emberites.HomeScanTicks"/>,
+    /// since the ground it stands by has just been looked at. So a trip that finds no charge ends at home.
+    /// </summary>
+    private void TurnHome(ref Emberite emberite)
+    {
+        emberite.FailedSeeks++;
+        emberite.State = EmberiteState.Returning;
+        emberite.Timer = Tweaks.Emberites.HomeScanTicks;
+        GoHome(ref emberite);
     }
 
     /// <summary>Sets off for the hot cell <paramref name="spot"/>, to drink there.</summary>
@@ -53,7 +67,7 @@ public sealed partial class EmberiteSwarm
         }
         if (--emberite.Timer <= 0)
         {
-            GoHome(ref emberite);
+            TurnHome(ref emberite);
             return;
         }
         SteerStraight(ref emberite, emberite.Hotspot, _nests[emberite.Nest]);
@@ -74,9 +88,10 @@ public sealed partial class EmberiteSwarm
             emberite.Charge += _terrain.ExtractEnergyInRadiusArea(emberite.Hotspot, Tweaks.Emberites.HotspotDrinkRadius, want, TerrainGrid.ThermalField.Terrain);
         if (!HasFullCharge(emberite))
         {
-            GoHome(ref emberite);
+            TurnHome(ref emberite);
             return;
         }
+        emberite.FailedSeeks = 0;
         emberite.State = EmberiteState.Hunting;
         emberite.SightTick = 0;
         emberite.Sees = false;
@@ -153,9 +168,12 @@ public sealed partial class EmberiteSwarm
     private static float Distance(Position a, Position b) => MathF.Sqrt(Position.DistanceSquared(a, b));
 
     /// <summary>
-    /// Whether <paramref name="tank"/> stands on ground at <see cref="Tweaks.Emberites.HotZoneHeat"/> or hotter: creatures
-    /// keep after it whatever its own heat. One read of the heat field per creature hunting.
+    /// Whether <paramref name="tank"/> stands on ground at <see cref="Tweaks.Emberites.HotZoneHeat"/> or hotter, within
+    /// <see cref="Tweaks.Emberites.HotZoneKeepCells"/> of the creature and not docked in its own base: the creature keeps
+    /// after it whatever its own heat. One read of the heat field per creature hunting.
     /// </summary>
-    private bool StandsInHeat(Tank tank) =>
+    private bool StandsInHeat(Tank tank, in Emberite emberite) =>
+        !tank.IsDockedAtOwnBase &&
+        Position.DistanceSquared(tank.Position, (Position)emberite.Position) <= (long)Tweaks.Emberites.HotZoneKeepCells * Tweaks.Emberites.HotZoneKeepCells &&
         _terrain.IsInside(tank.Position) && _terrain.GetHeatTemperature(tank.Position) >= Tweaks.Emberites.HotZoneHeat;
 }

@@ -587,13 +587,16 @@ Pyrite pockets and lumps at least 60 cells from every base hold a nest (a pocket
 60 by size); specks hold none. Heat is the noise a tank makes and the fight makes heat:
 
 - *Scout.* A guarded deposit shows resting embers on the ore, and the radar returns a life echo from the nest's centre
-  and from each creature out where it is. Once a side has discovered a nest (seen its centre, or had a life echo
-  from it), and for as long as the nest has creatures, a thin pink danger ring is drawn over it at the distance
+  and from each creature out where it is. Once a side has discovered a nest (seen its centre, or had the nest's own
+  life echo; a creature or tank echoing beside it does not count), a thin pink danger ring is drawn over it at the distance
   from which it senses that side's tank now (40 cells for a tank too cool to be sensed, the nearest it ever senses
   one, growing with the tank's heat to 110 at 100 degrees), titled "EMBERITE NEST" over "DANGER: EMBERITES". It is
   faint while the nest sleeps, full once it is awake, and pulses while its creatures are out; a cleared nest has
-  none. The ring stays on remembered ground like explored terrain does. Rock blocking the nest's sense, and digging
-  its ore, which wakes it from anywhere, are not drawn.
+  none. The ring shows the nest as the side last saw it (its centre in sight, or its echo back): out of sight, a
+  nest that wakes or is cleared keeps its old ring, as remembered ground keeps its old look. The ring is the wake
+  distance, where a hunt starts; once hunting, a nest follows a tank much farther (by its heat up to 220 cells, or
+  by its creatures' sight), which no one ring can show truthfully, so the pulse says it is hunting instead. Rock
+  blocking the nest's sense, and digging its ore, which wakes it from anywhere, are not drawn.
 - *Sneak or fight.* A cool tank is not sensed. A tank at 45 degrees is sensed from 40 cells, one at 100 from 110. Digging
   the nest's ore wakes it whatever the tank's heat, and the thief is hunted for six seconds. A tank that cools below 35
   degrees loses the scent and the creatures go home.
@@ -616,9 +619,11 @@ Pyrite pockets and lumps at least 60 cells from every base hold a nest (a pocket
   costs at most 12 cells of detour, skipping the ground it has just drained, and drinks there; full again, it
   charges the tank. Only with no hot ground on its way does it carry on home, where a resting creature drinks heat
   out of the deposit and leaves again only with a full charge. So cool ground around the fight and along the way
-  home sends each spent creature home after one bite. A tank standing on ground at 35 degrees or hotter (the scent threshold, so a
-  tank cannot keep its ground that hot by itself once it has cooled) is kept by the creatures out whatever its own
-  heat and whether they see it.
+  home sends each spent creature home after one bite. After two failures since it last filled up (no hot ground,
+  a spot it could not reach, a drink too short) it stops looking and goes home, so a trip always ends. A tank standing
+  on ground at 35 degrees or hotter (the scent threshold, so a tank cannot keep its ground that hot by itself once it
+  has cooled) is kept by creatures within 48 cells of it whatever its own heat and whether they see it, unless it is
+  docked in its own base.
   A tank in its base, or just respawned, is not bitten.
 - *Kills heat the ground.* A killed creature spills the charge it carries where it dies, so holding one choke point
   cooks it. One bullet, round or fragment kills. Creatures do not block tanks.
@@ -765,8 +770,9 @@ The player sees only what their side sees, so that learning the shape of the wor
   things first) and fading over 10 seconds: green for rock, amber for metal, a small gold diamond with a pale heart
   for pyrite, and a white-violet dot in a ring for something alive (the enemy tank, an occupied nest, an emberite out of
   its nest). Something alive leaves one blip at its centre, not a blip where each ray met it (a nest is wide, and that
-  drew a straight line of blips along one side of it), and a later pulse passing a living blip puts it out if what
-  left it has moved on. What lies behind a reflector is in its
+  drew a straight line of blips along one side of it), and a later pulse that reaches a living blip, or meets the
+  thing itself there, puts the blip out if what left it has moved on; one in the shadow of anything else stays.
+  What lies behind a reflector is in its
   shadow, so the outline of a thing is only learned by pinging it from several sides, and successive pulses hit
   slightly different points, so a shape fills in while you wait. When a later pulse passes an old blip it checks it
   again: a blip of an enemy that has driven off, or of ground that has changed, goes out; one hidden in a new

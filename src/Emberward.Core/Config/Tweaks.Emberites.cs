@@ -87,6 +87,9 @@ public static partial class Tweaks
         // by itself: only ground heated by something else (hot rock, a fight, a relay's dump) holds them.
         public const float HotspotHeat = 20f;
         public const float HotZoneHeat = LoseScentHeat;
+        // The hot-ground rule holds a tank only within HotZoneKeepCells of the creature, and never one docked in its own
+        // base: it keeps a fight going, it does not send creatures across the map to a tank on hot ground.
+        public const int HotZoneKeepCells = 2 * HotspotSearchCells;
         public const int HotspotSearchCells = 24;
         public const int HotspotSearchStep = 2;
         public const float HotspotArriveCells = 2f;
@@ -100,6 +103,9 @@ public static partial class Tweaks
         public const int HomeScanTicks = Perf.TargetFps / 2;
         public const int HomeScanCells = 20;
         public const float HomeDetourCells = 12f;
+        // A creature stops looking for hot ground once it has failed MaxFailedSeeks times since it last filled up (no
+        // hot ground found, a spot it could not reach, a drink too short), so a trip that finds no charge ends at home.
+        public const int MaxFailedSeeks = 2;
 
         // ---- Movement ----------------------------------------------------------------------------------------
         // Cells a tick: open ground (the tank walks one) and burrowing through soil (the tank digs about half a cell).

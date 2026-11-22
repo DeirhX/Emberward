@@ -56,6 +56,10 @@ public sealed class Radar
         /// <summary>0, or the axis (1 x, 2 y) of the second half of a diagonal step still to take.</summary>
         public byte Owed;
         public bool Live, WasDirt;
+        /// <summary>The ray stopped on something alive, whose square is centred on <see cref="LifeAt"/> and reaches <see cref="LifeHalfSize"/>.</summary>
+        public bool OnLife;
+        public Position LifeAt;
+        public int LifeHalfSize;
         public int WeakLeft, HeatLeft;
         public float Strength;
         /// <summary>Squared distance from the pulse origin of the last cell reached, now and at the start of the tick.</summary>
@@ -92,6 +96,12 @@ public sealed class Radar
 
     /// <summary>Ticks this radar has run; a contact's age is <c>Tick - BornTick</c>.</summary>
     public int Tick { get; private set; }
+
+    /// <summary>
+    /// Whether the next <c>Advance</c> walks a pulse (one in flight, or one due), and so reads its targets: between
+    /// pulses they need not be gathered.
+    /// </summary>
+    public bool NeedsTargets => PulseInFlight || Tick + 1 >= _nextPulseTick;
 
     /// <summary>Whether a pulse is travelling.</summary>
     public bool PulseInFlight { get; private set; }
@@ -361,10 +371,16 @@ public sealed class Radar
         // A reflector too hot to read returns nothing but the heat mark its cell already has (or gets now).
         bool scrambled = temperature >= Tweaks.Radar.HeatScrambleTemperature;
         TerrainPixel pixel = pixels[offset];
-        bool target = HitsTarget(cell, _onRay, out bool alive, out float signature, out Position lifeAt);
+        bool target = HitsTarget(cell, _onRay, out bool alive, out float signature, out Position lifeAt, out int lifeHalf);
         bool ore = !target && Pixel.IsOre(pixel);
         if (target || (Pixel.IsBlockingCollision(pixel) && !IsOwnBase(pixel, ownWall, cell)))
         {
+            if (alive)
+            {
+                ray.OnLife = true;
+                ray.LifeAt = lifeAt;
+                ray.LifeHalfSize = lifeHalf;
+            }
             // Whatever it is stops the ray, but each kind of thing only returns from within its own range.
             RadarEcho echo = alive ? RadarEcho.Life : target ? RadarEcho.Metal
                 : ore ? RadarEcho.Ore : RadarEcho.Solid;
@@ -478,12 +494,14 @@ public sealed class Radar
     /// in list order on a tie).
     /// </summary>
     private static bool HitsTarget(
-        Position cell, IReadOnlyList<RadarTarget> targets, out bool alive, out float signature, out Position lifeAt)
+        Position cell, IReadOnlyList<RadarTarget> targets, out bool alive, out float signature, out Position lifeAt,
+        out int lifeHalf)
     {
         bool hit = false;
         alive = false;
         signature = 0f;
         lifeAt = cell;
+        lifeHalf = 0;
         for (int i = 0; i < targets.Count; i++)
         {
             RadarTarget target = targets[i];
@@ -496,6 +514,7 @@ public sealed class Radar
                     alive = true;
                     signature = target.Signature;
                     lifeAt = target.Position;
+                    lifeHalf = target.HalfSize;
                 }
             }
         }
@@ -586,14 +605,18 @@ public sealed class Radar
                 int distanceSq = dx * dx + dy * dy;
                 if (distanceSq > passedFromSq && distanceSq <= frontSq)
                 {
-                    // A living contact sits at the centre of what returned it, past the face where its ray stopped, so
-                    // one an earlier pulse left is checked whenever the front passes it: one whose creature or tank has
-                    // moved on goes out (the ray that found it where it went leaves the new one) rather than trail
-                    // behind it. This pulse's own are left alone: a creature runs off its blip within a tick.
+                    // A living contact sits at the centre of what returned it, past the face where its ray stopped. So
+                    // one an earlier pulse left is checked also when the ray stopped on something alive whose square
+                    // covers it: the shadow is that thing's own, and one that has moved on goes out (the ray that found
+                    // it where it went leaves the new one) rather than trail behind it. In any other shadow it stays,
+                    // as every contact does. This pulse's own are left alone: a creature runs off its blip within a tick.
                     ref readonly Ray ray = ref _rays[NearestRay(dx, dy)];
+                    bool reached = distanceSq > ray.PrevReachSq && distanceSq <= ray.ReachSq;
                     bool check = contact.Echo == RadarEcho.Life
-                        ? contact.BornTick < _nextPulseTick - Tweaks.Radar.PulsePeriodTicks
-                        : distanceSq > ray.PrevReachSq && distanceSq <= ray.ReachSq;
+                        ? contact.BornTick < _nextPulseTick - Tweaks.Radar.PulsePeriodTicks &&
+                          (reached || (ray.OnLife && Math.Abs(cell.X - ray.LifeAt.X) <= ray.LifeHalfSize &&
+                                       Math.Abs(cell.Y - ray.LifeAt.Y) <= ray.LifeHalfSize))
+                        : reached;
                     if (check)
                         keep = StillHolds(contact, offset, pixels, heat, ownWall, targets);
                 }
@@ -634,7 +657,7 @@ public sealed class Radar
         {
             RadarEcho.Solid => IsRock(pixel) && !IsOwnBase(pixel, ownWall, contact.Position),
             RadarEcho.Ore => Pixel.IsOre(pixel),
-            RadarEcho.Metal => HitsTarget(contact.Position, targets, out bool living, out _, out _) && !living,
+            RadarEcho.Metal => HitsTarget(contact.Position, targets, out bool living, out _, out _, out _) && !living,
             RadarEcho.Life => LivesAt(contact.Position, targets),
             RadarEcho.Cavity => !Pixel.IsSoftCollision(pixel) && !Pixel.IsBlockingCollision(pixel),
             _ => heat.GetHeatTemperature(offset) > Tweaks.Radar.HeatThreshold,

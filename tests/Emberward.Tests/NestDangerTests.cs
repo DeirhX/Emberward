@@ -154,6 +154,65 @@ public class NestDangerTests
     }
 
     [Fact]
+    public void ACreatureOrTankBlipBesideANest_DoesNotDiscoverIt_TheNestsOwnEchoDoes()
+    {
+        var world = TestHelpers.CreateSeededWorld(enableTerrainRegrowth: false, emberites: true);
+        for (int y = 80; y <= 120; y++)
+            for (int x = 10; x <= 110; x++)
+                world.Terrain.SetPixel(new Position(x, y), TerrainPixel.Dirt);
+        var at = new Position(60, 100);
+        world.Emberites!.AddNest(at, radius: 12, creatures: 6);
+        var vision = new Emberward.Core.Sensing.VisionMap(world.Terrain);
+        var radar = new Emberward.Core.Sensing.Radar(vision);
+        var discovery = new Emberward.Core.Sensing.NestDiscovery();
+        var origin = new Position(20, 100);
+        int life = 0;
+        void Pulse(Emberward.Core.Sensing.RadarTarget[] targets)
+        {
+            for (int i = 0; i < Tweaks.Radar.PulsePeriodTicks; i++)
+            {
+                radar.Advance(world.Terrain, world.Terrain, origin, ownColor: 0, targets);
+                discovery.Update(world.Emberites, vision, radar);
+                for (int c = 0; c < radar.ContactCount; c++)
+                    if (radar.ContactAt(c).Echo == Emberward.Core.Sensing.RadarEcho.Life && radar.ContactAt(c).BornTick == radar.Tick)
+                        life++;
+            }
+        }
+
+        // A creature and a tank right beside the nest: their echoes sit on their own cells.
+        Pulse([new(at + new Offset(-4, 3), 1, Alive: true), new(at + new Offset(-5, -4), 3, Alive: true)]);
+        Assert.True(life > 0, "the creature and the tank should have echoed");
+        Assert.False(discovery.IsFound(0));
+
+        // The nest's own echo, on its centre.
+        Pulse([new(at, 6, Alive: true)]);
+        Assert.True(discovery.IsFound(0));
+    }
+
+    [Fact]
+    public void ANestOutOfSight_ShowsWhatTheSideLastLearned_NotWhatItDoesNow()
+    {
+        var (world, tank) = Arena();
+        var nest = world.Emberites!.AddNest(Centre + new Offset(8, 0), radius: 4, creatures: 6);
+        Tick(world, tank, 2);
+        Assert.Equal(NestDangerLevel.Dormant, Assert.Single(Dangers(world, tank)).Level);
+
+        // The tank goes off into the dirt, out of sight of the nest, and the nest wakes.
+        tank.Position = Centre + new Offset(-40, 0);
+        Tick(world, tank, 2);
+        Assert.False(world.TrackVision(tank).IsVisible(nest.Centre));
+        nest.Awake = true;
+        Tick(world, tank, 1);
+        Assert.True(world.Emberites.TryGetDangerLevel(0, out var now) && now == NestDangerLevel.Awake);
+        Assert.Equal(NestDangerLevel.Dormant, Assert.Single(Dangers(world, tank)).Level);
+
+        // Back in sight: the ring shows it awake.
+        tank.Position = Centre;
+        Tick(world, tank, 1);
+        Assert.Equal(NestDangerLevel.Awake, Assert.Single(Dangers(world, tank)).Level);
+    }
+
+    [Fact]
     public void WithoutFog_EveryNestIsKnown()
     {
         var world = TestHelpers.CreateSeededWorld(enableTerrainRegrowth: false, emberites: true);

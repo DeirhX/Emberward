@@ -196,19 +196,15 @@ public sealed partial class EmberiteSwarm
     /// </summary>
     public static float DangerRadius(float heat) => Math.Max(Tweaks.Emberites.WakeRange, SenseRange(heat));
 
-    /// <summary>
-    /// Nest <paramref name="index"/>'s danger for a tank at <paramref name="heat"/>; false for a cleared nest, which is
-    /// no danger.
-    /// </summary>
-    public bool TryGetDanger(int index, float heat, out NestDanger danger)
+    /// <summary>How dangerous nest <paramref name="index"/> is now; false for a cleared nest, which is no danger.</summary>
+    public bool TryGetDangerLevel(int index, out NestDangerLevel level)
     {
-        danger = default;
+        level = default;
         if (index < 0 || index >= _nests.Count || _nests[index].IsCleared)
             return false;
         Nest nest = _nests[index];
-        NestDangerLevel level = nest.Out > 0 ? NestDangerLevel.Swarming
+        level = nest.Out > 0 ? NestDangerLevel.Swarming
             : nest.Awake ? NestDangerLevel.Awake : NestDangerLevel.Dormant;
-        danger = new NestDanger(nest.Centre, DangerRadius(heat), level);
         return true;
     }
 
@@ -259,7 +255,7 @@ public sealed partial class EmberiteSwarm
                 hash = Fnv1a.Mix(hash, emberite.Pyrite);
             hash = Fnv1a.Mix(Fnv1a.Mix(hash, emberite.SightTick), emberite.Sees);
             if (emberite.State is not EmberiteState.Hunting)
-                hash = Fnv1a.Mix(Fnv1a.Mix(Fnv1a.Mix(hash, emberite.Hotspot.X), emberite.Hotspot.Y), emberite.Timer);
+                hash = Fnv1a.Mix(Fnv1a.Mix(Fnv1a.Mix(Fnv1a.Mix(hash, emberite.Hotspot.X), emberite.Hotspot.Y), emberite.Timer), emberite.FailedSeeks);
         }
         return _trails.Mix(hash);
     }

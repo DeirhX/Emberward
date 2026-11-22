@@ -83,7 +83,6 @@ public sealed partial class EmberiteSwarm
             }
             else
             {
-                emberite.State = EmberiteState.Returning;
                 emberite.Target = -1;
                 GoHome(ref emberite);
                 return;
@@ -125,7 +124,7 @@ public sealed partial class EmberiteSwarm
     {
         if (nest.Thief == emberite.Target && nest.ThiefTicks > 0)
             return true;
-        if (StandsInHeat(tank))
+        if (StandsInHeat(tank, emberite))
             return true;
         float leash = HeatLeash(tank.Heat);
         if (leash > 0f && Position.DistanceSquared(tank.Position, nest.Centre) <= leash * leash)
@@ -147,9 +146,9 @@ public sealed partial class EmberiteSwarm
     }
 
     /// <summary>
-    /// Goes home to rest. A creature short of a full charge looks, once in <see cref="Tweaks.Emberites.HomeScanTicks"/>
-    /// (at once when it turns for home), for hot ground on its way (<see cref="TryFindHotspotOnWayHome"/>) and drinks there
-    /// instead; only with none does it carry on home.
+    /// Goes home to rest. A creature short of a full charge, with looks left (<see cref="Tweaks.Emberites.MaxFailedSeeks"/>),
+    /// looks once in <see cref="Tweaks.Emberites.HomeScanTicks"/> for hot ground on its way
+    /// (<see cref="TryFindHotspotOnWayHome"/>) and drinks there instead; only with none does it carry on home.
     /// </summary>
     private void GoHome(ref Emberite emberite)
     {
@@ -172,7 +171,7 @@ public sealed partial class EmberiteSwarm
             emberite.Velocity = default;
             return;
         }
-        if (!HasFullCharge(emberite) && --emberite.Timer <= 0)
+        if (!HasFullCharge(emberite) && emberite.FailedSeeks < Tweaks.Emberites.MaxFailedSeeks && --emberite.Timer <= 0)
         {
             emberite.Timer = Tweaks.Emberites.HomeScanTicks;
             if (TryFindHotspotOnWayHome(emberite, nest, out Position spot))

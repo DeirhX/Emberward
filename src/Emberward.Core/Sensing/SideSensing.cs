@@ -79,14 +79,18 @@ internal sealed class SideSensing(TerrainGrid terrain, MachineList machines, Tan
             }
             // Everything that is not terrain and reflects: the other tanks and planted machines. The side's own
             // machines are left out: it knows where it put them, so their echo would tell it nothing.
+            // Gathered only for a tick that walks a pulse; between pulses the radar only ages its contacts.
             _radarTargets.Clear();
-            foreach (var machine in machines.Machines)
-                if (machine.IsStanding && (tank.Base is null || machine.OwnerBase != tank.Base))
-                    _radarTargets.Add(new RadarTarget(machine.Position, machine.BoundingBox.HalfWidth));
-            foreach (var other in tanks.Tanks)
-                if (other != tank && !other.IsDead)
-                    _radarTargets.Add(new RadarTarget(other.Position, Tweaks.Radar.TankHalfSize, Alive: true, Signature: TankSignature.Of(other.Heat)));
-            emberites?.CollectRadarTargets(_radarTargets);
+            if (radar.NeedsTargets)
+            {
+                foreach (var machine in machines.Machines)
+                    if (machine.IsStanding && (tank.Base is null || machine.OwnerBase != tank.Base))
+                        _radarTargets.Add(new RadarTarget(machine.Position, machine.BoundingBox.HalfWidth));
+                foreach (var other in tanks.Tanks)
+                    if (other != tank && !other.IsDead)
+                        _radarTargets.Add(new RadarTarget(other.Position, Tweaks.Radar.TankHalfSize, Alive: true, Signature: TankSignature.Of(other.Heat)));
+                emberites?.CollectRadarTargets(_radarTargets);
+            }
             radar.Advance(terrain, terrain, tank.Position, tank.Color, _radarTargets,
                 tank.Base is { } home ? RadarReach.Scaled(home.Upgrades.RadarRangeScale, home.Upgrades.RadarHeatBudgetScale)
                     : RadarReach.Base,
@@ -96,13 +100,13 @@ internal sealed class SideSensing(TerrainGrid terrain, MachineList machines, Tan
         // After the radars, so that a life echo born this tick counts.
         if (emberites != null)
             foreach (var (tank, nests) in _discoveries)
-                nests.Update(emberites.Nests, TrackVision(tank), RadarOf(tank));
+                nests.Update(emberites, TrackVision(tank), RadarOf(tank));
     }
 
     /// <summary>
-    /// Writes the nests <paramref name="tank"/>'s side has discovered and that still have creatures, each with its
-    /// danger ring for that tank's heat; returns how many. A side whose vision is not tracked plays without fog of
-    /// war and knows every nest.
+    /// Writes the nests <paramref name="tank"/>'s side has discovered and did not last see cleared, each as the side
+    /// last learned it (<see cref="NestDiscovery"/>) with its danger ring for that tank's heat; returns how many. A side
+    /// whose vision is not tracked plays without fog of war and knows every nest as it is.
     /// </summary>
     public int CopyNestDangers(Tank tank, Span<NestDanger> destination)
     {
@@ -114,8 +118,11 @@ internal sealed class SideSensing(TerrainGrid terrain, MachineList machines, Tan
                 found = nests;
         int count = 0;
         for (int i = 0; i < emberites.Nests.Count && count < destination.Length; i++)
-            if ((found is null || found.IsFound(i)) && emberites.TryGetDanger(i, tank.Heat, out NestDanger danger))
-                destination[count++] = danger;
+        {
+            bool known = found is null ? emberites.TryGetDangerLevel(i, out NestDangerLevel level) : found.TryGetKnownLevel(i, out level);
+            if (known)
+                destination[count++] = new NestDanger(emberites.Nests[i].Centre, Entities.Emberites.EmberiteSwarm.DangerRadius(tank.Heat), level);
+        }
         return count;
     }
 
