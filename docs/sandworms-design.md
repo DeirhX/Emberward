@@ -108,12 +108,17 @@ Two senses, both cheap:
   list and takes the block with the largest `Unrest - 16 * distance` above zero, the lower block index on a tie.
   That block's `LastAt` is where it goes. A worm that has prowled a block and found nothing ignores that block for
   `IgnoreTicks` (30 s).
-- **The tremor** (near). A worm feels a tank within `FeelRange` = 40 cells of its head if that tank made any noise
-  in the last `FeelMemoryTicks` = 24 (the noise pass stamps a last-noise tick per tank from each event's `Color`),
-  and is not docked or spawn-protected. A felt tank overrides the call. A tank that is still and silent is not
-  felt, even beside the worm, unless the worm's head blunders into it (within `BiteRange`).
+- **The tremor** (near). A worm feels a tank within `FeelRange` = 40 cells of its head if that tank itself moved,
+  dug or fired in the last `FeelMemoryTicks` = 24, and is not docked or spawn-protected. The noise pass stamps a
+  last-noise tick per tank from `TankMoved`, `TankDug` and `ShotFired` only, whose `Color` is the tank. The other
+  loud events add unrest but stamp no tank: `TurretFired`, `OreHarvested` and `MachinePlanted` carry the owner's
+  colour, not a tank's act, and a burst (`Explosion`) is noise where it lands. So a side's working gatling or
+  harvester calls worms to its own block and never gives away a tank that is holding still. A felt tank overrides
+  the call. A tank that is still and silent is not felt, even beside the worm, unless the worm's head blunders
+  into it (within `BiteRange`).
 
 A worm lunges only at a tank it feels. So the last-second answer to a worm is to stop: no move, no dig, no shot.
+Machines of the tank's side may keep working; they draw the worm to themselves, not to the tank.
 
 ### 2.5 Counters, in one place
 
@@ -203,7 +208,8 @@ gets clear (20 cells against 20). A lunge that misses leaves the worm stretched 
 A lunge whose head comes within `BiteRange` = 4.5 cells of the tank's centre bites: `BiteDamage` = 250, and the
 worm **holds** the tank. A held tank cannot move (the tank's step asks the pack, as it asks the reserve for its
 move factor); it can aim, shoot and torch. Every `ChewTicks` = 12 the worm chews for `ChewDamage` = 90 and
-passes `ChewDegrees` = 1.5 of heat from its own store into the tank. The hold ends when:
+passes `ChewEnergy` = 30 of heat from its own store into the tank (1.5 degrees for the tank, §5.3). The hold ends
+when:
 
 - the worm has taken `HoldBreakDamage` = 600 since it bit (three shells into the open maw, §6), or
 - `HoldMaxTicks` = 120 have passed (5 seconds), or
@@ -221,29 +227,41 @@ Worms attack tanks only in the first version, the bot's tank like the player's. 
 
 ### 5.3 Energy
 
-Damage is not heat and the ledger does not see it, as with an emberite's `BiteDamage`. The heat a chew passes is a
-move from the worm's store to `Tank.Heat`, as an emberite's bite is; a worm with no heat above 0 passes none.
+Damage is not heat and the ledger does not see it, as with an emberite's `BiteDamage`. The heat a chew passes is
+an amount of **energy**, moved as an emberite's bite moves its charge: the worm gives up
+`energy = min(ChewEnergy, Heat * HeatCapacity)` (nothing when it holds none above 0), its own `Heat` falls by
+`energy / HeatCapacity` and the tank's rises by `energy / tank.ThermalCapacity`. The two capacities differ twenty
+to one (400 against the tank's 20), so the same 30 of energy is 1.5 degrees for the tank and 0.075 for the worm;
+degrees are never copied across. Ten chews of a full hold warm the tank 15 degrees and cool the worm 0.75. Nothing
+is made or lost, so the ledger needs no entry.
 
 ### 5.4 The worm's own heat
 
-A worm holds `Heat` (degrees) with a heat capacity of `HeatCapacity` = 400, twenty tanks' worth.
+A worm holds `Heat` (degrees) with a heat capacity of `HeatCapacity` = 400, twenty tanks' worth; its energy is
+`Heat * HeatCapacity`, and every exchange below is in energy.
 
-- **In.** Each cell of soil the head travels adds `BurrowEnergyPerCell` = 20, booked with
-  `ThermalLedger.RecordInjected`, as a tank's dig heat is. Burrowing flat out that is about a degree a second.
-- **Out, slowly.** In open ground the head gives 0.5 degrees a second to the air around it
+- **In.** Each cell of soil the head travels adds `BurrowEnergyPerCell` = 40, booked with
+  `ThermalLedger.RecordInjected`, as a tank's dig heat is: 0.1 degrees a cell, so about 1.9 degrees a second
+  burrowing flat out, and the 20 degrees from `RestHeat` to `VentHeat` in 200 cells of soil (300 from cold).
+- **Out, slowly.** In open ground the head gives 0.5 degrees a second (200 of energy) to the air around it
   (`AddEnergyInRadiusArea`, air field), which wakes those tiles as any heat write does.
-- **Out, all at once.** At `VentHeat` = 45 the worm must vent. It finishes a hold first, then stops at the next
+- **Out, all at once.** At `VentHeat` = 30 the worm must vent. It finishes a hold first, then stops at the next
   open ground it enters, or clears a chamber where it is after 2 seconds in soil, and for `VentTicks` = 72 lies
   still with its maw open while everything above `RestHeat` = 10 goes into the air and ground around its head in
   equal parts per tick. `StepEventKind.WormVenting`.
 - **Death.** What it holds spills at the head (`AddEnergyInRadiusArea`, radius 4).
-- **Asleep.** It holds none: going home puts it in the lair's ground.
+- **Asleep.** It holds none: going home puts it in the lair's ground, so every outing starts from 0.
 
 `SandwormPack.TotalHeat()` joins `World.SumSystemThermalEnergy`, so `ThermalLedgerTests` closes every tick. Every
 write goes through the heat field's own writers, so tiles wake and relays hear it.
 
-This is the tie to the rest of the game. A worm called from far away, or led from decoy to decoy, arrives hot and
-has to lie in the open for three seconds: the burst window is something the player makes. And a vent site is hot
+This is the tie to the rest of the game, and the numbers are set so that a vent happens within one outing. A worm
+leaves its lair at 0 and must vent after 300 cells of soil. The nearest lair is typically 100 to 200 cells away, so
+the first worm arrives at 10 to 20 degrees and vents after another 100 to 200 cells: one prowl (six seconds is
+about 115 cells), a chase down a tunnel, or a trip to a decoy and back. A worm called from 300 cells or more (the
+second and third to come, §2.3) is due to vent as it arrives or on the way. After a vent it is at `RestHeat` and
+the next is 200 cells off, so a worm kept moving vents about every ten seconds of burrowing. The burst window is
+something the player makes, by making the worm travel. And a vent site is hot
 ground, which is what spent emberites drink from (`TryFindHotspot`), so a worm fight near a nest feeds the nest.
 
 ## 6. Killing a worm
@@ -334,14 +352,14 @@ area only as memory, not as work.
 | `DecayPerTick` | 3 | `BiteDamage` / `ChewDamage` | 250 / 90 |
 | `MachineUnrestCap` | 1600 | `ChewTicks` / `HoldMaxTicks` | 12 / 120 |
 | `MoveNoise` / `ShotNoise` / `BurstNoise` | 1 / 3 / 12 | `HoldBreakDamage` | 600 |
-| `TurretNoise` / `HarvestNoise` / `PlantNoise` | 2 / 6 / 20 | `ChewDegrees` | 1.5 |
+| `TurretNoise` / `HarvestNoise` / `PlantNoise` | 2 / 6 / 20 | `ChewEnergy` | 30 |
 | `DigCellsPerNoise` (torch: 1) | 2 | `Health` / `GenerationFactor` / `MaxGeneration` | 4000 / 1.25 / 3 |
 | `HearTicks` | 12 | `HeadArmour` / `MawFactor` | 0.25 / 1.5 |
 | `FeelRange` / `FeelMemoryTicks` | 40 / 24 | `HeadRadius` / `SegmentRadius` | 3 / 2.5 |
 | `ProwlTicks` / `ProwlRadius` | 144 / 12 | `BodySegments` / `SegmentSpacing` | 9 / 4 |
 | `IgnoreTicks` | 720 | `BreachRadius` / `VentRadius` | 3 / 4 |
-| `LoseInterestTicks` / `StuckTicks` | 192 / 72 | `HeatCapacity` / `BurrowEnergyPerCell` | 400 / 20 |
-| `CellsPerLair` | 100 000 | `VentHeat` / `RestHeat` / `VentTicks` | 45 / 10 / 72 |
+| `LoseInterestTicks` / `StuckTicks` | 192 / 72 | `HeatCapacity` / `BurrowEnergyPerCell` | 400 / 40 |
+| `CellsPerLair` | 100 000 | `VentHeat` / `RestHeat` / `VentTicks` | 30 / 10 / 72 |
 | `MinLairDistanceFromBase` / `MinLairSpacing` | 150 / 120 | `OpenShedDegreesPerSecond` | 0.5 |
 | `GraceSeconds` | 120 | `RebirthTicks` | 5760 |
 | `MaxOut` | 6 | `FeelerCells` | 8 |
@@ -409,12 +427,12 @@ worm is a loop whose gain is the proximity strength; `SoundDirector` needs a loo
   records an event that counts as noise.
 - `SandwormMovementTests`: the chain keeps its spacing; soil and open speeds; rock and bases stop it; a stuck
   worm goes home; burrowing writes no pixel; a breach clears soil and leaves rock; a worm home is counters again.
-- `SandwormAttackTests`: a silent tank is not lunged at; a wind-up fixes the line and a sidestep avoids it; bite
+- `SandwormAttackTests`: a silent tank is not lunged at, even while its own gatling and harvester work beside it; a wind-up fixes the line and a sidestep avoids it; bite
   and chew amounts through the shield; a held tank cannot move; the hold breaks on damage, on time and on death;
   a docked tank is safe.
 - `SandwormCombatTests`: the three damage factors; shells stop on segments; a segment blocks a tank and two
   overlapping bodies can part; kill, spent lair, rebirth with the next generation's health.
-- `SandwormHeatTests`: burrow heat is booked; the vent empties to `RestHeat`; a kill spills; `ThermalLedgerTests`
+- `SandwormHeatTests`: burrow heat is booked; a chew moves energy, not degrees (the sum of both stores is unchanged); a worm from cold vents after 300 cells of soil; the vent empties to `RestHeat`; a kill spills; `ThermalLedgerTests`
   with a worm out for a whole fight.
 - `SandwormCostTests`: `WormSteps` and `BlockWrites` stay 0 on a quiet map.
 - Existing suites that must grow: `DeterminismTests` and `ReplayTests` with the rule on; `SnapshotRoundTripTests`
