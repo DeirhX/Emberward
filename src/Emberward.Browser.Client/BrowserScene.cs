@@ -84,7 +84,8 @@ public sealed class BrowserScene
         Terrain.Prepare(View.VisibleCells(), time);
         _entities.Build(View, alpha, Math.Clamp(delta, 0f, 0.1f), snapHeadings: false, time,
             _session.Vision, _session.Radar, powerLabelCellSize);
-        int glowCount = _glowBuilder.BuildGpuTankHeatGlowData(_session.World.TankList.Tanks, positions, View, _glows, _session.Vision);
+        int glowCount = _glowBuilder.BuildGpuTankHeatGlowData(_session.World.TankList.Tanks, positions, View, _glows, _session.Vision,
+            _entities.TankFireLevels);
         var upload = new GamePixelsUpload(View,
             new PostProcessUploadOptions(_session.ThermalView, PostProcessPassFlags.All & ~PostProcessPassFlags.ThermalRegions, default, time),
             new TankGlowUpload(_glows, glowCount),

@@ -84,6 +84,9 @@ public sealed class EntityLayerBuilder
     /// </summary>
     public ReadOnlySpan<PositionF> TankPositions(float alpha) => _motion.TankPositions(alpha);
 
+    /// <summary>Each tank's fire level as drawn (easing after Core's), indexed like the world's tank list.</summary>
+    public ReadOnlySpan<float> TankFireLevels => _tankFires.DrawnLevels;
+
     /// <summary>Where tank <paramref name="slot"/> is drawn from and how it moves through the step (cells per step).</summary>
     public (PositionF Start, PositionF Motion) TankMotion(int slot) => _motion.TankMotion(slot);
 
@@ -96,6 +99,7 @@ public sealed class EntityLayerBuilder
         _motion.Hold();
         _projectiles.Hold();
         _emberites.Hold();
+        _tankShields.Hold();
         _tankFires.Hold();
     }
 

@@ -31,6 +31,16 @@ const HEADROOM = 44;
 const TEMP = { x: HEAT_X + 170, title: 151.5, readout: 179, right: HEAT_X + 239 },
     SHIELD = { x: SHIELD_X + 80.5, title: 153.5, readout: 180 },
     MATERIALS = { x: MATERIALS_X + 120, title: 154, readout: 184 };
+// HudStrip.DrawLedger: SHIELD above HULL in the readout plate, a label left, a number right, a hairline bar under each.
+// LedgerLayout.cs: the SHIELD/HULL rows, laid out so no number, bar or outline overlaps another or leaves the plate.
+const LEDGER = {
+    left: SHIELD_X + 19, right: SHIELD_X + 140, shieldY: 173.8, hullY: 185, soloY: 180,
+    barDrop: 5.4, barHalf: 0.6, barOutline: 0.6, label: 8.5, number: 10,
+};
+// HudPalette: the shield's cyan, an empty shield's slate, the hull label's warm colour (ABGR).
+const SHIELD_CYAN = 0xffffe0a0,
+    SHIELD_SLATE = 0xff997f5f,
+    HULL_NEUTRAL = 0xff70b8ff;
 const ORE_LINE = { x: MATERIALS_X + 122, y: 133, size: 15 };
 
 // HeatGauge.cs
@@ -207,8 +217,8 @@ export class StripView {
         this.shown.heat = Number.isNaN(this.shown.heat)
             ? heat
             : this.shown.heat + (heat - this.shown.heat) * EASE_HEAT;
-        // The crystal holds the shield when the match has one, else the hull.
-        const crystal = p.shieldActive ? p.shieldFill : p.hull;
+        // The crystal holds the shield when the match has one, else the hull; a dead tank's shield is spent.
+        const crystal = p.shieldActive ? (p.dead ? 0 : p.shieldFill) : p.hull;
         this.shown.crystal =
             this.shown.crystal < 0
                 ? crystal
@@ -240,16 +250,16 @@ export class StripView {
 
         this.drawOrb(left, p, time);
         this.drawLiquids(left, p, time);
-        // The plate's title changes with fire and shield, so it is drawn each frame, not in the cached layer.
-        // A burning hull says so, in fire colours; otherwise the plate names the crystal and the number under it.
-        if (p.fireLevel > 0) stripText(left, "FIRE ABOARD", SHIELD.x, SHIELD.title, 18, abgr(0xff50a0ff), abgr(0x402060ff));
-        else stripText(left, p.shieldActive ? "SHIELD/HULL" : "HULL", SHIELD.x, SHIELD.title, p.shieldActive ? 17 : 20, abgr(0xfff8e890), abgr(0x20ffa030));
+        // The plate's title is one status word (HullStatuses), so it is drawn each frame, not in the cached layer.
+        const plate = p.plate;
+        const flash = plate.wordFlashColor !== plate.wordColor && Math.floor(time * 4) % 2 !== 0;
+        stripText(left, plate.word, SHIELD.x, SHIELD.title, 17, flash ? plate.wordFlashColor : plate.wordColor, plate.wordColor + "30");
 
         const readout = (text, plate) =>
             stripText(left, text, plate.x, plate.readout, 22, abgr(0xffaafacd), abgr(0x2830ff60));
         readout(`${p.dead ? 0 : Math.round(p.heat)}°`, TEMP);
         this.drawTrend(left, p);
-        readout(String(p.health), SHIELD);
+        this.drawLedger(left, p);
         if (p.orePileFrame >= 0) {
             const column = p.orePileFrame % 8, row = Math.floor(p.orePileFrame / 8);
             left.drawImage(this.art.orePile, column * 288, row * 120, 288, 120, MATERIALS_X + 51, 48, 144, 60);
@@ -510,18 +520,73 @@ export class StripView {
         return w;
     }
 
-    // LiquidGauges.Draw: the shield crystal, with a softly waving surface. A low shield pulses red and flashes on a hit.
+    // HudStrip.DrawLedger: SHIELD above HULL (the hull alone, in the middle, with no shield in the match).
+    drawLedger(ctx, p) {
+        const plate = p.plate;
+        let hullY = LEDGER.hullY;
+        if (p.shieldActive) {
+            const color = abgr(plate.shield > 0 ? SHIELD_CYAN : SHIELD_SLATE);
+            const track = abgr(((0x70 << 24) | (SHIELD_SLATE & 0xffffff)) >>> 0);
+            ledgerRow(ctx, LEDGER.shieldY, "SHIELD", color, String(plate.shield), color, p.dead ? 0 : p.shieldFill, color, track);
+        } else {
+            hullY = LEDGER.soloY;
+        }
+        const hull = p.dead ? 0 : p.hull;
+        ledgerRow(ctx, hullY, "HULL", abgr(HULL_NEUTRAL), String(p.health), plate.hullColor, hull, plate.hullColor,
+            plate.glowStops[plate.glowStops.length - 1] + "90", abgr(0x30106aff));
+    }
+
+    // LiquidGauges.Draw: the shield crystal, dark where it has emptied from its edge inward, with the tank's hot
+    // centre glowing through the empty part. A low level pulses red and the crystal flashes on a hit.
     drawLiquids(ctx, p, time) {
         const pulse = Math.floor(time * 4) % 2 === 0;
-        const [sTop, sBottom] = extent(SHIELD_OUTLINE);
-        const sLevel = sBottom - (sBottom - sTop) * this.shown.crystal;
         const crystalLow = p.shieldActive ? p.shieldLow : p.hullLow;
-        const crystalFill = p.shieldActive ? p.shieldFill : p.hull;
-        if (p.hitFresh) fillBand(ctx, SHIELD_OUTLINE, sLevel, sBottom, abgr(0x90ffffff));
-        else if (crystalLow && crystalFill > 0 && pulse)
-            fillBand(ctx, SHIELD_OUTLINE, sLevel, sBottom, abgr(0x703030ff));
-        fillBand(ctx, SHIELD_OUTLINE, sTop, sLevel, abgr(0xc8080808));
-        surface(ctx, SHIELD_OUTLINE, sLevel, crystalFill > 0 ? 0xffffe0a0 : 0, time);
+        const crystalFill = p.shieldActive ? (p.dead ? 0 : p.shieldFill) : p.hull;
+        const [cx, cy] = centroid(SHIELD_OUTLINE);
+        const shrink = Math.sqrt(Math.min(1, Math.max(0, this.shown.crystal)));
+        const inner = scaled(SHIELD_OUTLINE, cx, cy, shrink);
+        if (p.hitFresh) {
+            polygon(ctx, inner);
+            ctx.fillStyle = abgr(0x90ffffff);
+            ctx.fill();
+        } else if (crystalLow && crystalFill > 0 && pulse) {
+            polygon(ctx, inner);
+            ctx.fillStyle = abgr(0x703030ff);
+            ctx.fill();
+        }
+        // The empty part: the outline less what is left.
+        polygon(ctx, SHIELD_OUTLINE);
+        ring(ctx, inner);
+        ctx.fillStyle = abgr(0xc8080808);
+        ctx.fill("evenodd");
+        const plate = p.plate;
+        if (plate.glow > 0) {
+            // The hot centre, from the hull's own heat in the middle to the ramp's dull red at the outline, seen
+            // only through the empty part.
+            const r = Math.max(...SHIELD_OUTLINE.map(([x, y]) => Math.hypot(x - cx, y - cy)));
+            const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+            const alpha = (a) => Math.round(Math.min(1, Math.max(0, a)) * 255).toString(16).padStart(2, "0");
+            // Every stop on the ramp, as the desktop's bands: the colour cools and the glow fades toward the rim.
+            const stops = plate.glowStops;
+            stops.forEach((colour, i) => {
+                const at = i / (stops.length - 1);
+                glow.addColorStop(at, colour + alpha(plate.glow * (1 - 0.8 * at)));
+            });
+            polygon(ctx, SHIELD_OUTLINE);
+            ring(ctx, inner);
+            ctx.fillStyle = glow;
+            ctx.fill("evenodd");
+        }
+        if (crystalFill > 0) {
+            // A bright line along the edge of what is left.
+            polygon(ctx, inner);
+            ctx.strokeStyle = abgr(0x50ffe0a0);
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            ctx.strokeStyle = abgr(0xffffe0a0);
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        }
     }
 
     // BuildPanel.Draw: a slot per machine, filling toward its cost from the stock that would pay (BuildSlotView).
@@ -587,9 +652,10 @@ function size(canvas, width, height, density) {
 // HudStrip.DrawStripText: centred on an art point, sized in art pixels, with a soft glow, a dark outline and a
 // second pass a fraction of a pixel over, to match the art's chunky lettering. The glow is a wide stroke in its
 // colour, where the desktop draws the text a dozen times around: a blur filter would cost far more.
-function stripText(ctx, text, cx, cy, size, color, glow) {
+// `align` is "center", "left" (starting at cx) or "right" (ending at cx).
+function stripText(ctx, text, cx, cy, size, color, glow, align = "center") {
     ctx.font = font(size);
-    ctx.textAlign = "center";
+    ctx.textAlign = align;
     ctx.textBaseline = "alphabetic";
     const ink = ctx.measureText("0");
     const y = cy + (ink.actualBoundingBoxAscent - ink.actualBoundingBoxDescent) / 2;
@@ -610,6 +676,25 @@ function stripText(ctx, text, cx, cy, size, color, glow) {
     ctx.fillText(text, cx + 0.6, y);
 }
 
+// HudStrip.DrawLedgerRow: a label left, a number right, and a hairline bar beneath, filled `fill` of the way.
+function ledgerRow(ctx, y, label, labelColor, number, numberColor, fill, barColor, trackColor, numberGlow) {
+    stripText(ctx, label, LEDGER.left, y, LEDGER.label, labelColor, null, "left");
+    stripText(ctx, number, LEDGER.right, y, LEDGER.number, numberColor, numberGlow, "right");
+    const barY = y + LEDGER.barDrop,
+        half = LEDGER.barHalf,
+        edge = LEDGER.barOutline,
+        width = LEDGER.right - LEDGER.left;
+    ctx.fillStyle = abgr(0xc0000000);
+    ctx.fillRect(LEDGER.left - edge, barY - half - edge, width + 2 * edge, 2 * (half + edge));
+    ctx.fillStyle = trackColor;
+    ctx.fillRect(LEDGER.left, barY - half, width, 2 * half);
+    const f = Math.min(1, Math.max(0, fill));
+    if (f > 0) {
+        ctx.fillStyle = barColor;
+        ctx.fillRect(LEDGER.left, barY - half, width * f, 2 * half);
+    }
+}
+
 // HudDraw.DrawOutlinedText: text from its top-left corner, with a one-pixel dark outline.
 function outlined(ctx, text, x, y, size, color) {
     ctx.font = font(size);
@@ -621,63 +706,25 @@ function outlined(ctx, text, x, y, size, color) {
     ctx.fillText(text, x, y);
 }
 
-function extent(poly) {
-    let top = Infinity,
-        bottom = -Infinity;
-    for (const [, y] of poly) {
-        top = Math.min(top, y);
-        bottom = Math.max(bottom, y);
+function centroid(poly) {
+    let x = 0,
+        y = 0;
+    for (const [px, py] of poly) {
+        x += px;
+        y += py;
     }
-    return [top, bottom];
+    return [x / poly.length, y / poly.length];
 }
 
-// HudDraw.FillPolygonBand: the polygon, between two heights.
-function fillBand(ctx, poly, y0, y1, color) {
-    if (y1 <= y0) return;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(-1e4, y0, 2e4, y1 - y0);
-    ctx.clip();
-    polygon(ctx, poly);
-    ctx.fillStyle = color;
-    ctx.fill();
-    ctx.restore();
+// The polygon shrunk toward (cx, cy) by `k`.
+function scaled(poly, cx, cy, k) {
+    return poly.map(([x, y]) => [cx + (x - cx) * k, cy + (y - cy) * k]);
 }
 
-// HudDraw.PolygonSpanAtY: where a level crosses the polygon's sides.
-function spanAt(poly, y) {
-    let x0 = Infinity,
-        x1 = -Infinity;
-    for (let i = 0; i < poly.length; i++) {
-        const [ax, ay] = poly[i],
-            [bx, by] = poly[(i + 1) % poly.length];
-        if (y < Math.min(ay, by) || y > Math.max(ay, by) || ay === by) continue;
-        const x = ax + ((y - ay) / (by - ay)) * (bx - ax);
-        x0 = Math.min(x0, x);
-        x1 = Math.max(x1, x);
-    }
-    return x0 <= x1 ? [x0, x1] : [0, 0];
-}
-
-// LiquidGauges.DrawSurface: a gently waving bright line where the liquid meets the empty part.
-function surface(ctx, poly, y, color, time) {
-    const [x0, x1] = spanAt(poly, y);
-    const half = (x1 - x0) / 2;
-    if (!color || half < 3) return;
-    ctx.beginPath();
-    for (let i = 0; i <= 12; i++) {
-        const u = i / 12;
-        const px = x0 + 2 * half * u,
-            py = y + Math.sin(u * 9 + time * 5) * 1.2;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-    }
-    ctx.strokeStyle = abgr(((0x50 << 24) | (color & 0xffffff)) >>> 0);
-    ctx.lineWidth = 4;
-    ctx.stroke();
-    ctx.strokeStyle = abgr(color);
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+// Adds the polygon to the current path as a second ring (for an even-odd fill), without starting a new path.
+function ring(ctx, poly) {
+    poly.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.closePath();
 }
 
 function polygon(ctx, poly) {

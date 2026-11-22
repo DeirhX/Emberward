@@ -61,7 +61,7 @@ public static class BrowserFrameBuilder
             Math.Max(0, player.Reactor.Health), HeatScale.Frozen(player.Heat), HeatScale.Boil(player.Heat),
             player.IsOverheating || player.IsAboveSafeHeat, player.IsHullLow(latched: false),
             player.HitFlashTicks > Tank.HitFlashDuration - HitFreshTicks, BuildSlotView.OrePileFrame(player), player.IsUnloadingOre,
-            player.IsOreHoldFull, player.IsOffNetworkUrgent, BuildSlotView.OreLine(player));
+            player.IsOreHoldFull, player.IsOffNetworkUrgent, BuildSlotView.OreLine(player), Plate(player, shield));
         return new BrowserFrame(session.Seed, world.AdvanceCount, Tweaks.Perf.TargetFps, status,
             session.Sounds.Frame(takePlays: includeEvents), builds, upgrades, preview, goal, Guidance(session.Guidance),
             includeDial ? Dial() : null, net?.Status(), BasePower(world, player), MachineUpgrade(session),
@@ -101,6 +101,34 @@ public static class BrowserFrameBuilder
 
     /// <summary>How many steps after a hit the desktop's shield crystal flashes white (<c>LiquidGauges</c>).</summary>
     private const int HitFreshTicks = 6;
+
+    /// <summary>The SHIELD/HULL plate as the desktop's <c>HudStrip</c> and <c>LiquidGauges</c> show it.</summary>
+    private static HullPlate Plate(Tank player, in TankShieldView shield)
+    {
+        var word = HullStatuses.Of(player, shield);
+        float hull = player.HullFraction;
+        return new HullPlate(word.Text, HudPalette.Hex(word.Color), HudPalette.Hex(word.FlashColor),
+            player.IsDead ? 0 : Math.Max(0, shield.Shield),
+            HudPalette.Hex(player.IsDead ? HudPalette.TextDim : HudPalette.HullHeat(hull)),
+            GlowStops(Math.Min(hull, HudPalette.HullHeatStart)),
+            player.IsDead ? 0f : HudPalette.HullGlowStrength(hull));
+    }
+
+    /// <summary>How many colour stops the crystal's hot centre has, from its middle to its outline.</summary>
+    public const int HullGlowStops = 5;
+
+    // The hot centre's colours from the middle (the hull's own heat) to the outline (the ramp's dull red), as the
+    // desktop's LiquidGauges bands take them.
+    private static string[] GlowStops(float heat)
+    {
+        var stops = new string[HullGlowStops];
+        for (int i = 0; i < stops.Length; i++)
+        {
+            float mid = i / (float)(stops.Length - 1);
+            stops[i] = HudPalette.Hex(HudPalette.HullEmber(heat + ((HudPalette.HullHeatStart - heat) * mid)));
+        }
+        return stops;
+    }
 
     /// <summary>The heat dial as the desktop's <c>HeatGauge</c> colours it.</summary>
     public static HeatDial Dial()

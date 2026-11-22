@@ -13,6 +13,39 @@ namespace Emberward.Tests;
 /// <summary>The HUD's decisions that do not need a window: which hint to show, the heat scale, the HUD's size.</summary>
 public class HudLogicTests
 {
+    /// <summary>
+    /// The line under the hold says what touching the core would do: bank the ore, burn it while the base is dark, and
+    /// nothing while the store is full (then it falls back to the plain label).
+    /// </summary>
+    [Fact]
+    public void TheOreLine_SaysWhatTheCoreWouldDoWithTheHold()
+    {
+        var s = RelayHeatTests.CreateScenario(energyNetwork: true);
+        s.Tank.Position = s.Base.SpawnPosition;
+        s.Tank.Hold.Ore = 10;
+        s.World.Advance(_ => default);
+        Assert.Equal(CoreDropOff.Banks, s.Tank.CoreDropOff);
+        Assert.Equal("TO CORE", BuildSlotView.OreLine(s.Tank));
+
+        s.Base.Store.Ore = s.Base.Store.Capacity;
+        s.World.Advance(_ => default);
+        Assert.Equal(CoreDropOff.None, s.Tank.CoreDropOff);
+        Assert.Equal("ORE", BuildSlotView.OreLine(s.Tank));
+
+        s.Base.Store.Ore = 0;
+        s.Base.DrawCharge(s.Base.Charge);
+        s.World.Advance(_ => default);
+        s.World.Advance(_ => default);
+        Assert.Equal(CoreDropOff.Burns, s.Tank.CoreDropOff);
+        Assert.Equal("BURN AT CORE", BuildSlotView.OreLine(s.Tank));
+
+        s.Tank.Position = TestHelpers.AgainstCore(s.Base);
+        s.World.Advance(_ => default);
+        s.Base.Store.Ore = 0;
+        s.World.Advance(_ => default);
+        Assert.True(s.Tank.OreHeld < 10, "touching the core burns or banks the hold");
+    }
+
     private static int Cost(MachineType type) => MachineBehaviors.Get(type).OreCost;
 
     /// <summary>A live tank out in the field with nothing to build and nothing going on.</summary>

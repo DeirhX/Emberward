@@ -57,7 +57,7 @@ bool IsBaseFloorCode(int code) { return code == kMaterialCodeBaseFloor; }
 bool IsBaseCoreCode(int code)  { return code == kMaterialCodeBaseCore; }
 bool IsBaseDoorCode(int code)  { return code == kMaterialCodeBaseDoor || code == kMaterialCodeBaseDoorOpen; }
 bool IsBaseCode(int code)      { return IsBaseWallCode(code) || IsBaseFloorCode(code) || IsBaseDoorCode(code) || IsBaseCoreCode(code); }
-// What stands up from the floor and shades it: walls and baffles. The core is round and shades its own cells.
+// What stands up from the floor and shades it: the walls. The core is round and shades its own cells.
 bool IsBaseRaisedCode(int code) { return IsBaseWallCode(code); }
 
 // ---- Natural material selection from coverageTex ---------------------------

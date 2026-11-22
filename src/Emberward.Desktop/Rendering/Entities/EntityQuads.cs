@@ -63,7 +63,18 @@ public sealed class EntityQuads
     public void Add(
         float cx, float cy, float axisX, float axisY,
         float minX, float maxX, float minY, float maxY,
-        Color color, float kind, float p0, float p1, float p2, float p3, PositionF motion = default)
+        Color color, float kind, float p0, float p1, float p2, float p3, PositionF motion = default) =>
+        Add(cx, cy, axisX, axisY, minX, maxX, minY, maxY, color.R / 255f, color.G / 255f, color.B / 255f, kind, p0, p1, p2, p3,
+            motion);
+
+    /// <summary>
+    /// Adds a quad as above whose vertex colour carries three more params (<paramref name="c0"/>, <paramref name="c1"/>,
+    /// <paramref name="c2"/>; any float) instead of a colour, for a kind that needs more than four (Layout.hlsli).
+    /// </summary>
+    public void Add(
+        float cx, float cy, float axisX, float axisY,
+        float minX, float maxX, float minY, float maxY,
+        float c0, float c1, float c2, float kind, float p0, float p1, float p2, float p3, PositionF motion = default)
     {
         if (_vertexCount + VerticesPerQuad > _vertices.Length)
             Array.Resize(ref _vertices, _vertices.Length * 2);
@@ -74,9 +85,9 @@ public sealed class EntityQuads
             CellY = cy + (lx * axisY + ly * axisX),
             LocalX = lx,
             LocalY = ly,
-            R = color.R / 255f,
-            G = color.G / 255f,
-            B = color.B / 255f,
+            R = c0,
+            G = c1,
+            B = c2,
             Kind = kind,
             P0 = p0,
             P1 = p1,

@@ -54,8 +54,8 @@ internal static class BotSiege
 
     /// <summary>
     /// The core cell a shot from <paramref name="from"/> aimed at <paramref name="aim"/> lands on, when the line has
-    /// room to spare. The gap between two baffles is narrow and a shell starts at the barrel's tip, up to a cell off
-    /// the line from the tank's centre, so the same shot from each cell beside the tank must reach the core as well.
+    /// room to spare. The core is small and a shell starts at the barrel's tip, up to a cell off the line from the
+    /// tank's centre, so the same shot from each cell beside the tank must reach the core as well.
     /// </summary>
     private static Position? ClearShotAtCore(Position from, Position aim, TankBase target, World world)
     {

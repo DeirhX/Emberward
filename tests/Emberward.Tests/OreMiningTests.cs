@@ -27,9 +27,14 @@ public class OreMiningTests
     }
 
     /// <summary>The tank in an open pocket outside its base, facing a wall of <paramref name="wall"/> to its right.</summary>
-    private static RelayHeatTests.Scenario FacingWall(TerrainPixel wall)
+    // A nearly full hold cooks the tank (Tweaks.Cargo); tests of what a full hold leaves in the ground turn the ramp
+    // off, so a death does not spill the hold.
+    private static readonly SimulationSettings NoCargoRamp =
+        SimulationSettings.FromTweaks() with { TankCargoHeatPerOreAboveStartPerTick = 0f };
+
+    private static RelayHeatTests.Scenario FacingWall(TerrainPixel wall, SimulationSettings? settings = null)
     {
-        var s = RelayHeatTests.CreateScenario();
+        var s = RelayHeatTests.CreateScenario(simulationSettings: settings);
         Fill(s.World.Terrain, s.RelayPos, 14, TerrainPixel.Blank);
         Fill(s.World.Terrain, s.RelayPos, 14, wall, fromDx: 5);
         s.Tank.Position = s.RelayPos;
@@ -112,7 +117,7 @@ public class OreMiningTests
     [Fact]
     public void FullHold_LeavesOreInTheGround()
     {
-        var s = FacingWall(TerrainPixel.Pyrite);
+        var s = FacingWall(TerrainPixel.Pyrite, NoCargoRamp);
         s.Tank.Hold.Ore = Tweaks.Ore.TankHold - 2;
         int before = CountOre(s.World.Terrain, s.RelayPos, 14);
 
@@ -126,7 +131,7 @@ public class OreMiningTests
     [Fact]
     public void ACoreCell_IsLeftAlone_UnlessAllItsUnitsFit()
     {
-        var s = FacingWall(TerrainPixel.PyriteCore);
+        var s = FacingWall(TerrainPixel.PyriteCore, NoCargoRamp);
         s.Tank.Hold.Ore = Tweaks.Ore.TankHold - (Tweaks.Ore.CoreCellUnits - 1);
         int before = CountOre(s.World.Terrain, s.RelayPos, 14);
 
@@ -136,10 +141,10 @@ public class OreMiningTests
     }
 
     [Fact]
-    public void DockingAtHome_BanksTheHold()
+    public void TouchingTheCore_BanksTheHold()
     {
         var s = RelayHeatTests.CreateScenario();
-        s.Tank.Position = s.Base.SpawnPosition;
+        s.Tank.Position = TestHelpers.AgainstCore(s.Base);
         s.Tank.Hold.Ore = Tweaks.Ore.TankHold;
         int stored = s.Base.Store.Ore;
 

@@ -12,8 +12,8 @@ using Emberward.Core.Entities.Bases;
 namespace Emberward.Tests;
 
 /// <summary>
-/// Ore as the only currency (DESIGN.md §6.4): who pays for a machine, unloading the hold through the network, the
-/// bot's stand-in income, and the radar upgrade staying out of the simulation.
+/// Ore as the only currency (DESIGN.md §6.4): who pays for a machine, unloading the hold by touching the core or a
+/// relay (and nowhere else), the bot's stand-in income, and the radar upgrade staying out of the simulation.
 /// </summary>
 public class OreEconomyTests
 {
@@ -52,7 +52,7 @@ public class OreEconomyTests
     }
 
     [Fact]
-    public void InLinkedCoverage_TheHoldUnloadsIntoTheStore_AtTheNetworkRate_AndOreIsConserved()
+    public void TouchingALinkedRelay_TheHoldUnloadsIntoTheStore_AtTheRelayRate_AndOreIsConserved()
     {
         var s = TankAtRelay(ore: 30);
         int total = s.Tank.OreHeld + s.Base.Store.Ore;
@@ -62,7 +62,7 @@ public class OreEconomyTests
 
         int unloaded = 30 - s.Tank.OreHeld;
         Assert.True(s.Tank.Coverage.Covered && !s.Tank.IsDockedAtOwnBase);
-        Assert.InRange(unloaded, Tweaks.Ore.NetworkUnloadPerSecond * seconds - 1, Tweaks.Ore.NetworkUnloadPerSecond * seconds);
+        Assert.InRange(unloaded, Tweaks.Ore.RelayUnloadPerSecond * seconds - 1, Tweaks.Ore.RelayUnloadPerSecond * seconds);
         Assert.Equal(total, s.Tank.OreHeld + s.Base.Store.Ore);
         Assert.True(s.Tank.IsUnloadingOre);
         // Every unit is a step event at the tank, so Desktop can play and draw it.
@@ -72,11 +72,11 @@ public class OreEconomyTests
     }
 
     [Fact]
-    public void Docking_UnloadsFasterThanTheNetwork()
+    public void TouchingTheCore_UnloadsFasterThanARelay()
     {
         int ore = Tweaks.Ore.TankHold;
         var docked = RelayHeatTests.CreateScenario();
-        docked.Tank.Position = docked.Base.SpawnPosition;
+        docked.Tank.Position = TestHelpers.AgainstCore(docked.Base);
         docked.Tank.Hold.Ore = ore;
         var networked = TankAtRelay(ore);
 
@@ -84,11 +84,124 @@ public class OreEconomyTests
         Advance(networked.World, Tweaks.Perf.TargetFps);
 
         int byDock = ore - docked.Tank.OreHeld, byNetwork = ore - networked.Tank.OreHeld;
-        Assert.True(docked.Tank.IsDockedAtOwnBase);
+        Assert.True(docked.Tank.IsDockedAtOwnBase && docked.Tank.TouchesCore(docked.Base));
         Assert.True(networked.Tank.Coverage.Covered && !networked.Tank.IsDockedAtOwnBase);
-        Assert.True(byNetwork > 0, "the network was unloading too");
-        Assert.True(byDock >= byNetwork * 4, $"docking should bank much faster. docked={byDock}, network={byNetwork}");
+        Assert.True(byNetwork > 0, "the relay was unloading too");
+        Assert.True(byDock >= byNetwork * 4, $"the core should bank much faster. core={byDock}, relay={byNetwork}");
         Assert.Equal(ore, byDock);
+    }
+
+    /// <summary>Inside the walls but away from the core (the courtyard where the tank spawns), nothing unloads.</summary>
+    [Fact]
+    public void InTheBase_AwayFromTheCore_NothingUnloads()
+    {
+        var s = RelayHeatTests.CreateScenario();
+        s.Tank.Position = s.Base.SpawnPosition;
+        s.Tank.Hold.Ore = 10;
+        int store = s.Base.Store.Ore;
+
+        var events = Advance(s.World, Tweaks.Perf.TargetFps * 2);
+
+        Assert.True(s.Tank.IsDockedAtOwnBase);
+        Assert.False(s.Tank.TouchesCore(s.Base));
+        Assert.Equal(10, s.Tank.OreHeld);
+        Assert.Equal(store, s.Base.Store.Ore);
+        Assert.False(s.Tank.IsUnloadingOre);
+        Assert.DoesNotContain(events, e => e.Kind == StepEventKind.OreUnloaded);
+    }
+
+    /// <summary>In a powered relay's coverage, but not touching it, nothing unloads: the network is no drop-off.</summary>
+    [Fact]
+    public void InCoverage_AwayFromTheRelay_NothingUnloads()
+    {
+        var s = TankAtRelay(ore: 10);
+        s.Tank.Position = s.RelayPos + new Offset(0, -s.DirY * 12);
+        int store = s.Base.Store.Ore;
+
+        var events = Advance(s.World, Tweaks.Perf.TargetFps * 2);
+
+        Assert.True(s.Tank.Coverage.Covered && !s.Tank.IsDockedAtOwnBase);
+        Assert.Equal(10, s.Tank.OreHeld);
+        Assert.Equal(store, s.Base.Store.Ore);
+        Assert.False(s.Tank.IsUnloadingOre);
+        Assert.DoesNotContain(events, e => e.Kind == StepEventKind.OreUnloaded);
+    }
+
+    /// <summary>
+    /// Touching is the hull within <see cref="Tweaks.Cargo.ContactReach"/> cells of the relay's body: beside it
+    /// unloads, a cell further does not.
+    /// </summary>
+    [Fact]
+    public void BesideARelay_Unloads_AndACellFurtherDoesNot()
+    {
+        var s = TankAtRelay(ore: 10);
+        int touching = TankSpriteShape.Radius + Tweaks.Machine.BoundingBoxHalfSize + Tweaks.Cargo.ContactReach;
+        // Backing away from the relay: that sprite's rear row is full, so its edge is the hull's edge.
+        s.Tank.Direction = TankSpriteShape.DirectionOf(new Offset(0, -s.DirY));
+        s.Tank.Position = s.RelayPos + new Offset(0, -s.DirY * touching);
+        Advance(s.World, Tweaks.Perf.TargetFps);
+        Assert.True(s.Tank.IsUnloadingOre);
+        Assert.True(s.Tank.OreHeld < 10);
+
+        int held = s.Tank.OreHeld;
+        s.Tank.Position = s.RelayPos + new Offset(0, -s.DirY * (touching + 1));
+        Advance(s.World, Tweaks.Perf.TargetFps);
+        Assert.False(s.Tank.IsUnloadingOre);
+        Assert.Equal(held, s.Tank.OreHeld);
+    }
+
+    /// <summary>Diagonally beside a relay, the hull's corner within reach of the relay's corner, it unloads too.</summary>
+    [Fact]
+    public void DiagonallyBesideARelay_Unloads()
+    {
+        var s = TankAtRelay(ore: 10);
+        int touching = TankSpriteShape.Radius + Tweaks.Machine.BoundingBoxHalfSize + Tweaks.Cargo.ContactReach - 1;
+        s.Tank.Direction = TankSpriteShape.DirectionOf(new Offset(1, 0));
+        s.Tank.Position = s.RelayPos + new Offset(-touching, -s.DirY * touching);
+        Advance(s.World, Tweaks.Perf.TargetFps);
+        Assert.True(s.Tank.IsUnloadingOre);
+        Assert.Equal(s.RelayPos, s.Tank.UnloadNode);
+        Assert.True(s.Tank.OreHeld < 10);
+    }
+
+    /// <summary>Another side's relay is no drop-off: touching it unloads nothing.</summary>
+    [Fact]
+    public void TouchingAnotherSidesRelay_UnloadsNothing()
+    {
+        var s = RelayHeatTests.CreateScenario();
+        var rival = s.World.TankList.Tanks[1];
+        var relay = new Machine(s.RelayPos, MachineType.Relay, rival.Color);
+        s.World.Machines.Add(relay);
+        s.World.PlantMachine(relay, rival.Base);
+        Advance(s.World, 12);
+        s.Tank.Position = s.RelayPos;
+        s.Tank.Hold.Ore = 10;
+
+        var events = Advance(s.World, Tweaks.Perf.TargetFps * 2);
+
+        Assert.Equal(10, s.Tank.OreHeld);
+        Assert.False(s.Tank.IsUnloadingOre);
+        Assert.DoesNotContain(events, e => e.Kind == StepEventKind.OreUnloaded);
+    }
+
+    /// <summary>A dark base takes nothing at its relays: there the hold burns only at the core.</summary>
+    [Fact]
+    public void AtARelayOfADarkBase_NothingUnloads()
+    {
+        var s = RelayHeatTests.CreateScenario(energyNetwork: true);
+        RelayHeatTests.PlantRelay(s);
+        Advance(s.World, 12);
+        s.Base.DrawCharge(s.Base.Charge);
+        Advance(s.World, 1);
+        Assert.True(s.World.IsBaseDark(s.Base));
+        s.Tank.Position = s.RelayPos;
+        s.Tank.Hold.Ore = 10;
+
+        Advance(s.World, Tweaks.Perf.TargetFps * 2);
+
+        Assert.True(s.World.IsBaseDark(s.Base));
+        Assert.Equal(10, s.Tank.OreHeld);
+        Assert.False(s.Tank.IsUnloadingOre);
     }
 
     [Fact]
