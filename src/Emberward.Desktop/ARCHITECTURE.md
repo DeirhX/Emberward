@@ -308,7 +308,7 @@ from repeating on the frames drawn between steps.
 | Build a machine, plant | `MachineBuilt` (the machine's own build sound), `MachinePlanted` (a tank that dies drops its machine silently) |
 | Plant refused | `PlantRefused`, and `BuildRefused` (not enough ore) (player only) |
 | Pickup | `OreCollected`. At most every 3 steps; a run of pickups climbs in pitch. |
-| Ore unloaded | `OreUnloaded` at a relay (`Target` `Machine`, player only): the pickup sound, quieter, once per unit. A bank at the core (`Target` `Base`) plays nothing of its own (`StepEventSounds.CueFor(in StepEvent)`) |
+| Ore unloaded | `OreUnloaded` at a relay (`Target` `Machine`, player only): the pickup sound, quieter, once per unit. A bank at the core (`Target` `Base`) is one deposit per pour, louder for a bigger load, and ore burned to restart a dark base the same deposit pitched down (`StepEventSounds.Ore.cs`) |
 | Dock | `Docked` (player only; a respawn is not a docking) |
 | Warnings | Player only, most urgent first like the HUD banner: overheating, low shield, running hot. The thresholds are shared with the HUD through `PlayerWarnings`. Each repeats at its own interval while it lasts. These follow the tank's state, not events. |
 | Engine loop | Per tank, while alive: idle, or louder and higher on steps with `TankMoved` |
