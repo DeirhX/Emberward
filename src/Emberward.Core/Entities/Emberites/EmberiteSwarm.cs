@@ -87,7 +87,8 @@ public sealed partial class EmberiteSwarm
 
     /// <summary>
     /// Makes a nest in each pocket and lump of <paramref name="deposits"/> that is at least
-    /// <see cref="Tweaks.Emberites.MinNestDistanceFromBase"/> from every base.
+    /// <see cref="Tweaks.Emberites.MinNestDistanceFromBase"/> from every base and whose ground does not overlap a nest
+    /// made before it (two deposits that touch are one nest).
     /// </summary>
     public void Seed(IReadOnlyList<OreDeposit> deposits)
     {
@@ -102,8 +103,22 @@ public sealed partial class EmberiteSwarm
             int max = lump ? Tweaks.Emberites.LumpMaxCreatures : Tweaks.Emberites.PocketMaxCreatures;
             float share = Math.Clamp((deposit.Cells - minCells) / (float)Math.Max(1, maxCells - minCells), 0f, 1f);
             int radius = (int)MathF.Ceiling(MathF.Sqrt(deposit.Cells) * Tweaks.Emberites.NestRadiusPerSqrtCell) + Tweaks.Emberites.NestRadiusPadding;
+            if (OverlapsNest(deposit.Center, radius))
+                continue;
             AddNest(deposit.Center, radius, min + (int)MathF.Round(share * (max - min)));
         }
+    }
+
+    /// <summary>Whether a nest at <paramref name="centre"/> reaching <paramref name="radius"/> would share ground with one made already.</summary>
+    private bool OverlapsNest(Position centre, int radius)
+    {
+        foreach (Nest nest in _nests)
+        {
+            int reach = nest.Radius + radius;
+            if (Position.DistanceSquared(centre, nest.Centre) < reach * reach)
+                return true;
+        }
+        return false;
     }
 
     /// <summary>Makes a nest of <paramref name="creatures"/> at <paramref name="centre"/>, whose ground reaches <paramref name="radius"/> cells.</summary>

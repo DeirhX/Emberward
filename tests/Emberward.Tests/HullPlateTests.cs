@@ -4,7 +4,7 @@ namespace Emberward.Tests;
 
 /// <summary>
 /// The SHIELD/HULL plate: the hull's heat ramp (<see cref="HudPalette.HullHeat"/>, which the tank's hotspot shares)
-/// and the plate's status word (<see cref="HullStatuses"/>).
+/// the HULL label's colour (<see cref="HullStatuses"/>), and where the two lines sit (<see cref="LedgerLayout"/>).
 /// </summary>
 public class HullPlateTests
 {
@@ -90,73 +90,67 @@ public class HullPlateTests
     }
 
     [Theory]
-    [InlineData(false, true, 40, 0f, 0.9f, HullStatus.Shielded)]
-    [InlineData(false, true, 0, 0f, 0.9f, HullStatus.ShieldDown)]
-    [InlineData(false, true, 0, 0.3f, 0.3f, HullStatus.HullBreach)]
-    [InlineData(false, true, 25, 0.3f, 0.3f, HullStatus.HullBreach)]
-    [InlineData(false, true, 0, 0.1f, 0.67f, HullStatus.ShieldDown)]
-    [InlineData(false, true, 0, 0.2f, 0.6f, HullStatus.ShieldDown)]
-    [InlineData(false, true, 0, 0.21f, 0.59f, HullStatus.HullBreach)]
-    [InlineData(false, true, 25, 0.1f, 0.67f, HullStatus.HullBreach)]
-    [InlineData(false, false, 0, 0.1f, 0.67f, HullStatus.HullBreach)]
-    [InlineData(false, true, 0, 0.9f, 0.04f, HullStatus.Melting)]
-    [InlineData(false, true, 0, 0f, 0.049f, HullStatus.Melting)]
-    [InlineData(false, true, 0, 0f, 0.05f, HullStatus.ShieldDown)]
-    [InlineData(true, true, 50, 0f, 0f, HullStatus.Slag)]
-    [InlineData(true, false, 0, 1f, 0.5f, HullStatus.Slag)]
-    [InlineData(false, false, 0, 0f, 0.9f, HullStatus.Hull)]
-    [InlineData(false, false, 0, 0.5f, 0.2f, HullStatus.HullBreach)]
-    public void TheStatusWord_NamesTheWorstThing(bool dead, bool shieldActive, int shield, float fire, float hull, HullStatus expected) =>
-        Assert.Equal(expected, HullStatuses.Of(dead, shieldActive, shield, fire, hull).Status);
+    [InlineData(false, 0f, 0.9f, HullStatus.Intact)]
+    [InlineData(false, 0f, 0.05f, HullStatus.Intact)]
+    [InlineData(false, 0.1f, 0.67f, HullStatus.Burning)]
+    [InlineData(false, 0.5f, 0.2f, HullStatus.Burning)]
+    [InlineData(false, 0.9f, 0.04f, HullStatus.Melting)]
+    [InlineData(false, 0f, 0.049f, HullStatus.Melting)]
+    [InlineData(true, 0f, 0f, HullStatus.Slag)]
+    [InlineData(true, 1f, 0.5f, HullStatus.Slag)]
+    public void TheHullLabel_NamesTheWorstThing(bool dead, float fire, float hull, HullStatus expected) =>
+        Assert.Equal(expected, HullStatuses.Of(dead, fire, hull).Status);
 
     [Fact]
-    public void EachStatus_HasItsWord_AndOnlyMeltingFlashes()
+    public void EachStatus_HasItsOwnColour_AndOnlyMeltingFlashes()
     {
-        var words = new[]
+        var labels = new[]
         {
-            HullStatuses.Of(false, true, 10, 0f, 1f), HullStatuses.Of(false, true, 0, 0f, 1f),
-            HullStatuses.Of(false, true, 0, 0.5f, 0.3f), HullStatuses.Of(false, true, 0, 1f, 0.01f),
-            HullStatuses.Of(true, true, 0, 0f, 0f), HullStatuses.Of(false, false, 0, 0f, 1f),
+            HullStatuses.Of(false, 0f, 1f), HullStatuses.Of(false, 0.5f, 0.3f),
+            HullStatuses.Of(false, 1f, 0.01f), HullStatuses.Of(true, 0f, 0f),
         };
-        Assert.Equal(["SHIELDED", "SHIELD DOWN", "HULL BREACH", "MELTING", "SLAG", "HULL"], words.Select(w => w.Text));
-        Assert.Equal([HullStatus.Melting], words.Where(w => w.Flashes).Select(w => w.Status));
-        var melting = words[3];
+        Assert.Equal(labels.Length, labels.Select(l => l.Color).Distinct().Count());
+        Assert.Equal([HullStatus.Melting], labels.Where(l => l.Flashes).Select(l => l.Status));
+        var melting = labels[2];
         Assert.NotEqual(melting.ColorAt(0f), melting.ColorAt(0.3f));
-        Assert.Equal(HudPalette.Shield, words[0].Color);
+        // A whole hull's label is its warm neutral and calls no attention; anything worse glows.
+        Assert.Equal(HudPalette.HullNeutral, labels[0].Color);
+        Assert.Equal([false, true, true, true], labels.Select(l => l.Alarms));
     }
 
     [Fact]
-    public void TheLedgerLine_TextAndBars_NeitherOverlapNorLeaveThePlate()
+    public void TheLedgerLines_TextAndBars_NeitherOverlapNorLeaveTheirPlates()
     {
-        // Top to bottom: the line's text, then its bars.
-        var text = LedgerLayout.Text(LedgerLayout.LineY);
-        var bar = LedgerLayout.Bar(LedgerLayout.LineY);
-        Assert.True(text.Top >= LedgerLayout.PlateTop, $"the line starts at {text.Top}, above the plate");
-        Assert.True(bar.Top >= text.Bottom, $"the bars ({bar.Top}) overlap the text ({text.Bottom})");
-        Assert.True(bar.Bottom <= LedgerLayout.PlateBottom, $"the bars end at {bar.Bottom}, below the plate");
+        foreach (var (y, top, bottom) in new[]
+        {
+            (LedgerLayout.ShieldLineY, LedgerLayout.UpperPlateTop, LedgerLayout.UpperPlateBottom),
+            (LedgerLayout.HullLineY, LedgerLayout.LowerPlateTop, LedgerLayout.LowerPlateBottom),
+        })
+        {
+            // Top to bottom: the line's text, then its bar.
+            var text = LedgerLayout.Text(y);
+            var bar = LedgerLayout.Bar(y);
+            Assert.True(text.Top >= top, $"the line at {y} starts at {text.Top}, above its plate");
+            Assert.True(bar.Top >= text.Bottom, $"the bar ({bar.Top}) overlaps the text ({text.Bottom})");
+            Assert.True(bar.Bottom <= bottom, $"the bar at {y} ends at {bar.Bottom}, below its plate");
+        }
         Assert.True(LedgerLayout.LabelSize <= LedgerLayout.NumberSize);
-        // Bigger than the two stacked rows it replaced (labels 10, numbers 11).
-        Assert.True(LedgerLayout.LabelSize >= 12f && LedgerLayout.NumberSize >= 14f);
+        // No smaller than the one-line readout it replaced (labels 12, numbers 15).
+        Assert.True(LedgerLayout.LabelSize >= 12f && LedgerLayout.NumberSize >= 15f);
     }
 
     /// <summary>
-    /// SHIELD 400 | 1000 HULL fits across the plate: each label and the number beside it, and the two numbers either
-    /// side of the split, stay apart, at a generous width for the HUD font (each character at most <c>Advance</c> of
-    /// the text size; Chakra Petch's capitals and digits measure about 0.45).
+    /// SHIELD 400 and HULL 1000 fit across their plates: each label stays clear of its number, at a generous width for
+    /// the HUD font (each character at most <c>Advance</c> of the text size; Chakra Petch's capitals and digits measure
+    /// about 0.45).
     /// </summary>
     [Fact]
-    public void TheLedgerLine_FitsAcrossThePlate()
+    public void TheLedgerLines_FitAcrossThePlates()
     {
         const float Advance = 0.5f;
         static float Width(string text, float size) => text.Length * size * Advance;
-        float split = LedgerLayout.LedgerSplit, gap = LedgerLayout.SplitGap;
-        float shieldLabelEnd = LedgerLayout.LedgerLeft + Width("SHIELD", LedgerLayout.LabelSize);
-        float shieldStart = split - gap - Width("400", LedgerLayout.NumberSize);
-        float hullEnd = split + gap + Width("1000", LedgerLayout.NumberSize);
-        float hullLabelStart = LedgerLayout.LedgerRight - Width("HULL", LedgerLayout.LabelSize);
-        Assert.True(shieldLabelEnd < shieldStart, $"SHIELD ends at {shieldLabelEnd}, past its number at {shieldStart}");
-        Assert.True(hullEnd < hullLabelStart, $"the hull's number ends at {hullEnd}, past HULL at {hullLabelStart}");
-        // Alone, with no shield in the match, the hull's number is centred on the split.
-        Assert.True(LedgerLayout.LedgerLeft + Width("HULL", LedgerLayout.LabelSize) < split - Width("1000", LedgerLayout.NumberSize) * 0.5f);
+        float labelEnd = LedgerLayout.LedgerLeft + Width("SHIELD", LedgerLayout.LabelSize);
+        float numberStart = LedgerLayout.LedgerRight - Width("1000", LedgerLayout.NumberSize);
+        Assert.True(labelEnd + 10f < numberStart, $"SHIELD ends at {labelEnd}, too near its number at {numberStart}");
     }
 }

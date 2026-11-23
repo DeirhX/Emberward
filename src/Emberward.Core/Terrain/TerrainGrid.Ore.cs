@@ -25,11 +25,7 @@ public partial class TerrainGrid
         if (maxX < minX || maxY < minY)
             return;
 
-        bool any = false;
-        for (int ty = minY >> OreTileShift; ty <= maxY >> OreTileShift && !any; ty++)
-            for (int tx = minX >> OreTileShift; tx <= maxX >> OreTileShift && !any; tx++)
-                any = _oreCellsOfTile[tx + ty * _oreTilesX] > 0;
-        if (!any)
+        if (!AnyOreInTiles(minX, minY, maxX, maxY))
             return;
 
         for (int y = minY; y <= maxY; y++)
@@ -47,6 +43,53 @@ public partial class TerrainGrid
                     plain = true;
             }
         }
+    }
+
+    /// <summary>
+    /// The plain ore cell (not lump core) within <paramref name="radius"/> of <paramref name="center"/> nearest
+    /// <paramref name="near"/> (ties to the first in row order), for a digger choosing where to dig next. Like
+    /// <see cref="FindOre"/>, it reads no cell where the tiles under the circle hold no ore.
+    /// </summary>
+    public bool TryFindPlainOre(Position center, int radius, Position near, out Position cell)
+    {
+        cell = default;
+        int minX = Math.Max(0, center.X - radius), maxX = Math.Min(Width - 1, center.X + radius);
+        int minY = Math.Max(0, center.Y - radius), maxY = Math.Min(Height - 1, center.Y + radius);
+        if (maxX < minX || maxY < minY || !AnyOreInTiles(minX, minY, maxX, maxY))
+            return false;
+
+        long best = long.MaxValue;
+        for (int y = minY; y <= maxY; y++)
+        {
+            int dy = y - center.Y;
+            for (int x = minX; x <= maxX; x++)
+            {
+                int dx = x - center.X;
+                if (dx * dx + dy * dy > radius * radius)
+                    continue;
+                TerrainPixel pixel = _data[x + y * Width];
+                if (!Pixel.IsOre(pixel) || Pixel.IsOreCore(pixel))
+                    continue;
+                long nx = x - near.X, ny = y - near.Y;
+                long distance = nx * nx + ny * ny;
+                if (distance < best)
+                {
+                    best = distance;
+                    cell = new Position(x, y);
+                }
+            }
+        }
+        return best != long.MaxValue;
+    }
+
+    /// <summary>Whether any ore tile overlaps the cell rectangle from (<paramref name="minX"/>, <paramref name="minY"/>) to (<paramref name="maxX"/>, <paramref name="maxY"/>).</summary>
+    private bool AnyOreInTiles(int minX, int minY, int maxX, int maxY)
+    {
+        for (int ty = minY >> OreTileShift; ty <= maxY >> OreTileShift; ty++)
+            for (int tx = minX >> OreTileShift; tx <= maxX >> OreTileShift; tx++)
+                if (_oreCellsOfTile[tx + ty * _oreTilesX] > 0)
+                    return true;
+        return false;
     }
 
     private void NoteOreWrite(int offset, TerrainPixel was, TerrainPixel now)

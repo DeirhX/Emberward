@@ -20,6 +20,9 @@ internal sealed class TankThermals
     private readonly TankHeatEngine _heatEngine;
     private int _frameDugPixels;
     private bool _frameShotFired;
+    // Overheat damage a burning hull may still take, in 1/TicksPerSecond hull points (FireCappedOverheatDamage): what is
+    // left of the fraction the per-second cap does not divide into whole ticks.
+    private int _fireDamageCredit;
 
     public TankThermals(Tank tank, SimulationSettings settings)
     {
@@ -34,6 +37,9 @@ internal sealed class TankThermals
     public float OffNetworkFloor { get; private set; }
     public bool IsOverheating { get; private set; }
     public bool IsFreezing { get; private set; }
+
+    /// <summary>What is left of the burning hull's overheat cap this second, in 1/TicksPerSecond hull points.</summary>
+    public int FireDamageCredit => _fireDamageCredit;
 
     private int InsulationLevel => _tank.Base?.Upgrades.CargoInsulationLevel ?? 0;
 
@@ -174,12 +180,13 @@ internal sealed class TankThermals
         int radius = _settings.TankDigRadius;
         var contact = heat.SampleTankContact(position, radius);
         float cargoHeat = TankHeatModel.ComputeCargoHeat(in _settings, _tank.OreHeld, InsulationLevel);
-        // A burning hull (TankShieldSystem.FireLevelOf) heats the tank and, more, the air around it. External sources.
-        float fire = _tank.FireLevel;
-        float fireHeat = fire > 0f ? fire * _settings.TankFireHeatPerTickMax : 0f;
-        float currentHeat = _tank.Heat + cargoHeat;
-        if (fireHeat > 0f)
-            currentHeat += fireHeat;
+        // A burning hull (TankShieldSystem.FireLevelOf) heats the tank and, more, the air around it; external sources.
+        // The heat grows much faster than the fire (TankHeatModel.FireHeatShare). The tank's share goes in before the
+        // exchange below, so in the same tick the tank sheds into cooler ground and air what they will take: cold
+        // surroundings carry a fire's heat away, hot ones (or the fire's own warmed air) do not.
+        float fireShare = TankHeatModel.FireHeatShare(in _settings, _tank.FireLevel);
+        float fireHeat = fireShare * _settings.TankFireHeatPerTickMax;
+        float currentHeat = _tank.Heat + cargoHeat + fireHeat;
         var step = _heatEngine.Advance(
             currentHeat: currentHeat,
             frameDugPixels: _frameDugPixels,
@@ -193,20 +200,25 @@ internal sealed class TankThermals
 
         // Carried pyrite and tank actions are external heat sources.
         heat.Ledger.RecordInjected((cargoHeat + step.ActionHeat) * ThermalCapacity);
-        if (fire > 0f)
+        if (fireShare > 0f)
         {
             heat.Ledger.RecordInjected(fireHeat * (double)ThermalCapacity);
-            // The air takes all of it (0 only if the area is off the map); book what was applied.
+            // The air takes all of it (0 only if the area is off the map); book what was applied. The heat field's own
+            // writer wakes the tiles it touches.
             double applied = heat.AddEnergyInRadiusArea(position, _settings.TankFireAirRadius,
-                fire * _settings.TankFireAirEnergyPerTickMax, TerrainGrid.ThermalField.Air);
+                fireShare * _settings.TankFireAirEnergyPerTickMax, TerrainGrid.ThermalField.Air);
             heat.Ledger.RecordInjected(applied);
         }
 
         if (step.OverheatDamage > 0)
         {
             IsOverheating = true;
-            _tank.TakeDamage(step.OverheatDamage, DamageCause.Overheat);
+            int damage = fireShare > 0f ? FireCappedOverheatDamage(step.OverheatDamage) : step.OverheatDamage;
+            if (damage > 0)
+                _tank.TakeDamage(damage, DamageCause.Overheat);
         }
+        if (fireShare <= 0f)
+            _fireDamageCredit = 0;
         if (step.FrostbiteDamage > 0)
         {
             IsFreezing = true;
@@ -231,12 +243,31 @@ internal sealed class TankThermals
         _frameShotFired = false;
     }
 
+    /// <summary>
+    /// The share of <paramref name="damage"/> a burning hull takes this tick: no more than
+    /// <c>TankFireMaxHullLossPerSecond</c> over a second (DESIGN.md §4.7). The cap does not divide into whole ticks
+    /// (50 over 24), so each tick adds the cap to a credit counted in 1/<c>TicksPerSecond</c> points and the tank takes
+    /// what the credit holds in whole points; a full second takes exactly the cap. Only the fraction is carried, so a
+    /// tick that takes less banks nothing for later. Integer arithmetic, the same on every machine.
+    /// </summary>
+    private int FireCappedOverheatDamage(int damage)
+    {
+        int perSecond = _settings.TankFireMaxHullLossPerSecond, ticks = _settings.TicksPerSecond;
+        if (perSecond <= 0 || ticks <= 0)
+            return damage;
+        _fireDamageCredit += perSecond;
+        int taken = Math.Min(damage, _fireDamageCredit / ticks);
+        _fireDamageCredit = Math.Min(_fireDamageCredit - taken * ticks, ticks - 1);
+        return taken;
+    }
+
     /// <summary>A fresh tank starts cold: whatever heat the wreck still held is removed from the system.</summary>
     public void ResetForSpawn(ThermalLedger? ledger)
     {
         ledger?.RecordSunkTank(_tank.Heat * ThermalCapacity);
         _tank.Heat = 0f;
         OffNetworkFloor = 0f;
+        _fireDamageCredit = 0;
         _tank.Reactor.Current.Heat = new Heat(0);
     }
 

@@ -27,30 +27,24 @@ const LEFT_W = BUILD_X,
 // Room above the left part for the OFF NETWORK tag, which the desktop draws 24 art pixels above TEMP.
 const HEADROOM = 44;
 
-// HudStrip.cs: the plates' centres, title rows and readout rows.
-const TEMP = { x: HEAT_X + 170, title: 151.5, readout: 179, right: HEAT_X + 239 },
-    SHIELD = { x: SHIELD_X + 80.5, title: 153.5, readout: 180 },
-    MATERIALS = { x: MATERIALS_X + 120, title: 154 };
-// HudStrip.DrawLedger: one line in the readout plate, SHIELD 400 | 1000 HULL, the numbers meeting at the split and a
-// hairline bar under each half, filled from the plate's outer edge. LedgerLayout.cs places it so nothing overlaps or
-// leaves the plate.
+// HudStrip.cs: the TEMP plate's centre, title row and readout row.
+const TEMP = { x: HEAT_X + 170, title: 151.5, readout: 179, right: HEAT_X + 239 };
+// HudStrip.DrawLedger: a line on each plate, SHIELD on the upper and HULL on the lower, the label at the left end, the
+// number ending at the right end and a hairline bar under each line filled from the left. LedgerLayout.cs places them
+// so nothing overlaps or leaves its plate.
 const LEDGER = {
-    left: SHIELD_X + 15, right: SHIELD_X + 144, split: SHIELD_X + 79.5, y: 178.5,
-    barDrop: 9.5, barHalf: 0.9, barOutline: 0.6, barGap: 1.5, label: 12, number: 15,
+    left: SHIELD_X + 15, right: SHIELD_X + 144, shieldY: 151.5, hullY: 178.5,
+    barDrop: 9, barHalf: 0.9, barOutline: 0.6, label: 13, number: 16,
 };
-// LedgerLayout.SplitGap and SplitHalf: the gap between a value and the split, and the split's hairline half height.
-const SPLIT_GAP = 3.5,
-    SPLIT_HALF = 4.5,
-    SPLIT_COLOR = 0x60a0b4c8;
-// HudPalette: the shield's cyan, an empty shield's slate, the hull label's warm colour (ABGR).
+// HudPalette: the shield's cyan and an empty shield's slate (ABGR).
 const SHIELD_CYAN = 0xffffe0a0,
-    SHIELD_SLATE = 0xff997f5f,
-    HULL_NEUTRAL = 0xff70b8ff;
+    SHIELD_SLATE = 0xff997f5f;
 const ORE_LINE = { x: MATERIALS_X + 122, y: 133, size: 15 };
-// LedgerLayout.cs and HudStrip.DrawMaterials: the MATERIALS plate's one line (no bars), HOLD 23 | 1,234 +18/m BASE.
+// LedgerLayout.cs and HudStrip.DrawMaterials: a line on each MATERIALS plate (no bars), HOLD 23 on the upper and
+// BASE 1,234 +18/m on the lower, the numbers ending in one column.
 const MATERIALS_LEDGER = {
-    left: MATERIALS_X + 35, split: MATERIALS_X + 87, rateRight: MATERIALS_X + 175, right: MATERIALS_X + 205, y: 184,
-    label: 12, number: 15, rate: 12, deltaRise: 14,
+    left: MATERIALS_X + 35, numbers: MATERIALS_X + 162, right: MATERIALS_X + 205, holdY: 156, baseY: 184,
+    label: 13, number: 16, rate: 12, deltaRise: 12,
 };
 // HudStrip's MATERIALS colours (ABGR): labels, rate, the store and its deposit flash.
 const MATERIALS_LABEL = 0xff9ac8e8,
@@ -265,16 +259,12 @@ export class StripView {
 
         this.drawOrb(left, p, time);
         this.drawLiquids(left, p, time);
-        // The plate's title is one status word (HullStatuses), so it is drawn each frame, not in the cached layer.
-        const plate = p.plate;
-        const flash = plate.wordFlashColor !== plate.wordColor && Math.floor(time * 4) % 2 !== 0;
-        stripText(left, plate.word, SHIELD.x, SHIELD.title, 17, flash ? plate.wordFlashColor : plate.wordColor, plate.wordColor + "30");
 
         const readout = (text, plate) =>
             stripText(left, text, plate.x, plate.readout, 22, abgr(0xffaafacd), abgr(0x2830ff60));
         readout(`${p.dead ? 0 : Math.round(p.heat)}°`, TEMP);
         this.drawTrend(left, p);
-        this.drawLedger(left, p);
+        this.drawLedger(left, p, time);
         const m = p.materials;
         if (m.pileFrame >= 0) {
             const column = m.pileFrame % 8, row = Math.floor(m.pileFrame / 8);
@@ -328,7 +318,6 @@ export class StripView {
         ])
             left.drawImage(image, px, 0, w, STRIP_H);
         stripText(left, "TEMP", TEMP.x, TEMP.title, 19, abgr(0xff78c8ff), abgr(0x181880ff));
-        stripText(left, "MATERIALS", MATERIALS.x, MATERIALS.title, 21, abgr(0xff68e0ff), abgr(0x282090ff));
         // Dark glass behind the liquid (hides the energy bolt baked into the art), and the dial's dim track.
         left.fillStyle = abgr(0xff0a0c0e);
         circle(left, x, y, r - 1);
@@ -536,30 +525,21 @@ export class StripView {
         return w;
     }
 
-    // HudStrip.DrawLedger: SHIELD 400 | 1000 HULL on one line (the hull alone, its number centred, with no shield in
-    // the match), a hairline bar under each half.
-    drawLedger(ctx, p) {
+    // HudStrip.DrawLedger: SHIELD and its bar on the upper plate, HULL and its bar on the lower (HULL alone with no
+    // shield in the match). The HULL label takes its colour from what the hull is doing (HullStatuses).
+    drawLedger(ctx, p, time) {
         const plate = p.plate,
-            L = LEDGER,
-            hull = p.dead ? 0 : p.hull,
-            health = String(p.health),
-            hullTrack = plate.glowStops[plate.glowStops.length - 1] + "90",
-            hullGlow = abgr(0x30106aff);
-        if (!p.shieldActive) {
-            stripText(ctx, "HULL", L.left, L.y, L.label, abgr(HULL_NEUTRAL), null, "left");
-            stripText(ctx, health, L.split, L.y, L.number, plate.hullColor, hullGlow);
-            ledgerBar(ctx, L.left, L.right, hull, false, plate.hullColor, hullTrack);
-            return;
+            L = LEDGER;
+        if (p.shieldActive) {
+            const color = abgr(plate.shield > 0 ? SHIELD_CYAN : SHIELD_SLATE);
+            const track = abgr(((0x70 << 24) | (SHIELD_SLATE & 0xffffff)) >>> 0);
+            ledgerLine(ctx, L.shieldY, "SHIELD", color, null, String(plate.shield), color, null,
+                p.dead ? 0 : p.shieldFill, track);
         }
-        const color = abgr(plate.shield > 0 ? SHIELD_CYAN : SHIELD_SLATE);
-        const track = abgr(((0x70 << 24) | (SHIELD_SLATE & 0xffffff)) >>> 0);
-        stripText(ctx, "SHIELD", L.left, L.y, L.label, color, null, "left");
-        stripText(ctx, String(plate.shield), L.split - SPLIT_GAP, L.y, L.number, color, null, "right");
-        drawSplit(ctx, L.split, L.y);
-        stripText(ctx, health, L.split + SPLIT_GAP, L.y, L.number, plate.hullColor, hullGlow, "left");
-        stripText(ctx, "HULL", L.right, L.y, L.label, abgr(HULL_NEUTRAL), null, "right");
-        ledgerBar(ctx, L.left, L.split - L.barGap, p.dead ? 0 : p.shieldFill, false, color, track);
-        ledgerBar(ctx, L.split + L.barGap, L.right, hull, true, plate.hullColor, hullTrack);
+        const flash = plate.hullLabelFlashColor !== plate.hullLabelColor && Math.floor(time * 4) % 2 !== 0;
+        ledgerLine(ctx, L.hullY, "HULL", flash ? plate.hullLabelFlashColor : plate.hullLabelColor,
+            plate.hullLabelAlarms ? plate.hullLabelColor + "40" : null, String(p.health), plate.hullColor,
+            abgr(0x30106aff), p.dead ? 0 : p.hull, plate.glowStops[plate.glowStops.length - 1] + "90");
     }
 
     // LiquidGauges.Draw: the shield crystal, dark where it has emptied from its edge inward, with the tank's hot
@@ -702,27 +682,20 @@ function stripText(ctx, text, cx, cy, size, color, glow, align = "center") {
     ctx.fillText(text, cx + 0.6, y);
 }
 
-// HudStrip.DrawMaterials: one line, HOLD and the hold's amount left of the split, the store, its rate and BASE right
-// of it; the store flashes gold as a deposit lands, and the deposit's +N rises out of it.
+// HudStrip.DrawMaterials: HOLD and the hold's amount on the upper plate, BASE, the store and its rate on the lower,
+// the numbers ending in one column; the store flashes gold as a deposit lands, and the deposit's +N rises out of it.
 function drawMaterials(ctx, m) {
     const L = MATERIALS_LEDGER;
-    stripText(ctx, "HOLD", L.left, L.y, L.label, abgr(MATERIALS_LABEL), null, "left");
-    stripText(ctx, m.holdText, L.split - SPLIT_GAP, L.y, L.number, abgr(m.holdFull ? 0xff2880ff : 0xffaafacd), null, "right");
-    drawSplit(ctx, L.split, L.y);
+    stripText(ctx, "HOLD", L.left, L.holdY, L.label, abgr(MATERIALS_LABEL), null, "left");
+    stripText(ctx, m.holdText, L.numbers, L.holdY, L.number, abgr(m.holdFull ? 0xff2880ff : 0xffaafacd), null, "right");
+    stripText(ctx, "BASE", L.left, L.baseY, L.label, abgr(MATERIALS_LABEL), null, "left");
     const store = lerpAbgr(STORE_COLOR, STORE_FLASH, m.flash);
     const glow = m.flash > 0 ? withAlpha(STORE_FLASH, 0.3 * m.flash) : null;
-    stripText(ctx, m.baseText, L.split + SPLIT_GAP, L.y, L.number, abgr(store), glow, "left");
-    if (m.rateText) stripText(ctx, m.rateText, L.rateRight, L.y, L.rate, abgr(MATERIALS_RATE), null, "right");
-    stripText(ctx, "BASE", L.right, L.y, L.label, abgr(MATERIALS_LABEL), null, "right");
+    stripText(ctx, m.baseText, L.numbers, L.baseY, L.number, abgr(store), glow, "right");
+    if (m.rateText) stripText(ctx, m.rateText, L.right, L.baseY, L.rate, abgr(MATERIALS_RATE), null, "right");
     if (m.deltaText)
-        stripText(ctx, m.deltaText, L.split + SPLIT_GAP, L.y - 2 - L.deltaRise * m.deltaRise, L.number,
-            withAlpha(STORE_FLASH, m.deltaAlpha), null, "left");
-}
-
-// HudStrip.DrawSplit: the hairline between a line's two values.
-function drawSplit(ctx, x, y) {
-    ctx.fillStyle = abgr(SPLIT_COLOR);
-    ctx.fillRect(x - 0.5, y - SPLIT_HALF, 1, 2 * SPLIT_HALF);
+        stripText(ctx, m.deltaText, L.numbers, L.baseY - 2 - L.deltaRise * m.deltaRise, L.number,
+            withAlpha(STORE_FLASH, m.deltaAlpha), null, "right");
 }
 
 // HudPalette.Lerp: channel by channel between two ABGR colours.
@@ -741,21 +714,24 @@ function withAlpha(color, alpha) {
     return abgr(((color & 0x00ffffff) | (Math.round(Math.min(1, Math.max(0, alpha)) * 255) << 24)) >>> 0);
 }
 
-// HudStrip.DrawLedgerBar: a hairline bar under the SHIELD/HULL line from `left` to `right`, filled `fill` of the way
-// from its left end, or from its right one when `fromRight`.
-function ledgerBar(ctx, left, right, fill, fromRight, barColor, trackColor) {
-    const barY = LEDGER.y + LEDGER.barDrop,
-        half = LEDGER.barHalf,
-        edge = LEDGER.barOutline,
-        width = right - left;
+// HudStrip.DrawLedgerLine: a SHIELD/HULL line at `y`, the label at the left end, the number ending at the right end,
+// and under them a hairline bar across the plate filled `fill` of the way from the left.
+function ledgerLine(ctx, y, label, labelColor, labelGlow, number, numberColor, numberGlow, fill, trackColor) {
+    const L = LEDGER;
+    stripText(ctx, label, L.left, y, L.label, labelColor, labelGlow, "left");
+    stripText(ctx, number, L.right, y, L.number, numberColor, numberGlow, "right");
+    const barY = y + L.barDrop,
+        half = L.barHalf,
+        edge = L.barOutline,
+        width = L.right - L.left;
     ctx.fillStyle = abgr(0xc0000000);
-    ctx.fillRect(left - edge, barY - half - edge, width + 2 * edge, 2 * (half + edge));
+    ctx.fillRect(L.left - edge, barY - half - edge, width + 2 * edge, 2 * (half + edge));
     ctx.fillStyle = trackColor;
-    ctx.fillRect(left, barY - half, width, 2 * half);
+    ctx.fillRect(L.left, barY - half, width, 2 * half);
     const filled = width * Math.min(1, Math.max(0, fill));
     if (filled > 0) {
-        ctx.fillStyle = barColor;
-        ctx.fillRect(fromRight ? right - filled : left, barY - half, filled, 2 * half);
+        ctx.fillStyle = numberColor;
+        ctx.fillRect(L.left, barY - half, filled, 2 * half);
     }
 }
 

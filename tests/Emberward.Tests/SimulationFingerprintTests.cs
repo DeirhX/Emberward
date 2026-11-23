@@ -25,7 +25,7 @@ public class SimulationFingerprintTests
     private const ulong ExpectedRelayHarvesterNetwork = 0x4E3008A7C22C2325UL;
     private const ulong ExpectedEnemyMachinesShotToPieces = 0x9AD33135699B9C28UL;
     private const ulong ExpectedBotVsBot = 0x837361CC26EF6A73UL;
-    private const ulong ExpectedShieldedBotVsBot = 0xA7FD2E9002593D11UL;
+    private const ulong ExpectedShieldedBotVsBot = 0x7A83B3CE0806731BUL;
     private const ulong ExpectedTankBanksAtCore = 0x969707C1821E53C6UL;
 
     /// <summary>

@@ -192,8 +192,8 @@ public static partial class Tweaks
         public const int HarvesterReach = 4;
         public const int HarvesterPlainWork = 6;
 
-        // The bot does not prospect: a base whose side is played by the computer gets this much ore a second instead
-        // (World.SetBotControlled). A stand-in until the bot mines.
+        // The bot mines only in the opening (BotProspector): a base whose side is played by the computer also gets this
+        // much ore a second (World.SetBotControlled). A stand-in until the bot mines all match.
         public const double BotOrePerSecond = 0.5;
         // A dead tank's hold goes back into the ground as plain ore within this many cells (OreDrop).
         public const int DeathDropRadius = 6;

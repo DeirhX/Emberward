@@ -594,6 +594,7 @@ public class Tank
         hash = Fnv1a.Mix(hash, _unloadCredit);
         hash = Fnv1a.Mix(hash, _thermals.IsOffNetwork);
         hash = Fnv1a.Mix(hash, _thermals.OffNetworkFloor);
+        hash = Fnv1a.Mix(hash, _thermals.FireDamageCredit);
         hash = Turret.MixLatent(hash);
         hash = _digger.MixLatent(hash);
         hash = _build.MixLatent(hash);

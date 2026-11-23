@@ -28,6 +28,20 @@ public static class TankHeatModel
         return raw / (1f + s.TankCargoInsulationPerLevel * Math.Max(0, insulationLevel));
     }
 
+    /// <summary>
+    /// How hard a fire of <paramref name="fireLevel"/> (0 to 1, <see cref="TankShieldSystem.FireLevelOf"/>) burns, as a
+    /// share of a full fire's heat: the level raised to <c>TankFireHeatPower</c>, so a hull just alight gives almost
+    /// nothing and a hull nearly gone nearly all of it (DESIGN.md §4.7). Plain multiplication, no transcendental.
+    /// </summary>
+    public static float FireHeatShare(in SimulationSettings s, float fireLevel)
+    {
+        float level = Math.Clamp(fireLevel, 0f, 1f);
+        float share = 1f;
+        for (int i = 0; i < s.TankFireHeatPower; i++)
+            share *= level;
+        return level > 0f ? share : 0f;
+    }
+
     /// <summary>The load from which each unit heats the tank hard, at insulated hold level <paramref name="insulationLevel"/>.</summary>
     public static int CargoHeatStartOre(in SimulationSettings s, int insulationLevel = 0) =>
         s.TankCargoHeatStartOre + Math.Max(0, insulationLevel) * s.TankCargoHeatStartOrePerLevel;

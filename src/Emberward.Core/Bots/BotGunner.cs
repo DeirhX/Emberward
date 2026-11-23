@@ -63,6 +63,9 @@ internal sealed class BotGunner
     /// <summary>True while the bot has a clear line of sight to a live enemy (as of <see cref="UpdateLineOfSight"/>).</summary>
     public bool EnemyInSight => _losStreak > 0;
 
+    /// <summary>Ticks the gunner has run: the bot's clock since the match began.</summary>
+    public int Frame => _frame;
+
     /// <summary>False during the opening: the bot does not shoot at the enemy's base until the siege grace is over.</summary>
     public bool BaseSiegeAllowed => _frame >= BaseSiegeGraceFrames;
 
