@@ -77,6 +77,19 @@ public class TankPlateTests
     }
 
     [Fact]
+    public void ANameGivenAfterThePlateIsMade_ReachesItAtOnce()
+    {
+        var (world, vision, _) = Arena();
+        var plates = new TankPlateQuads();
+        Step(world, vision, plates);
+        Assert.Equal("PLAYER 2", plates.Plates[1].Name);
+
+        plates.SetPlayerName(1, "Ann");
+
+        Assert.Equal("ANN", plates.Plates[1].Name);
+    }
+
+    [Fact]
     public void APlayerName_IsShownInCapitals_UnlessABotDrivesTheSeat()
     {
         var (world, vision, _) = Arena();

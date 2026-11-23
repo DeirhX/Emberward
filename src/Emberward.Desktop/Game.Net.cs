@@ -161,7 +161,7 @@ public partial class Game
 
     /// <summary>
     /// The network overlays of a frame: the lobby before the start and a warning plate when something is wrong. The
-    /// names over the other tanks are the entity layer's (<see cref="NamePlayers"/>).
+    /// names over the other tanks are the entity layer's (<see cref="NamePlayers"/>, given before each build).
     /// </summary>
     private void DrawNetOverlays()
     {
@@ -178,7 +178,6 @@ public partial class Game
         _hud.CanRestartMatch = _world.IsMatchOver;
         var winner = _world.MatchWinner?.Tank;
         _hud.WinnerName = winner != null && _netPlaying ? relay.DriverName(winner.Color, _netSession!.HumanMask) : null;
-        NamePlayers(relay);
 
         var play = _hud.PlayRect;
         var anchor = new Vector2(play.x + play.w * 0.5f, play.y + 18f);

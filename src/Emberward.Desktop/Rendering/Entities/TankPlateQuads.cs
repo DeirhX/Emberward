@@ -59,6 +59,9 @@ public sealed class TankPlateQuads
         public int Color;
 
         public string Name;
+
+        /// <summary>The computer plays this tank's side (its name is then the default, <c>BOT n</c>).</summary>
+        public bool Bot;
     }
 
     /// <summary>Every tank's plate after the last step, for tests; an inactive one draws nothing.</summary>
@@ -82,6 +85,9 @@ public sealed class TankPlateQuads
         if (_playerNames.Length <= slot)
             Array.Resize(ref _playerNames, slot + 1);
         _playerNames[slot] = string.IsNullOrWhiteSpace(name) ? null : name;
+        // A plate already made (a ghost too) takes the new name at once.
+        if (slot < _plates.Length && _plates[slot].Active)
+            _plates[slot].Name = NameOf(slot, _plates[slot].Bot, _plates[slot].Name);
     }
 
     /// <summary>
@@ -122,6 +128,7 @@ public sealed class TankPlateQuads
             plate.Cell = cell;
             plate.StepsLost = 0;
             plate.Color = color;
+            plate.Bot = botControlled;
             plate.Name = NameOf(slot, botControlled, plate.Name);
             return;
         }

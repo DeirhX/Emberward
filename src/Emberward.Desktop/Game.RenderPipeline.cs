@@ -50,6 +50,8 @@ public partial class Game
             CameraMotion: _renderViewState.CamMotion,
             StepAlpha: stepProgress);
         float visualTime = VisualTime;
+        if (_relay is { } relay)
+            NamePlayers(relay); // Before the build: the plates are drawn with this frame's names.
         _entityLayer.Build(
             renderView, stepProgress, turnSeconds: WorldStandsStill ? 0f : dt, snapHeadings: !_interpolateFrames,
             visualSeconds: visualTime, vision: _vision, radar: _radar,
