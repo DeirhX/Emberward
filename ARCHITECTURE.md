@@ -189,7 +189,7 @@ updates it after each step on the match's time (`BrowserSession.HudSeconds`) and
   (`IEventWatch`): base attacks, upgrades, the sector goal, the network (relays linking or lost, harvesters started,
   stalled or out of charge, off network), the base's power (heat store, low charge, engine), ore (first ore, first pyrite banked,
   full hold, full store, harvester deliveries), radar scattered by heat, nests, kills, and a timed match with its powerup
-  drops (`ArcadeWatch`: the rules as it starts, a drop landed, who took it, who destroyed whom, the lead changing
+  drops (`TankDeathWatch`: another tank lost to heat, frost, emberites or its base, no side credited; `ArcadeWatch`: the rules as it starts, a drop landed, who took it, who destroyed whom, the lead changing
   hands, the last minute, sudden death; kills share one toast that the next replaces. In a match with no clock only
   the player's own kills and deaths are told, without standings; once the match is decided, drops and kills are not
   told, though the step that decided it is). Each watch compares its system's state with
