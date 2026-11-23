@@ -180,6 +180,18 @@ a count outside 2 to 8 is two tanks, a mode nobody knows the standard one. A sta
 map whatever the count; an arcade one gets the map a room of its size would (320x200 up to four tanks,
 `BrowserSession.LocalMapSize`), and `?map=WxH` chooses another for either.
 
+An arcade match shows what the desktop's HUD does, in its words: `BrowserArcade` turns `Scoreboards` and
+`DropBoard` into the frame's `arcade` field after each step (null in a match without a clock), and `arcade.js` only
+places it. The clock plate stands at the top of the view with the drop lines under it (the next drop, where and
+when; one on the ground and how long it lies; who took the last), the board (place, colour, name, kills, deaths;
+the player's line and the sole leader marked) at the right above the other panels, the running powerups as tags
+over the bottom of the view, and a badge at the edge of the view for each drop out of sight. Below 1080 pixels of
+width the clock stands over the board. Once the score decides the match the board moves to the middle with the
+result over it, and the local match stops stepping, so the page is sent nothing more. Every kind's chip carries its
+mark (`PowerupPresentations`), never its colour alone. The arcade toasts and sounds are the desktop's (`ArcadeWatch`,
+`SoundDirector`), which the browser already shares. `BrowserArcadeTests` checks the fields, that the page has and
+styles each element `arcade.js` writes to, and a local four-tank match up to its first drop.
+
 ## Network play
 
 The welcome screen has two tabs, **Solo** and **Online**, and keeps the one last chosen. **Online** joins a room on

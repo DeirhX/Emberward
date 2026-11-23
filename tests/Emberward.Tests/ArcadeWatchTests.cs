@@ -13,8 +13,9 @@ namespace Emberward.Tests;
 
 /// <summary>
 /// The toasts of a timed match and its drops (<c>ArcadeWatch</c>, DESIGN.md §6.8): the rules as it starts, a drop
-/// landing and who took it, who destroyed whom without flooding the stack, the lead changing hands, the last minute
-/// and sudden death; and the guidance of the core race keeping quiet meanwhile.
+/// landing and who took it, who destroyed whom without flooding the stack (and in a match with no clock only the
+/// player's own kills and deaths), the lead changing hands, the last minute and sudden death, nothing more of drops
+/// and kills once the match is decided; and the guidance of the core race keeping quiet meanwhile.
 /// </summary>
 public class ArcadeWatchTests
 {
@@ -110,8 +111,7 @@ public class ArcadeWatchTests
     public void ADropLanding_IsTold_WithWhatItDoesAndHowFar()
     {
         var m = WithDrops();
-        while (m.World.PowerupDropCount == 0)
-            m.Step();
+        Bounded.Until(() => m.World.PowerupDropCount > 0, () => m.Step(), Tweaks.Powerups.FirstDropTicks + 1, "the first drop landing");
 
         // The forecast has moved on to the next drop; the toast is about the one on the ground.
         Span<PowerupRenderState> drops = stackalloc PowerupRenderState[1];
@@ -199,6 +199,45 @@ public class ArcadeWatchTests
     }
 
     [Fact]
+    public void InAMatchWithNoClock_OnlyThePlayersOwnKillsAndDeathsAreTold_WithNoStanding()
+    {
+        var m = new Match { World = Create(new MatchRules { TerrainRegrowth = false }) };
+        m.Step();
+
+        m.Kill(killer: 1, victim: 2);
+        Assert.DoesNotContain(m.Feed.Active, n => n.Key.StartsWith("kill", StringComparison.Ordinal));
+
+        m.Kill(killer: 0, victim: 1);
+        Notification won = m.Toast("kill-own")!;
+        Assert.Equal(("You destroyed BOT 2", "", NotificationKind.Good), (won.Title, won.Detail, won.Kind));
+
+        m.Kill(killer: 3, victim: 0);
+        Notification lost = m.Toast("kill-own")!;
+        Assert.Equal(("BOT 4 destroyed you", "", NotificationKind.Danger), (lost.Title, lost.Detail, lost.Kind));
+        Assert.Null(m.Toast("kill-feed"));
+    }
+
+    [Fact]
+    public void OnceTheMatchIsDecided_ItsKillsAndDropsAreNoNews_ButTheKillThatDecidedItIs()
+    {
+        var m = WithDrops(PowerupWorlds.Rules with { TimeLimitSeconds = 3 });
+        Bounded.Until(() => m.World.MatchClock.IsSuddenDeath, () => m.Step(), 4 * Fps, "sudden death");
+
+        // The first kill of sudden death leaves one tank ahead alone: it ends the match, and is told.
+        m.Kill(killer: 1, victim: 2);
+        Assert.True(m.World.IsMatchOver);
+        Assert.Equal("BOT 2 destroyed BOT 3", m.Toast("kill-feed")!.Title);
+        m.Feed.Update(m.Now + 60f);
+        Assert.Empty(m.Feed.Active);
+
+        // The world steps on behind the result; what happens in it is not told.
+        m.Kill(killer: 3, victim: 2);
+        m.Kill(killer: 0, victim: 1);
+        Bounded.Until(() => m.World.PowerupDropCount > 0, () => m.Step(), Tweaks.Powerups.FirstDropTicks + 1, "the first drop landing");
+        Assert.DoesNotContain(m.Feed.Active, n => n.Key.StartsWith("kill", StringComparison.Ordinal) || n.Key.StartsWith("drop", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void ADeathNobodyScored_IsNoKillToast()
     {
         var m = Timed();
@@ -255,23 +294,20 @@ public class ArcadeWatchTests
         var tied = Timed(62);
         tied.Step();
         Assert.Null(tied.Toast("clock"));
-        while (tied.World.MatchClock.RemainingSeconds > 60)
-            tied.Step();
+        Bounded.Until(() => tied.World.MatchClock.RemainingSeconds <= 60, () => tied.Step(), 62 * Fps, "the last minute");
         Assert.Equal(("One minute left", "The top score is tied: a tie at the end means sudden death.", NotificationKind.Warning),
             (tied.Toast("clock")!.Title, tied.Toast("clock")!.Detail, tied.Toast("clock")!.Kind));
 
         var led = Timed(90);
         led.Step();
         led.Kill(killer: 2, victim: 1);
-        while (led.World.MatchClock.RemainingSeconds > 60)
-            led.Step();
+        Bounded.Until(() => led.World.MatchClock.RemainingSeconds <= 60, () => led.Step(), 90 * Fps, "the last minute");
         Assert.Equal("BOT 3 leads with 1 kill.", led.Toast("clock")!.Detail);
 
         var own = Timed(90);
         own.Step();
         own.Kill(killer: 0, victim: 1);
-        while (own.World.MatchClock.RemainingSeconds > 60)
-            own.Step();
+        Bounded.Until(() => own.World.MatchClock.RemainingSeconds <= 60, () => own.Step(), 90 * Fps, "the last minute");
         Assert.Equal("You lead with 1 kill.", own.Toast("clock")!.Detail);
     }
 
@@ -280,8 +316,7 @@ public class ArcadeWatchTests
     {
         var m = Timed(3);
         m.Step();
-        while (!m.World.MatchClock.IsSuddenDeath)
-            m.Step();
+        Bounded.Until(() => m.World.MatchClock.IsSuddenDeath, () => m.Step(), 4 * Fps, "sudden death");
 
         Notification sudden = m.Toast("clock-sudden")!;
         Assert.Equal(("Sudden death", NotificationKind.Danger), (sudden.Title, sudden.Kind));

@@ -172,9 +172,9 @@ public static partial class BrowserApi
             _hudStale |= steps > 0 || net.Changed;
             DeliverOutgoing(net);
         }
-        else if (step)
+        else if (step && session.Advance(input))
         {
-            session.Advance(input);
+            // A decided match takes no more steps, and its HUD, final standings included, was sent with the last one.
             steps = 1;
             _hudStale = true;
         }

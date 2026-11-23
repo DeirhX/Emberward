@@ -106,8 +106,7 @@ public class DropBoardTests
         var player = world.TankList.Tanks[0];
         var board = new DropBoard();
         PowerupForecast first = world.PowerupForecast;
-        while (world.PowerupDropCount == 0)
-            Step(world, board);
+        Bounded.Until(() => world.PowerupDropCount > 0, () => Step(world, board), Tweaks.Powerups.FirstDropTicks + 1, "the first drop landing");
 
         var lines = board.Lines(world, player, Names);
 
@@ -123,8 +122,7 @@ public class DropBoardTests
         var world = Create();
         var player = world.TankList.Tanks[0];
         var board = new DropBoard();
-        while (world.PowerupDropCount == 0)
-            Step(world, board);
+        Bounded.Until(() => world.PowerupDropCount > 0, () => Step(world, board), Tweaks.Powerups.FirstDropTicks + 1, "the first drop landing");
 
         // Through the landing of the next two: the old drop is gone in the step the new one lands.
         for (int tick = 0; tick < 2 * Tweaks.Powerups.DropPeriodSeconds * Fps + Fps; tick++)
@@ -179,8 +177,7 @@ public class DropBoardTests
         var world = Create();
         var player = world.TankList.Tanks[0];
         var board = new DropBoard();
-        while (world.PowerupDropCount == 0)
-            Step(world, board);
+        Bounded.Until(() => world.PowerupDropCount > 0, () => Step(world, board), Tweaks.Powerups.FirstDropTicks + 1, "the first drop landing");
         PowerupKind kind = board.Lines(world, player, Names)[1].Kind;
 
         Step(world, board, Tweaks.Powerups.GroundTicks);
@@ -253,5 +250,41 @@ public class DropBoardTests
         Assert.Equal("0 m", DropBoard.Distance(new Position(5, 5), new Position(5, 5)));
         Assert.Equal("5 m", DropBoard.Distance(new Position(10, 10), new Position(13, 14)));
         Assert.Equal("120 m", DropBoard.Distance(new Position(0, 60), new Position(120, 60)));
+    }
+
+    [Fact]
+    public void Lines_AreNotBuiltAgain_WhileWhatTheyShowStaysTheSame()
+    {
+        var world = Create();
+        var player = world.TankList.Tanks[0];
+        var board = new DropBoard();
+        Step(world, board);
+
+        DropLine first = board.Lines(world, player, Names)[0];
+        // Another frame, and another step in the same second: the same words, not made again.
+        Assert.Same(first.When, board.Lines(world, player, Names)[0].When);
+        Step(world, board);
+        Assert.Same(first.When, board.Lines(world, player, Names)[0].When);
+
+        // The countdown's second turns over, or the tank moves a metre: the line says so, as a fresh board would.
+        Step(world, board, Fps);
+        DropLine later = board.Lines(world, player, Names)[0];
+        Assert.NotEqual(first.When, later.When);
+        Assert.Equal(new DropBoard().Lines(world, player, Names)[0], later);
+        player.Position += new Offset(0, 3);
+        DropLine moved = board.Lines(world, player, Names)[0];
+        Assert.NotEqual(later.Detail, moved.Detail);
+        Assert.Equal(new DropBoard().Lines(world, player, Names)[0], moved);
+    }
+
+    [Fact]
+    public void EffectsNow_AreTheEffects_InAListTheBoardKeeps()
+    {
+        var view = new TankPowerupView(Active: true, OverchargeTicks: 7 * Fps, BulwarkTicks: 0, DrillTicks: 3 * Fps);
+        var board = new DropBoard();
+
+        Assert.Equal(DropBoard.Effects(view), board.EffectsNow(view));
+        Assert.Same(board.EffectsNow(view), board.EffectsNow(default));
+        Assert.Empty(board.EffectsNow(default));
     }
 }

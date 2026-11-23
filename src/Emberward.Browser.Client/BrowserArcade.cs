@@ -65,28 +65,30 @@ public static class BrowserArcade
     /// sends nothing and pays nothing.
     /// </summary>
     /// <param name="player">The tank of the player at this page.</param>
+    /// <param name="board">The match's board, kept between frames so that it is built again only when what it shows changed.</param>
     /// <param name="drops">The match's drop board, which has heard every step (<see cref="DropBoard.AfterStep"/>).</param>
     /// <param name="names">What to call the tank in a slot (<see cref="BrowserSession.Names"/>).</param>
-    public static ArcadeStatus? Capture(World world, Tank player, DropBoard drops, Func<int, string> names)
+    public static ArcadeStatus? Capture(World world, Tank player, ScoreboardCache board, DropBoard drops, Func<int, string> names)
     {
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(player);
+        ArgumentNullException.ThrowIfNull(board);
         ArgumentNullException.ThrowIfNull(drops);
-        if (Scoreboards.Of(world, player.Color, names) is not { } board)
+        if (board.Get(world, player.Color, names) is not { } now)
             return null;
 
-        var rows = new ScoreLine[board.Rows.Count];
+        var rows = new ScoreLine[now.Rows.Count];
         for (int i = 0; i < rows.Length; i++)
         {
-            ScoreRow row = board.Rows[i];
+            ScoreRow row = now.Rows[i];
             rows[i] = new ScoreLine(row.Rank, row.Slot, row.Name, row.Hex, row.Kills, row.Deaths, row.IsLocal, row.IsLeader);
         }
-        return new ArcadeStatus(board.Clock, board.Caption, board.Phase.ToString(), HudPalette.Hex(board.ClockColor),
-            board.IsUrgent, Scoreboards.Objective, rows,
+        return new ArcadeStatus(now.Clock, now.Caption, now.Phase.ToString(), HudPalette.Hex(now.ClockColor),
+            now.IsUrgent, Scoreboards.Objective, rows,
             // Over, the match has its final board to show; what drops next is no longer anyone's business.
             world.IsMatchOver ? [] : Drops(drops.Lines(world, player, names)),
-            player.IsDead ? [] : Effects(DropBoard.Effects(world.PowerupsOf(player))),
-            Over(world, player, board, names));
+            player.IsDead ? [] : Effects(drops.EffectsNow(world.PowerupsOf(player))),
+            Over(world, player, now, names));
     }
 
     private static DropStatus[] Drops(IReadOnlyList<DropLine> lines)

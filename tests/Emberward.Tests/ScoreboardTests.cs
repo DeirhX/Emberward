@@ -179,4 +179,36 @@ public class ScoreboardTests
         Assert.Equal("BOT 1", SlotNames.Local(3)(0));
         Assert.Contains("most kills", Scoreboards.Objective);
     }
+
+    [Fact]
+    public void TheCache_GivesTheBoardOf_AndBuildsItAgainOnlyWhenWhatItShowsChanges()
+    {
+        var world = Create(Timed(480));
+        var cache = new ScoreboardCache();
+        Func<int, string> names = SlotNames.Local(0);
+
+        Scoreboard first = cache.Get(world, 0, names)!;
+        Assert.Equal(Board(world).Rows, first.Rows);
+        Assert.Equal((Board(world).Clock, Board(world).Phase), (first.Clock, first.Phase));
+        // Frames in the same second: the same board.
+        Assert.Same(first, cache.Get(world, 0, names));
+        world.Advance(_ => default);
+        Assert.Same(first, cache.Get(world, 0, names));
+
+        // The clock's second turns over: a new board, with the new time.
+        Bounded.Until(() => world.MatchClock.RemainingSeconds < 480, () => world.Advance(_ => default), Fps + 1, "the first second");
+        Scoreboard ticked = cache.Get(world, 0, names)!;
+        Assert.NotSame(first, ticked);
+        Assert.Equal("7:59", ticked.Clock);
+
+        // A kill, another slot at this screen and another name each build it again.
+        Kill(world, killer: 1, world.TankList.Tanks[2]);
+        Scoreboard killed = cache.Get(world, 0, names)!;
+        Assert.Equal(Board(world).Rows, killed.Rows);
+        Assert.Equal(2, cache.Get(world, 2, SlotNames.Local(2))!.Local!.Value.Slot);
+        Assert.Equal("Ada", cache.Get(world, 2, slot => slot == 1 ? "Ada" : "Grace")!.Leader!.Value.Name);
+
+        // A world with no clock has no board.
+        Assert.Null(cache.Get(Create(new MatchRules { TerrainRegrowth = false }), 0, names));
+    }
 }

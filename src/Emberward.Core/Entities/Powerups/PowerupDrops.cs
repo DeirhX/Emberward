@@ -246,7 +246,10 @@ public sealed partial class PowerupDrops
         _events.Record(new StepEvent(StepEventKind.PowerupCollected, drop.Site, tank.Color, Count: (int)drop.Kind));
     }
 
-    /// <summary>Counts every running effect down a tick; one that runs out, and every effect of a tank that died, ends.</summary>
+    /// <summary>
+    /// Counts every running effect down a tick; one that runs out ends. (A tank's death ends all of its effects at
+    /// once, <see cref="EndEffects"/>, so a dead tank has none here.)
+    /// </summary>
     private void AdvanceEffects()
     {
         for (int color = 0; color < _effects.Count; color++)
@@ -261,8 +264,7 @@ public sealed partial class PowerupDrops
                 int left = effects.Get(kind);
                 if (left <= 0)
                     continue;
-                left = tank.IsDead ? 0 : left - 1;
-                effects.Set(kind, left);
+                effects.Set(kind, --left);
                 if (left == 0)
                     _events.Record(new StepEvent(StepEventKind.PowerupEnded, tank.Position, color, Count: k));
             }
@@ -270,6 +272,22 @@ public sealed partial class PowerupDrops
                 effects.Carry = 0;
             _effects[color] = effects;
         }
+    }
+
+    /// <summary>
+    /// <paramref name="tank"/> has died: every effect it had running ends now, each with its
+    /// <see cref="StepEventKind.PowerupEnded"/>, and the bulwark's carried remainder is dropped. Called from the death
+    /// itself, so a recall, which dies and respawns in the same step, ends them too.
+    /// </summary>
+    internal void EndEffects(Tank tank)
+    {
+        if (tank.Color < 0 || tank.Color >= _effects.Count)
+            return;
+        TankEffects effects = _effects[tank.Color];
+        for (int k = 0; k < PowerupKinds.Count; k++)
+            if (effects.Get((PowerupKind)k) > 0)
+                _events.Record(new StepEvent(StepEventKind.PowerupEnded, tank.Position, tank.Color, Count: k));
+        _effects[tank.Color] = default;
     }
 
     /// <summary>What <paramref name="tank"/>'s running powerups change about its digging and its shells this tick.</summary>

@@ -25,8 +25,11 @@ using Emberward.Protocol;
 /// <para>
 /// A recording holds the players' inputs and none of the bots': a replay has the bots decide again. The header's
 /// <c>bots</c> is the <see cref="CurrentBots"/> of the build that recorded it (1 without the line). A recording a bot
-/// played in, from a build whose bots decided otherwise, cannot be replayed, and <see cref="Replay"/> says so; one of
-/// players only replays whatever its number.
+/// played in, from a build whose bots decided otherwise, cannot be replayed, and <see cref="Replay"/> says so. A
+/// recording of players only is not checked by that number, but it is not proof against other changes either: it
+/// carries no version of the simulation, so it replays the same match only on a build whose simulation gives the same
+/// result for the same inputs (one with the same <c>SimulationFingerprintTests</c> constants). On a build that changed
+/// the simulation it replays without complaint into another match.
 /// </para>
 /// </remarks>
 /// <param name="HumanMask">Which slots players drove before the first recorded tick.</param>

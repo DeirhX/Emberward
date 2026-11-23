@@ -152,7 +152,7 @@ public sealed class PowerupQuads
                     // The letters sit in a row above the rings' upper right, the first ring's first.
                     float markX = cx + HaloRadius * 0.75f + ring * (GlyphText.GlyphWidth + 2) * dot;
                     float markTop = -HaloRadius * 0.75f - (GlyphText.GlyphHeight + 2) * dot;
-                    GlyphText.AddLine(quads, markX, cy, markTop, kind.Mark.ToString(), dot, tint, 1f, drift);
+                    GlyphText.AddLine(quads, markX, cy, markTop, kind.MarkText, dot, tint, 1f, drift);
                     ring++;
                 }
             }
@@ -162,7 +162,7 @@ public sealed class PowerupQuads
     /// <summary>
     /// The letters and the labels, over everything but the HUD: the kind's letter in the middle of the site and of
     /// each drop, the kind's name above, and below the time until the landing (<c>0:32</c>) or the seconds a drop has
-    /// left (<c>52s</c>).
+    /// left (<c>52s</c>). The numbers' words are made once and kept (<see cref="HudNumbers"/>), so a frame makes none.
     /// </summary>
     public void EmitLabels(EntityQuads quads)
     {
@@ -175,8 +175,7 @@ public sealed class PowerupQuads
         {
             ref readonly PowerupRenderState drop = ref _drops[i];
             int left = (int)MathF.Ceiling(drop.SecondsUntilExpiry);
-            Label(quads, drop.Cell, drop.Radius, drop.Kind,
-                left.ToString(System.Globalization.CultureInfo.InvariantCulture) + "s", markAlpha: 1f, onCapsule: true);
+            Label(quads, drop.Cell, drop.Radius, drop.Kind, HudNumbers.Seconds(left), markAlpha: 1f, onCapsule: true);
         }
     }
 
@@ -196,7 +195,7 @@ public sealed class PowerupQuads
         float belowDot = MathF.Max(CountdownDot, 1f / scale);
         // On a drop's dark capsule the letter is nearly white; on the bare ground of a site it keeps the kind's colour.
         Color mark = onCapsule ? Mix(tint, White, 0.7f) : tint;
-        GlyphText.AddLine(quads, x, y, -GlyphText.GlyphHeight * 0.5f * markDot, presentation.Mark.ToString(), markDot, mark, markAlpha);
+        GlyphText.AddLine(quads, x, y, -GlyphText.GlyphHeight * 0.5f * markDot, presentation.MarkText, markDot, mark, markAlpha);
         GlyphText.AddLine(quads, x, y, -radius - GapCells - GlyphText.GlyphHeight * nameDot, presentation.Tag, nameDot, tint, 1f);
         GlyphText.AddLine(quads, x, y, radius + GapCells, below, belowDot, tint, 1f);
     }

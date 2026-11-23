@@ -24,11 +24,12 @@ internal static class PowerupWorlds
     private static readonly Position[] Spawns = [new(30, 30), new(170, 120), new(170, 30), new(30, 120)];
 
     /// <summary><paramref name="ground"/> all over, with <paramref name="tanks"/> bases in its corners, played under <paramref name="rules"/>.</summary>
-    internal static World Create(MatchRules? rules = null, int tanks = 4, int seed = 7, TerrainPixel ground = TerrainPixel.Blank)
+    internal static World Create(MatchRules? rules = null, int tanks = 4, int seed = 7, TerrainPixel ground = TerrainPixel.Blank,
+        SimulationSettings? settings = null)
     {
         var terrain = new TerrainGrid(MapSize);
         terrain.Fill(ground);
-        var world = new World(MapSize, simulationSeed: seed, rules ?? Rules);
+        var world = new World(MapSize, simulationSeed: seed, rules ?? Rules, settings);
         world.Initialize(terrain, Spawns[..tanks]);
         return world;
     }

@@ -31,11 +31,11 @@ public class PowerupSnapshotTests
         // the next drop has landed and lies.
         Position first = AwaitLanding(world);
         var kind = (PowerupKind)Events(world, StepEventKind.PowerupLanded)[0].Count;
-        while (!PowerupKinds.IsTimed(kind))
+        Bounded.Until(() => PowerupKinds.IsTimed(kind), () =>
         {
             first = AwaitLanding(world);
             kind = (PowerupKind)Events(world, StepEventKind.PowerupLanded)[0].Count;
-        }
+        }, 2 * PowerupKinds.Count, "a timed drop landing");
         Step(world, Tweaks.Powerups.GroundTicks - 2);
         tank.Position = first;
         Step(world);

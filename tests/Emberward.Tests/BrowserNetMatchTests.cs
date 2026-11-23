@@ -62,6 +62,18 @@ public class BrowserNetMatchTests
         Assert.Equal((1500, 750), (chosen.MapWidth, chosen.MapHeight));
     }
 
+    /// <summary>The proposal reaches the relay with its mode: a room this browser opens is an arcade room.</summary>
+    [Fact]
+    public void TheHello_CarriesTheProposedMode_InTheCurrentProtocol()
+    {
+        var match = new BrowserNetMatch("room", "Ann", BrowserNetMatch.Propose(7, 4, mode: BrowserLaunch.Mode("arcade")));
+
+        var hello = Assert.IsType<Hello>(Single(match.TakeOutgoing()));
+
+        Assert.Equal(14, MessageCodec.ProtocolVersion);
+        Assert.Equal((MessageCodec.ProtocolVersion, (byte)MatchMode.Arcade, 4), (hello.Protocol, hello.Config.Mode, hello.Config.Slots));
+    }
+
     [Fact]
     public void TheRoomsMode_IsTheMatchThatIsBuilt_WhateverThisClientProposed()
     {

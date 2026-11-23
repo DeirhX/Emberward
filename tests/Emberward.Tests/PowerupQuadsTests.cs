@@ -126,8 +126,7 @@ public class PowerupQuadsTests
     {
         var layer = new Layer { World = Create() };
         PowerupForecast first = layer.World.PowerupForecast;
-        while (layer.World.PowerupDropCount == 0)
-            layer.Step();
+        Bounded.Until(() => layer.World.PowerupDropCount > 0, () => layer.Step(), Tweaks.Powerups.FirstDropTicks + 1, "the first drop landing");
 
         var shapes = Shapes(layer.Draw());
 

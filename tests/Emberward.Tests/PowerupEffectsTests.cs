@@ -246,11 +246,11 @@ public class PowerupEffectsTests(ITestOutputHelper output)
         // (Three of the four kinds are timed, so two of them are dealt one after the other in every round.)
         Position firstSite = AwaitLanding(world);
         var first = (PowerupKind)Events(world, StepEventKind.PowerupLanded)[0].Count;
-        while (!PowerupKinds.IsTimed(first) || !PowerupKinds.IsTimed(world.PowerupForecast.Kind))
+        Bounded.Until(() => PowerupKinds.IsTimed(first) && PowerupKinds.IsTimed(world.PowerupForecast.Kind), () =>
         {
             firstSite = AwaitLanding(world);
             first = (PowerupKind)Events(world, StepEventKind.PowerupLanded)[0].Count;
-        }
+        }, 2 * PowerupKinds.Count, "a timed drop landing with a timed one forecast");
         PowerupKind second = world.PowerupForecast.Kind;
         Assert.NotEqual(first, second);
         Step(world, world.PowerupForecast.TicksUntilLanding - 2);
@@ -284,6 +284,39 @@ public class PowerupEffectsTests(ITestOutputHelper output)
         int hull = tank.Reactor.Health;
         Assert.True(tank.TakeDamage(100, DamageCause.Emberite));
         Assert.Equal(hull - 100, (int)tank.Reactor.Health);
+    }
+
+    [Fact]
+    public void ARecall_EndsEveryEffect_ThoughTheTankRespawnsInTheSameStep()
+    {
+        // The off-network clock runs out in a tick, so the tank may recall as soon as it is out of its base.
+        var settings = SimulationSettings.FromTweaks() with { TankOffNetworkHeatPerTick = Tweaks.Tank.HeatSafeMax };
+        var world = Create(tanks: 2, settings: settings);
+        Tank tank = world.TankList.Tanks[0];
+        Take(world, tank, PowerupKind.Bulwark);
+        Assert.True(world.PowerupsOf(tank).IsRunning(PowerupKind.Bulwark));
+        // A hit of an odd amount leaves a carried remainder behind.
+        Assert.True(tank.TakeDamage(101, DamageCause.Emberite));
+        for (int i = 0; i < 10 && !tank.CanRecall; i++)
+            Step(world);
+        Assert.True(tank.CanRecall, "the tank could not recall within 10 ticks of taking the drop");
+        Assert.True(world.PowerupsOf(tank).IsRunning(PowerupKind.Bulwark));
+        Position recalledFrom = tank.Position;
+
+        world.Advance(slot => slot == tank.Color ? new ControllerOutput { Recall = true } : default);
+
+        // Back home in the same step, and with nothing running.
+        Assert.False(tank.IsDead);
+        Assert.Single(Events(world, StepEventKind.TankRespawned));
+        StepEvent ended = Assert.Single(Events(world, StepEventKind.PowerupEnded));
+        Assert.Equal((recalledFrom, tank.Color, (int)PowerupKind.Bulwark), (ended.Position, ended.Color, ended.Count));
+        Assert.False(world.PowerupsOf(tank).Any);
+        // Nothing of the bulwark is left: a hit takes all it should, carry and all.
+        int hull = tank.Reactor.Health;
+        Assert.True(tank.TakeDamage(100, DamageCause.Emberite));
+        Assert.Equal(hull - 100, (int)tank.Reactor.Health);
+        Step(world);
+        Assert.Empty(Events(world, StepEventKind.PowerupEnded));
     }
 
     [Fact]

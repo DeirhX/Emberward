@@ -1,6 +1,7 @@
 namespace Emberward.Tests;
 
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Emberward.Browser.Client;
 using Emberward.Core;
 using Emberward.Core.Config;
@@ -24,7 +25,7 @@ public class BrowserArcadeTests
 
     private static ArcadeStatus Capture(World world, DropBoard drops, int slot = 0)
     {
-        var status = BrowserArcade.Capture(world, world.TankList.Tanks[slot], drops, SlotNames.Local(slot));
+        var status = BrowserArcade.Capture(world, world.TankList.Tanks[slot], new ScoreboardCache(), drops, SlotNames.Local(slot));
         Assert.NotNull(status);
         return status;
     }
@@ -92,6 +93,7 @@ public class BrowserArcadeTests
     }
 
     [Fact]
+    [Trait("Category", "Slow")]
     public void AStandardMatch_CarriesNoArcadeHud_AndKeepsItsCoreGoal()
     {
         var session = new BrowserSession(1234);
@@ -113,7 +115,7 @@ public class BrowserArcadeTests
         PowerupWorlds.Step(world);
         drops.AfterStep(world);
 
-        Assert.Null(BrowserArcade.Capture(world, world.TankList.Tanks[0], drops, Names));
+        Assert.Null(BrowserArcade.Capture(world, world.TankList.Tanks[0], new ScoreboardCache(), drops, Names));
     }
 
     [Fact]
@@ -212,10 +214,108 @@ public class BrowserArcadeTests
         Assert.Empty(winner.Drops);
         Assert.True(winner.Rows[0].Leader);
 
+        // The page reads these names of the last lines (arcade.js, showOver).
+        var frame = BrowserFrameBuilder.Capture(new BrowserSession(7, mode: MatchMode.Arcade), includeEvents: false) with { Arcade = winner };
+        using (var json = JsonDocument.Parse(JsonSerializer.Serialize(frame, BrowserJsonContext.Default.BrowserFrame)))
+        {
+            var over = json.RootElement.GetProperty("arcade").GetProperty("over");
+            foreach (string name in (string[])["won", "title", "reason", "own"])
+                Assert.True(over.TryGetProperty(name, out _), name);
+        }
+
         var loser = Capture(world, drops, slot: 1).Over;
         Assert.NotNull(loser);
         Assert.Equal((false, "DEFEAT"), (loser.Won, loser.Title));
         // Seen from slot 1 the winner is a bot, and the line names it.
         Assert.StartsWith("BOT 1 won with 1 kill", loser.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheClock_TurnsUrgentInItsLastMinute_AndBeatsInItsLastSeconds_AndThePageStylesEveryPhase()
+    {
+        var world = ArcadeWorlds.Create(ArcadeWorlds.Timed(120));
+        var drops = new DropBoard();
+        Assert.Equal((nameof(ClockPhase.Running), false), (Capture(world, drops).Phase, Capture(world, drops).Urgent));
+
+        ArcadeWorlds.RunClockDownTo(world, 59 * Fps);
+        var lastMinute = Capture(world, drops);
+        Assert.Equal((nameof(ClockPhase.LastMinute), Scoreboards.Caption(ClockPhase.LastMinute), true, "0:59"),
+            (lastMinute.Phase, lastMinute.Caption, lastMinute.Urgent, lastMinute.Clock));
+
+        ArcadeWorlds.RunClockDownTo(world, 5 * Fps);
+        var lastSeconds = Capture(world, drops);
+        Assert.Equal((nameof(ClockPhase.LastSeconds), true), (lastSeconds.Phase, lastSeconds.Urgent));
+
+        // The page tells the phases apart by the class arcade.js gives the plate (phase-<name>); the beat is styled.
+        string css = PageFile("style.css");
+        foreach (var phase in (ClockPhase[])[ClockPhase.LastSeconds, ClockPhase.SuddenDeath])
+            Assert.Contains($"#arcade-clock.phase-{phase}", css, StringComparison.Ordinal);
+        Assert.Contains("phase-${a.phase}", PageFile("arcade.js"), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Every element arcade.js looks up is on the page and styled: a missing one would throw on the first arcade
+    /// frame, an unstyled one would stand in the page's flow over the world.
+    /// </summary>
+    [Fact]
+    public void ThePage_HasAndStylesEveryElementTheArcadeHudWritesTo()
+    {
+        string script = PageFile("arcade.js"), html = PageFile("index.html"), css = PageFile("style.css");
+
+        var ids = Regex.Matches(script, @"\$\(""([a-z-]+)""\)").Select(m => m.Groups[1].Value)
+            .Concat(Regex.Matches(script, @"""#([a-z-]+)""").Select(m => m.Groups[1].Value))
+            .Concat(["arcade-clock", "scoreboard", "effects", "arcade-dim", "final", "final-foot"])
+            .Distinct().ToArray();
+        Assert.Contains("drop-lines", ids);
+        foreach (string id in ids)
+            Assert.Contains($"id=\"{id}\"", html, StringComparison.Ordinal);
+        foreach (string id in (string[])["arcade-clock", "scoreboard", "effects", "arcade-dim", "final", "drop-lines", "score-rows"])
+            Assert.Contains($"\n#{id} {{", css, StringComparison.Ordinal);
+    }
+
+    internal static string PageFile(string name) =>
+        File.ReadAllText(Path.Combine(EntityLayoutGuardTests.FindRepositoryRoot(), "src", "Emberward.Browser", "wwwroot", name));
+}
+
+/// <summary>
+/// A whole local arcade match as the browser plays it, bots and all. A class of its own: it is slow, and xUnit runs a
+/// class's tests one after another.
+/// </summary>
+public class BrowserArcadeMatchTests
+{
+    private const int Fps = Tweaks.Perf.TargetFps;
+
+    /// <summary>
+    /// A local arcade match in the browser, as the page starts it (<c>?mode=arcade&amp;players=4</c>): bots in every
+    /// other slot, the forecast counting down to the first drop and, once it lands, its line with how long it lies.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "Slow")]
+    public void ALocalArcadeMatch_ShowsTheForecastCountingDown_AndTheFirstDropLanding()
+    {
+        var session = new BrowserSession(1234, players: BrowserLaunch.Players(4), mode: BrowserLaunch.Mode("ARCADE"));
+        Assert.Equal((MatchMode.Arcade, 4), (session.Mode, session.World.TankList.Count));
+        Assert.True(session.Advance(default));
+        var first = BrowserFrameBuilder.Capture(session, includeEvents: false).Arcade;
+        Assert.NotNull(first);
+        Assert.Equal("in 0:45", Assert.Single(first.Drops).When);
+
+        int bound = (Tweaks.Powerups.GroundSeconds + 60) * Fps;
+        int steps = 0;
+        while (session.World.PowerupDropCount == 0)
+        {
+            Assert.True(++steps < bound, $"no drop landed in {bound} steps");
+            Assert.True(session.Advance(default), "the match ended before the first drop");
+        }
+
+        var arcade = BrowserFrameBuilder.Capture(session, includeEvents: true).Arcade;
+        Assert.NotNull(arcade);
+        var landed = Assert.Single(arcade.Drops, d => d.State == nameof(DropLineState.Landed));
+        Assert.StartsWith("LANDED ", landed.When, StringComparison.Ordinal);
+        Assert.StartsWith(landed.Mark, landed.PointerText, StringComparison.Ordinal);
+        Assert.True(landed.Pointed);
+        // The next one is forecast as soon as this one lands: its line comes first.
+        Assert.Equal(nameof(DropLineState.Forecast), arcade.Drops[0].State);
+        Assert.Equal(4, arcade.Rows.Length);
     }
 }

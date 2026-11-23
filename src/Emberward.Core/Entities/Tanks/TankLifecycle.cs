@@ -151,6 +151,9 @@ internal sealed class TankLifecycle
         var reactor = _tank.Reactor;
         reactor.Exhaust(new ReactorState(reactor.Heat, reactor.Health));
         _build.DiscardCarried();
+        // Death ends every running powerup, here and not when the drops next step, which a recall's same-step
+        // respawn would hide from them.
+        _tank.Powerups?.EndEffects(_tank);
         DropOre(terrain, isOccupied);
         _respawning = true;
         _respawnTimer = delay ?? Tweaks.Tank.RespawnDelay;

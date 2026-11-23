@@ -15,8 +15,8 @@ internal interface IEventWatch
     /// <summary>Forgets what it saw: a new match.</summary>
     void Reset();
 
-    /// <summary>Once for each simulated step, before its events reach <see cref="OnStepEvent"/>.</summary>
-    void OnStep() { }
+    /// <summary>Once for each simulated step, after it ran and before its events reach <see cref="OnStepEvent"/>.</summary>
+    void OnStep(World world) { }
 
     /// <summary>One event of the step just simulated (<see cref="World.StepEvents"/>).</summary>
     void OnStepEvent(World world, Tank player, in StepEvent e);

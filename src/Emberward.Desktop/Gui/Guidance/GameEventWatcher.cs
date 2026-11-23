@@ -66,7 +66,7 @@ public sealed class GameEventWatcher
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(player);
         foreach (IEventWatch watch in _watches)
-            watch.OnStep();
+            watch.OnStep(world);
         foreach (ref readonly StepEvent e in world.StepEvents)
             foreach (IEventWatch watch in _watches)
                 watch.OnStepEvent(world, player, in e);

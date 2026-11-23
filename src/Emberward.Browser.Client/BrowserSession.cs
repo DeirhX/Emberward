@@ -160,6 +160,9 @@ public sealed class BrowserSession
     /// <summary>A timed match's drop lines (<see cref="BrowserArcade"/>); it hears every step, as the desktop's does.</summary>
     public DropBoard Drops { get; } = new();
 
+    /// <summary>A timed match's board, built again only when what it shows changed (<see cref="ScoreboardCache"/>).</summary>
+    public ScoreboardCache Board { get; } = new();
+
     private Func<int, string>? _names;
 
     /// <summary>
@@ -201,12 +204,17 @@ public sealed class BrowserSession
     }
 
     /// <summary>One step of the local match: the player's input, and the bots'.</summary>
-    public void Advance(ControllerOutput input)
+    /// <returns>
+    /// Whether it stepped: a decided match stands still, and the page has nothing new to be told (its last frame
+    /// carries the final standings).
+    /// </returns>
+    public bool Advance(ControllerOutput input)
     {
         if (World.MatchOutcomeFor(Player) != MatchOutcome.InProgress)
-            return;
+            return false;
         SlotStepper.Advance(World, _bots, _ => input);
         AfterStep(silent: false);
+        return true;
     }
 
     /// <summary>What follows every step, local or from the relay: sound, guidance and what the next frame draws.</summary>

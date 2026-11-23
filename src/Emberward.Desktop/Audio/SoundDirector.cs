@@ -37,8 +37,9 @@ public interface ISoundSink
 /// loudness follows distance, stereo position follows direction, rock and dirt in between muffle it, and another
 /// tank's engine and treads rise a little in pitch while it comes closer. An announcement about the match
 /// (<see cref="CueHeard.Everyone"/>: a powerup drop, the clock, a kill confirmed) is the exception: it plays at the
-/// listener, as loud wherever the thing it is about lies. It only reads simulation output; nothing here feeds back
-/// into the simulation.
+/// listener, as loud wherever the thing it is about lies. Once the match is decided the world steps on, but its drops
+/// and kill confirmations are silent (<see cref="StepEventSounds.QuietOnceDecided"/>); the clock's last cue, the horn, still plays.
+/// It only reads simulation output; nothing here feeds back into the simulation.
 /// </summary>
 public sealed class SoundDirector
 {
@@ -74,6 +75,10 @@ public sealed class SoundDirector
     private bool _runningHot, _lowShield;
     private int _nextWarningStep, _lastWarningStep = -1000, _lastWarningRank;
     private ClockPhase _clockPhase;
+
+    // Whether the match was decided as of the last step heard: the steps after it play on, but the drops and kills of
+    // a match already decided are no news (StepEventSounds.QuietOnceDecided).
+    private bool _matchOver;
 
     // The world last heard: a new match (or a late join's copy) starts each tank's fire from silence.
     private WeakReference<World>? _world;
@@ -119,6 +124,10 @@ public sealed class SoundDirector
         if (player != null)
             _listener = player.Position;
         int playerColor = player?.Color ?? -1;
+        // The step that decided the match still sounds in full (its kill may be the winning one); the ones after it
+        // keep their drop and kill cues to themselves. The clock's horn is ObserveClock's, which this does not touch.
+        bool decided = newWorld ? world.IsMatchOver : _matchOver;
+        _matchOver = world.IsMatchOver;
 
         for (int i = 0; i < _tanks.Length; i++)
             _tanks[i].Moved = _tanks[i].Dug = _tanks[i].Torched = false;
@@ -156,6 +165,8 @@ public sealed class SoundDirector
                         PlayCue(wake, e.Position, index, ref impacts);
                     break;
                 default:
+                    if (decided && StepEventSounds.QuietOnceDecided(e.Kind))
+                        break;
                     bool own = e.Color == playerColor;
                     if (((own ? StepEventSounds.PlayerCueFor(e) : null) ?? StepEventSounds.CueFor(e)) is { } cue &&
                         StepEventSounds.Hears(cue, tracked: index >= 0, isPlayer: own))
@@ -165,7 +176,7 @@ public sealed class SoundDirector
                             cue = cue with { Gain = StepEventSounds.DepositGain(e.Count + tanks[index].OreHeld) };
                         PlayCue(cue, e.Position, index, ref impacts);
                     }
-                    if (StepEventSounds.KillCueFor(e, playerColor) is { } kill)
+                    if (!decided && StepEventSounds.KillCueFor(e, playerColor) is { } kill)
                         PlayCue(kill, e.Position, -1, ref impacts);
                     break;
             }

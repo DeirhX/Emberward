@@ -342,9 +342,9 @@ from repeating on the frames drawn between steps.
 | Pickup | `OreCollected`. At most every 3 steps; a run of pickups climbs in pitch. |
 | Ore unloaded | `OreUnloaded` at a relay (`Target` `Machine`, player only): the pickup sound, quieter, once per unit. A bank at the core (`Target` `Base`) is one deposit per pour, louder for a bigger load, and ore burned to restart a dark base the same deposit pitched down (`StepEventSounds.Ore.cs`) |
 | Dock | `Docked` (player only; a respawn is not a docking) |
-| Drop announced, landed, taken, gone | `PowerupAnnounced` (a soft ping), `PowerupLanded` (a clear chime, the loudest), `PowerupCollected` (a falling pair of notes for a drop someone else took; a rising flourish, `PlayerCueFor`, for one the player took), `PowerupExpired` (the ping again, lower and quieter). Every player hears them, unplaced. |
+| Drop announced, landed, taken, gone | `PowerupAnnounced` (a soft ping), `PowerupLanded` (a clear chime, the loudest), `PowerupCollected` (a falling pair of notes for a drop someone else took; a rising flourish, `PlayerCueFor`, for one the player took), `PowerupExpired` (the ping again, lower and quieter). Every player hears them, unplaced. Silent in the steps after the match was decided (`QuietOnceDecided`), as is the kill confirmation. |
 | Powerup run out | `PowerupEnded` on the player's own tank |
-| Kill confirmed | `TankDied` whose `Killer` is the player (`KillCueFor`), beside the death itself |
+| Kill confirmed | `TankDied` whose `Killer` is the player (`KillCueFor`), beside the death itself, in any match; not once the match was decided before the step |
 | Match clock | From `World.MatchClock`, not an event (`StepEventSounds.ClockCue`): three strokes as the last minute starts, a tick on each of the last ten seconds (higher for the last three), an alarm as sudden death starts, a horn when the match ends. A clock first heard part-way (a late join) says nothing of where it already stands. |
 | Warnings | Player only, most urgent first like the HUD banner: overheating, low shield, running hot. The thresholds are shared with the HUD through `PlayerWarnings`. Each repeats at its own interval while it lasts. These follow the tank's state, not events. |
 | Engine loop | Per tank, while alive: idle, or louder and higher on steps with `TankMoved` |

@@ -952,7 +952,7 @@ schedule, and everyone knows well ahead where, when and what:
     A recall still destroys it.
   - *Drill*, 25 seconds: the tank digs soil as fast as it drives open ground (twice its plain digging). Rock is as
     it was.
-  Taking a kind that is still running starts its time over. A tank's death ends what it had.
+  Taking a kind that is still running starts its time over. A tank's death ends what it had, a recall too.
 - **Where a drop lands is fair.** Always on soil or open ground a tank can reach, away from every base (at least 30
   cells, and 30% of the spacing of the two nearest bases), from the hot core, the hot and frost pockets and the nests,
   off ground warmer than 40 degrees or colder than -20, and never where the drop before it lies. Two kinds of site

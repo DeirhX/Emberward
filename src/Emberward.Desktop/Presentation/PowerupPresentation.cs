@@ -23,6 +23,9 @@ public sealed record PowerupPresentation(PowerupKind Kind, string Name, string T
     /// <summary>The mark and the tag, as the HUD writes a kind: <c>X OVERCHARGE</c>.</summary>
     public string MarkedTag { get; } = Mark + " " + Tag;
 
+    /// <summary>The mark alone, as a string: what the HUD and the ground write it with.</summary>
+    public string MarkText { get; } = Mark.ToString();
+
     /// <summary>The colour as CSS <c>#rrggbb</c>, for the browser's page.</summary>
     public string Hex => HudPalette.Hex(Color);
 

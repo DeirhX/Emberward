@@ -111,8 +111,8 @@ internal static class ArcadeWorlds
     internal static void RunClockDownTo(World world, int remainingTicks)
     {
         Assert.True(world.MatchClock.RemainingTicks >= remainingTicks, "the clock is already past that");
-        while (world.MatchClock.RemainingTicks > remainingTicks)
-            world.Advance(_ => default);
+        Bounded.Until(() => world.MatchClock.RemainingTicks <= remainingTicks, () => world.Advance(_ => default),
+            world.MatchClock.RemainingTicks - remainingTicks + 1, $"{remainingTicks} ticks left on the clock");
     }
 
     /// <summary>

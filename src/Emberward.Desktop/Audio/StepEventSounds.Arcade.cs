@@ -48,6 +48,16 @@ public static partial class StepEventSounds
             : null;
 
     /// <summary>
+    /// Whether an event of <paramref name="kind"/> is silent in the steps after the match was decided: the world steps
+    /// on behind the result, but a drop announced, landing, taken or gone and an effect running out are no news by
+    /// then, and neither is a kill (<see cref="KillCueFor"/> is not asked; the death itself still sounds where it
+    /// happens). The clock is not an event, and its horn plays (<see cref="ClockCue"/>).
+    /// </summary>
+    public static bool QuietOnceDecided(StepEventKind kind) => kind is StepEventKind.PowerupAnnounced
+        or StepEventKind.PowerupLanded or StepEventKind.PowerupCollected or StepEventKind.PowerupExpired
+        or StepEventKind.PowerupEnded;
+
+    /// <summary>
     /// What the clock of a timed match sounds this step, having stood at <paramref name="before"/> the step before
     /// and at <paramref name="now"/> after it: three strokes as the last minute starts, a tick on each of the last
     /// seconds (higher for the last three), an alarm as sudden death starts and a horn when the match ends. Null on

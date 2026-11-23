@@ -14,6 +14,8 @@ using Emberward.Core.Entities.Tanks;
 public partial class GameHud
 {
     private readonly DropBoard _drops = new();
+    private readonly ScoreboardCache _scoreboards = new();
+    private readonly JoinedText _texts = new();
     private Func<int, string>? _localNames;
     private int _localNamesSlot = -1;
 
@@ -62,7 +64,7 @@ public partial class GameHud
     private void ReadArcade(Tank player, World world)
     {
         var names = NamesFor(player);
-        _board = Scoreboards.Of(world, player.Color, names);
+        _board = _scoreboards.Get(world, player.Color, names);
         // Over, the match has its final board to show; what drops next is no longer anyone's business.
         _dropLines = world.IsMatchOver ? [] : _drops.Lines(world, player, names);
         var vp = ViewportRect;
@@ -163,7 +165,7 @@ public partial class GameHud
                 HudDraw.StrokeArc(dl, at, radius + 5f, i * MathF.PI * 0.5f + _time, i * MathF.PI * 0.5f + _time + 0.9f, color, 1.6f);
         ArcadeLines.DrawChip(dl, at, line.Kind, 1f, 9f);
 
-        string text = line.PointerText;
+        string text = _texts.PointerText(line);
         var sz = HudTheme.Measure(14f, text);
         // The tag toward the middle of the view, clear of the badge whichever way the arrow points.
         float reach = radius + 12f + MathF.Abs(dir.X) * (sz.X * 0.5f + 9f) + MathF.Abs(dir.Y) * (sz.Y * 0.5f + 5f);
@@ -181,7 +183,7 @@ public partial class GameHud
     /// </summary>
     private void DrawEffectTags(ImDrawListPtr dl, Tank player, World world, (float x, float y, float w, float h) vp)
     {
-        var tags = DropBoard.Effects(world.PowerupsOf(player));
+        var tags = _drops.EffectsNow(world.PowerupsOf(player));
         if (tags.Count == 0 || player.IsDead)
             return;
         const float size = 15f, gap = 8f, height = 30f;
@@ -189,7 +191,7 @@ public partial class GameHud
         float total = -gap;
         for (int i = 0; i < tags.Count; i++)
         {
-            widths[i] = HudTheme.Measure(size, tags[i].Text).X + 22f;
+            widths[i] = HudTheme.Measure(size, _texts.Join(tags[i].Tag, " ", tags[i].Seconds)).X + 22f;
             total += widths[i] + gap;
         }
         float x = MathF.Floor(vp.x + vp.w * 0.5f - total * 0.5f);
@@ -203,7 +205,7 @@ public partial class GameHud
             uint color = tag.Blink && !blinkOn ? HudTheme.WithAlpha(tag.Color, 0.45f) : tag.Color;
             dl.AddRectFilled(min, max, HudTheme.Rgba(14, 14, 16, 225), 4f);
             dl.AddRect(min, max, HudTheme.WithAlpha(color, 0.85f), 4f, ImDrawFlags.None, 1.4f);
-            HudTheme.TextAt(dl, size, min + new Vector2(11f, 4f), tag.Text, color);
+            HudTheme.TextAt(dl, size, min + new Vector2(11f, 4f), _texts.Join(tag.Tag, " ", tag.Seconds), color);
             var barMin = new Vector2(min.X + 5f, max.Y - 6f);
             float barW = widths[i] - 10f;
             dl.AddRectFilled(barMin, barMin + new Vector2(barW, 3f), HudTheme.Track);

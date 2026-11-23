@@ -8,6 +8,9 @@ import { setClass, setHidden, setProperty, setText } from "./hud.js";
 const $ = (id) => document.getElementById(id);
 
 const HUD_FONT = '"Chakra Petch", system-ui, sans-serif';
+// The pointers' fonts, built once: the pointers are drawn every frame, and a font string per frame is garbage.
+const MARK_FONT = `700 15px ${HUD_FONT}`;
+const TAG_FONT = `14px ${HUD_FONT}`;
 // The page's parts a drop pointer keeps clear of.
 const PANELS = [
     "#mission", "#toasts", "#arcade-clock", "#scoreboard", "#warning", "#upgrades", "#effects",
@@ -36,8 +39,9 @@ export class ArcadeView {
         this.main = document.querySelector("main");
         this.clock = $("arcade-clock");
         this.board = $("scoreboard");
-        // Below this width the clock stands over the board at the right, and nothing has to make room under it.
-        this.narrow = matchMedia("(max-width: 700px)");
+        // Below this width the clock stands over the board at the right, and nothing has to make room under it
+        // (style.css has the same width).
+        this.narrow = matchMedia("(max-width: 1080px)");
         // The warning and the network notice go under the clock, and the panels under the board: both need the heights.
         const observer = new ResizeObserver(() => this.makeRoom());
         observer.observe(this.clock);
@@ -97,15 +101,16 @@ export class ArcadeView {
             list.append(line);
             this.drops.push({ line, chip, name, when, detail });
         }
-        drops.forEach((drop, i) => {
-            const row = this.drops[i];
+        for (let i = 0; i < drops.length; i++) {
+            const drop = drops[i],
+                row = this.drops[i];
             setClass(row.line, `drop-${drop.state}${drop.urgent ? " urgent" : ""}${drop.pointed ? "" : " past"}`);
             setProperty(row.line, "--kind", drop.color);
             setText(row.chip, drop.mark);
             setText(row.name, drop.name);
             setText(row.when, drop.when);
             setText(row.detail, drop.detail);
-        });
+        }
         setHidden(list, drops.length === 0);
     }
 
@@ -126,8 +131,24 @@ export class ArcadeView {
             list.append(line);
             this.rows.push({ line, rank, lead, name, kills, deaths });
         }
-        rows.forEach((r, i) => {
-            const row = this.rows[i];
+        for (let i = 0; i < rows.length; i++) {
+            const r = rows[i],
+                row = this.rows[i];
+            // The board changes with a kill, not with every step: an unchanged line writes and builds nothing.
+            if (
+                row.slot === r.slot && row.rankValue === r.rank && row.killsValue === r.kills &&
+                row.deathsValue === r.deaths && row.local === r.local && row.leader === r.leader &&
+                row.nameValue === r.name && row.color === r.color
+            )
+                continue;
+            row.slot = r.slot;
+            row.rankValue = r.rank;
+            row.killsValue = r.kills;
+            row.deathsValue = r.deaths;
+            row.local = r.local;
+            row.leader = r.leader;
+            row.nameValue = r.name;
+            row.color = r.color;
             setClass(row.line, `${r.local ? "local" : ""}${r.leader ? " leader" : ""}`);
             setProperty(row.line, "--tank", r.color);
             setText(row.rank, String(r.rank));
@@ -135,11 +156,12 @@ export class ArcadeView {
             setText(row.name, r.name);
             setText(row.kills, String(r.kills));
             setText(row.deaths, String(r.deaths));
-            const label =
+            row.line.setAttribute(
+                "aria-label",
                 `Place ${r.rank}: ${r.name}, ${r.kills} kills, ${r.deaths} deaths` +
-                (r.local ? ", you" : "") + (r.leader ? ", leading" : "");
-            if (row.line.getAttribute("aria-label") !== label) row.line.setAttribute("aria-label", label);
-        });
+                    (r.local ? ", you" : "") + (r.leader ? ", leading" : ""),
+            );
+        }
     }
 
     // The running powerups, side by side over the bottom of the view: mark, name and seconds left, and a bar that
@@ -154,14 +176,19 @@ export class ArcadeView {
             list.append(tag);
             this.effects.push({ tag, text, bar });
         }
-        effects.forEach((effect, i) => {
-            const row = this.effects[i];
+        for (let i = 0; i < effects.length; i++) {
+            const effect = effects[i],
+                row = this.effects[i];
             setClass(row.tag, `effect${effect.blink ? " blink" : ""}`);
             setProperty(row.tag, "--kind", effect.color);
             setText(row.text, effect.text);
             // In steps of 1/200, finer than the bar's pixels, so a bar that has not moved writes nothing.
-            setProperty(row.bar, "--left", String(Math.round(Math.min(1, Math.max(0, effect.fraction)) * 200) / 200));
-        });
+            const left = Math.round(Math.min(1, Math.max(0, effect.fraction)) * 200);
+            if (row.left !== left) {
+                row.left = left;
+                setProperty(row.bar, "--left", String(left / 200));
+            }
+        }
         setHidden(list, effects.length === 0);
     }
 
@@ -252,9 +279,16 @@ function roundedBox(c, x, y, w, h, r) {
 // the desktop's GameHud.DrawDropPointer draws it. A drop still to land has a broken ring that turns; one about to
 // land or to run out beats. `view` is the renderer: its size, and where a cell is from the centre of the view.
 // Returns whether anything was drawn.
+// Where this frame's badges and tags went, kept between frames so that drawing them allocates nothing.
+const badges = [],
+    tags = [];
+// The width of each pointer's tag, measured once per text: the text changes once a second, the frame sixty times.
+let measuredText = ["", ""],
+    measuredWidth = [0, 0];
+
 export function drawDropPointers(c, view, drops, layout, now) {
-    const badges = [],
-        tags = [];
+    badges.length = 0;
+    tags.length = 0;
     let drawn = false;
     for (const drop of drops)
         if (drop.pointed) drawn = drawDropPointer(c, view, drop, layout, now / 1000, badges, tags) || drawn;
@@ -346,14 +380,23 @@ function drawDropPointer(c, view, drop, layout, time, badges, tags) {
     roundedBox(c, x - 9, y - 9, 18, 18, 3);
     c.fill();
     c.fillStyle = DARK;
-    c.font = `700 15px ${HUD_FONT}`;
+    c.font = MARK_FONT;
     c.textAlign = "center";
     c.textBaseline = "middle";
     c.fillText(drop.mark, x, y + 1);
 
     // The tag toward the middle of the view, clear of the badge whichever way the beak points.
-    c.font = `14px ${HUD_FONT}`;
-    const halfText = c.measureText(drop.pointerText).width / 2,
+    c.font = TAG_FONT;
+    const slot = badges.length - 1;
+    if (slot >= measuredText.length) {
+        measuredText = measuredText.concat(["", ""]);
+        measuredWidth = measuredWidth.concat([0, 0]);
+    }
+    if (measuredText[slot] !== drop.pointerText) {
+        measuredText[slot] = drop.pointerText;
+        measuredWidth[slot] = c.measureText(drop.pointerText).width;
+    }
+    const halfText = measuredWidth[slot] / 2,
         halfLine = 7;
     const reach = RADIUS + 12 + Math.abs(ux) * (halfText + 9) + Math.abs(uy) * (halfLine + 5);
     const half = { x: halfText + 11, y: halfLine + 7 };

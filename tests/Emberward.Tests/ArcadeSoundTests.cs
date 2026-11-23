@@ -1,4 +1,5 @@
 using Emberward.Core;
+using Emberward.Core.Config;
 using Emberward.Core.Entities;
 using Emberward.Core.Match;
 using Emberward.Desktop.Audio;
@@ -15,6 +16,19 @@ namespace Emberward.Tests;
 /// </summary>
 public class ArcadeSoundTests
 {
+    /// <summary>Records every one-shot started; loops are handed out and ignored.</summary>
+    private sealed class PlayedSink : ISoundSink
+    {
+        public readonly List<SoundEffect> Played = new();
+        private int _loops;
+
+        public void Play(SoundEffect effect, float gain, float pan, float rate, float muffle = 0f) => Played.Add(effect);
+
+        public int AddLoop(SoundEffect effect) => _loops++;
+
+        public void SetLoop(int handle, float gain, float pan = 0f, float rate = 1f, float muffle = 0f) { }
+    }
+
     private static MatchClock Clock(int remainingTicks, bool suddenDeath = false) =>
         new(Active: true, ElapsedTicks: 480 * Fps - remainingTicks, LimitTicks: 480 * Fps, suddenDeath);
 
@@ -163,11 +177,11 @@ public class ArcadeSoundTests
             before = now;
         }
 
-        while (!world.MatchClock.IsSuddenDeath)
+        Bounded.Until(() => world.MatchClock.IsSuddenDeath, () =>
         {
             world.Advance(_ => default);
             Listen();
-        }
+        }, 63 * Fps, "sudden death");
         // Sudden death goes on in silence until a kill ends it. The steps the kill takes are not listened to one by
         // one, so the end is heard as the change from sudden death to the final board.
         Kill(world, killer: 1, world.TankList.Tanks[0]);
@@ -177,5 +191,40 @@ public class ArcadeSoundTests
         Assert.Equal(Scoreboards.CountdownSeconds, heard.Count(e => e == SoundEffect.ClockTick));
         Assert.Equal([SoundEffect.SuddenDeath, SoundEffect.MatchHorn], heard.TakeLast(2));
         Assert.Equal(1 + Scoreboards.CountdownSeconds + 2, heard.Count);
+    }
+
+    [Fact]
+    public void OnceTheMatchIsDecided_ItsDropsAndKillsAreSilent_ButTheKillThatDecidedItAndTheHornAreHeard()
+    {
+        var world = PowerupWorlds.Create(PowerupWorlds.Rules with { TimeLimitSeconds = 3 });
+        var sink = new PlayedSink();
+        var director = new SoundDirector(sink);
+        void Step()
+        {
+            world.Advance(_ => default);
+            director.AfterStep(world, localSlot: 0);
+        }
+
+        Step();
+        Assert.Contains(SoundEffect.DropAnnounce, sink.Played);
+        Bounded.Until(() => world.MatchClock.IsSuddenDeath, Step, 4 * Fps, "sudden death");
+
+        // The player's kill ends sudden death: it is confirmed, and the horn sounds.
+        sink.Played.Clear();
+        Kill(world, killer: 0, world.TankList.Tanks[1]);
+        director.AfterStep(world, localSlot: 0);
+        Assert.True(world.IsMatchOver);
+        Assert.Contains(SoundEffect.KillConfirm, sink.Played);
+        Assert.Contains(SoundEffect.MatchHorn, sink.Played);
+
+        // After it, a kill of the player's and a drop landing are not.
+        sink.Played.Clear();
+        Kill(world, killer: 0, world.TankList.Tanks[2]);
+        director.AfterStep(world, localSlot: 0);
+        Bounded.Until(() => world.PowerupDropCount > 0, Step, Tweaks.Powerups.FirstDropTicks + 1, "the first drop landing");
+        Assert.DoesNotContain(SoundEffect.KillConfirm, sink.Played);
+        Assert.DoesNotContain(SoundEffect.DropLand, sink.Played);
+        Assert.DoesNotContain(SoundEffect.DropAnnounce, sink.Played);
+        Assert.DoesNotContain(SoundEffect.MatchHorn, sink.Played);
     }
 }

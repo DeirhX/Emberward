@@ -9,10 +9,12 @@ using Emberward.Core.Types;
 using Emberward.Desktop.Presentation;
 
 /// <summary>
-/// A timed match and its powerup drops (DESIGN.md §6.8): the rules as the match starts, a drop landing and who took
-/// it, who destroyed whom, the lead changing hands, the last minute and sudden death. Kills share one toast that the next
-/// replaces (the player's own kills and deaths another), so a busy fight never fills the stack. Silent in a match
-/// with no clock and no drops.
+/// Kills, and a timed match and its powerup drops (DESIGN.md §6.8): the rules as the match starts, a drop landing and
+/// who took it, who destroyed whom, the lead changing hands, the last minute and sudden death. In every match the
+/// player hears of the tanks they destroy and of being destroyed by another (one toast, which the next replaces); the
+/// kill feed of everyone else's kills (a toast of its own that the next replaces, so a busy fight never fills the
+/// stack) and the killer's standing are for a timed match, which is won on them. Once the match is decided the world
+/// steps on, but its drops and kills are no news: they are not told, though the step that decided it still is.
 /// </summary>
 internal sealed class ArcadeWatch : IEventWatch
 {
@@ -25,6 +27,11 @@ internal sealed class ArcadeWatch : IEventWatch
     private readonly List<StepEvent> _pending = new();
     private bool _rulesTold;
 
+    // Whether the match was decided before the step whose events arrive now, and as of the last step seen.
+    private bool _decided;
+    private bool _overAfterLast;
+    private bool _stepSeen;
+
     // The tank that leads alone now (-1 while the top score is tied), and the last one that did.
     private int _leader = -1;
     private int _lastLeader = -1;
@@ -34,17 +41,37 @@ internal sealed class ArcadeWatch : IEventWatch
     {
         _pending.Clear();
         _rulesTold = false;
+        _decided = _overAfterLast = _stepSeen = false;
         _leader = -1;
         _lastLeader = -1;
         _phase = ClockPhase.Running;
     }
 
+    public void OnStep(World world)
+    {
+        // The first step seen of a match joined late takes the result as it found it.
+        _decided = _stepSeen ? _overAfterLast : world.IsMatchOver;
+        _overAfterLast = world.IsMatchOver;
+        _stepSeen = true;
+    }
+
     public void OnStepEvent(World world, Tank player, in StepEvent e)
     {
-        if (e.Kind is StepEventKind.PowerupLanded or StepEventKind.PowerupCollected
-            || (e.Kind == StepEventKind.TankDied && e.Killer >= 0 && e.Killer != e.Color))
+        if (!_decided && Tells(world, player, in e))
             _pending.Add(e);
     }
+
+    /// <summary>
+    /// Whether <paramref name="e"/> is told: a drop landing or taken; a tank destroyed by another, in a timed match
+    /// whoever they are, else only when one of them is the player.
+    /// </summary>
+    private static bool Tells(World world, Tank player, in StepEvent e) => e.Kind switch
+    {
+        StepEventKind.PowerupLanded or StepEventKind.PowerupCollected => true,
+        StepEventKind.TankDied => e.Killer >= 0 && e.Killer != e.Color
+            && (world.MatchClock.Active || e.Killer == player.Color || e.Color == player.Color),
+        _ => false,
+    };
 
     public void Update(in GuidanceFrame f)
     {
@@ -114,7 +141,7 @@ internal sealed class ArcadeWatch : IEventWatch
         string who = killer == self ? "You" : f.Names(killer);
         string whom = victim == self ? "you" : f.Names(victim);
         string standing = "";
-        if (TankOf(f.World, killer) is { } tank && f.World.ScoreOf(tank) is { Active: true } score)
+        if (f.World.MatchClock.Active && TankOf(f.World, killer) is { } tank && f.World.ScoreOf(tank) is { Active: true } score)
             standing = $"{Scoreboards.Count(score.Kills, "kill")}, {Scoreboards.Ordinal(score.Rank)} place";
         // The player's own kills and deaths keep a toast of their own; everyone else's share one that the next replaces.
         (string key, NotificationKind kind) = killer == self ? ("kill-own", NotificationKind.Good)

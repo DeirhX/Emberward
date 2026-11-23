@@ -188,9 +188,11 @@ updates it after each step on the match's time (`BrowserSession.HudSeconds`) and
 - `GameEventWatcher` posts toasts to a `NotificationFeed` through one watch per system in `Guidance/Events`
   (`IEventWatch`): base attacks, upgrades, the sector goal, the network (relays linking or lost, harvesters started,
   stalled or out of charge, off network), the base's power (heat store, low charge, engine), ore (first ore, first pyrite banked,
-  full hold, full store, harvester deliveries), radar scattered by heat, nests, and a timed match with its powerup
+  full hold, full store, harvester deliveries), radar scattered by heat, nests, kills, and a timed match with its powerup
   drops (`ArcadeWatch`: the rules as it starts, a drop landed, who took it, who destroyed whom, the lead changing
-  hands, the last minute, sudden death; kills share one toast that the next replaces). Each watch compares its system's state with
+  hands, the last minute, sudden death; kills share one toast that the next replaces. In a match with no clock only
+  the player's own kills and deaths are told, without standings; once the match is decided, drops and kills are not
+  told, though the step that decided it is). Each watch compares its system's state with
   the previous frame and hears the step's events (`AfterStep`); harvester deliveries are counted from
   `StepEventKind.OreHarvested`, not from the store, so a tank unloading in the same frame is not mistaken for them. A
   new system's toasts are a new watch and a line in the watcher's list; retiring a system deletes both. The feed
@@ -213,7 +215,11 @@ updates it after each step on the match's time (`BrowserSession.HudSeconds`) and
   `Gui/Scoreboard.cs` words the board and the clock (`Scoreboards.Of`: rows in rank order, `7:15`, `+0:12` in sudden
   death, the clock's phase and caption, the lines of the match-over screen) and `Gui/PowerupViews.cs` the drops
   (`DropBoard`: the next drop as `D DRILL  in 0:32  120 m`, each drop on the ground with the seconds it still lies,
-  who took the last one; `DropBoard.Effects`: the player's running powerups as `B BULWARK 14s`). They only read Core
+  who took the last one; `DropBoard.Effects`: the player's running powerups as `B BULWARK 14s`). A host that shows
+  them every frame asks `ScoreboardCache.Get` (the board of `Scoreboards.Of`, built again only when the standings, a
+  name or the clock's displayed second change), `DropBoard.Lines` (which keeps its lines until a countdown's second,
+  a distance's metre, a drop or a name changes) and `DropBoard.EffectsNow`; their numbers' words come from
+  `HudNumbers`, made once and kept, so a frame that changes nothing makes no strings. They only read Core
   (`World.MatchClock`, `CopyStandings`, `ScoreLeader`, `PowerupForecast`, `CopyPowerupRenderStates`, `PowerupsOf`).
   On the desktop `GameHud.Arcade` and `ArcadeLines` draw them: the clock and the drop lines on a plate at the top
   centre, the board in the BASE panel where a core race has its goal lines, a round badge at the edge of the view

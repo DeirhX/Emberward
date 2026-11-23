@@ -758,8 +758,9 @@ spawn-protection check and before the shield, so shield and hull both lose half 
 carried to the next hit, so heat's point at a time is halved too. A recall and a fallen base still kill. An Overhaul
 acts at once in `Give`: the hull whole, the tank shield full (`TankShieldSystem.Clear`), and the tank's heat above the
 ground's rest temperature taken out of the system (`Tank.CoolFromPickup`, booked in `ThermalLedger` as sunk by the
-tank, so the balance holds) with its off-network floor back at zero. Taking a kind again restarts its time; a tank's death ends its effects
-(`PowerupEnded`). The schedule, the drops, the effects and the stream are saved in the snapshot (plain fields and
+tank, so the balance holds) with its off-network floor back at zero. Taking a kind again restarts its time; a tank's death ends all its effects at
+once (`TankLifecycle.Die` calls `EndEffects`, each with its `PowerupEnded`, and the bulwark's carry is dropped), so a
+recall, which dies and respawns in the same step, ends them too. The schedule, the drops, the effects and the stream are saved in the snapshot (plain fields and
 lists), `MixState` mixes what shows into `WorldStateHash.Compute`, and `MixLatent` the stream, the bag and the turn
 into the sync digest's latent part.
 

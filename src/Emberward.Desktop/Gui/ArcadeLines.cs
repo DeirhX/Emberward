@@ -1,6 +1,5 @@
 namespace Emberward.Desktop.Gui;
 
-using System.Globalization;
 using System.Numerics;
 using ImGuiNET;
 using Emberward.Core.Entities.Powerups;
@@ -17,6 +16,9 @@ public static class ArcadeLines
     public const float PlateWidth = 292f;
 
     private const float RowHeight = 19f, HeaderHeight = 14f, ClockHeight = 48f, DropHeight = 20f, PlatePad = 10f;
+
+    // A drop line's time and time left in one string, kept while the line's words stay the same.
+    private static readonly JoinedText Joined = new();
 
     /// <summary>
     /// Inside the base panel, where a core race has its goal lines: the goal of a timed match and its board. When the
@@ -101,15 +103,15 @@ public static class ArcadeLines
             if (row.IsLeader)
                 dl.AddTriangleFilled(new Vector2(pos.X + 1f, mid - 5f), new Vector2(pos.X + 1f, mid + 5f),
                     new Vector2(pos.X + 9f, mid), HudTheme.WithAlpha(HudTheme.Amber, alpha));
-            HudTheme.TextAt(dl, 15f, new Vector2(pos.X + 14f, y), row.Rank.ToString(CultureInfo.InvariantCulture), dim);
+            HudTheme.TextAt(dl, 15f, new Vector2(pos.X + 14f, y), HudNumbers.Digits(row.Rank), dim);
             var swatch = new Vector2(pos.X + 31f, y + 2f);
             dl.AddRectFilled(swatch, swatch + new Vector2(12f, 12f), HudTheme.WithAlpha(row.Color, alpha), 2f);
             dl.AddRect(swatch, swatch + new Vector2(12f, 12f), HudTheme.WithAlpha(HudTheme.BronzeDark, alpha), 2f);
             HudTheme.TextAt(dl, 15f, new Vector2(pos.X + 51f, y), row.Name,
                 HudTheme.WithAlpha(HudTheme.Text, (row.IsLocal ? 1f : 0.82f) * alpha));
-            RightText(dl, 15.5f, killsRight, y, row.Kills.ToString(CultureInfo.InvariantCulture),
+            RightText(dl, 15.5f, killsRight, y, HudNumbers.Digits(row.Kills),
                 HudTheme.WithAlpha(row.IsLeader ? HudTheme.Amber : HudTheme.Text, alpha));
-            RightText(dl, 15f, deathsRight, y, row.Deaths.ToString(CultureInfo.InvariantCulture), dim);
+            RightText(dl, 15f, deathsRight, y, HudNumbers.Digits(row.Deaths), dim);
             y += RowHeight;
         }
         return y - pos.Y + 2f;
@@ -134,7 +136,7 @@ public static class ArcadeLines
             DrawChip(dl, new Vector2(pos.X + 8f, y + 8f), line.Kind, alpha);
             HudTheme.TextAt(dl, 14.5f, new Vector2(pos.X + 21f, y), PowerupPresentations.Get(line.Kind).Tag,
                 HudTheme.WithAlpha(line.Color, alpha));
-            string when = line.Left.Length > 0 ? line.When + " " + line.Left : line.When;
+            string when = line.Left.Length > 0 ? Joined.Join(line.When, " ", line.Left) : line.When;
             uint whenColor = line.Urgent ? (blinkOn ? HudTheme.Warn : HudTheme.Text) : HudTheme.WithAlpha(HudTheme.Text, alpha);
             HudTheme.TextAt(dl, 14.5f, new Vector2(pos.X + 118f, y), when, whenColor);
             RightText(dl, 14.5f, pos.X + width, y, line.Detail, HudTheme.WithAlpha(over ? HudTheme.TextDim : HudTheme.Text, alpha));
@@ -201,7 +203,7 @@ public static class ArcadeLines
     {
         var p = PowerupPresentations.Get(kind);
         dl.AddRectFilled(center - new Vector2(half, half), center + new Vector2(half, half), HudTheme.WithAlpha(p.Color, alpha), 3f);
-        string mark = p.Mark.ToString();
+        string mark = p.MarkText;
         float size = half * 1.75f;
         var sz = HudTheme.Measure(size, mark);
         HudTheme.TextAt(dl, size, new Vector2(center.X - sz.X * 0.5f, center.Y - sz.Y * 0.5f), mark,
