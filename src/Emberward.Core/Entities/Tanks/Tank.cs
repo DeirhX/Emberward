@@ -558,7 +558,7 @@ public class Tank
     private void AdvanceShooting(ControllerOutput input, in SimulationContext ctx, int delayFactor)
     {
         if (!input.ShootPrimary) return;
-        var bullet = Turret.TryShoot(Position, ctx.Projectiles, delayFactor);
+        var bullet = Turret.TryShoot(Position, ctx.Projectiles, ctx.Terrain, delayFactor);
         if (bullet != null)
         {
             _thermals.RecordShot();

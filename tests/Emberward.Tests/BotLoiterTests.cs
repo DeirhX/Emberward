@@ -203,7 +203,8 @@ public class BotLoiterTests
 
         var (_, waited) = Run(world, ai, 40 * Fps);
 
-        Assert.True(enemy.IsDockedAtOwnBase);
+        // The roaming bot fights the tank it sees through the open gate, so that tank may be waiting to respawn.
+        Assert.True(enemy.IsDead || enemy.IsDockedAtOwnBase, "the enemy never leaves its base");
         Assert.False(waited, "a base it can break is only not yet allowed: the bot roams until the grace is over");
     }
 

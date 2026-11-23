@@ -587,7 +587,9 @@ Desktop:
    and a draw colour. Use `CollisionSolver.TestPoint` to hit tanks, machines or terrain (bullets skip their own side's tanks and machines), `ProjectileList`'s RNG for chance,
    and the heat API (`AddHeat`, `AddHeatRadius`) for heat, so the ledger stays balanced.
 3. Something has to spawn it: today `TankTurret` and `TurretAction` (bullets, and a gatling's rounds) and
-   `ExplosionFactory` (shrapnel) do.
+   `ExplosionFactory` (shrapnel) do. A shot is tested from its first step on, never where it starts: anything fired
+   from a barrel asks `ProjectileList.MuzzleOf` where to start, so that a barrel lying across a keep's wall or a shut
+   gate does not put the shot past it.
 4. Desktop: `Rendering/Entities/ProjectileQuads.cs` draws bullets and shrapnel as hot shots and throws for any
    other type; add a case for a new projectile. Record what presentation should hear about in `World.StepEvents` (bullets record `BulletImpact`, shrapnel `ShrapnelSpent`).
 

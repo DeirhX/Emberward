@@ -229,6 +229,33 @@ public class ProjectileList
         AddRange(ExplosionFactory.CreateExplosion(pos, p, ref _rng, shrapnelHeatScale));
     }
 
+    /// <summary>
+    /// Where a shot of side <paramref name="ownerColor"/> starts when it is fired from <paramref name="from"/> through a
+    /// barrel whose tip is at <paramref name="tip"/>: the tip, unless the barrel reaches into or through a keep's wall or
+    /// a gate shut to that side (DESIGN.md §4.9). A shot is tested from its first step on, so one that started at such
+    /// a tip would already be past what stops it. It starts at <paramref name="from"/> instead and meets the wall or the
+    /// gate shield on its way, as a shot fired from further back does.
+    /// </summary>
+    /// <remarks>
+    /// The cells of the barrel are walked a king's move at a time, as a shot flies, and a keep's walls and gates are an
+    /// unbroken ring one cell thick: neither can cross it without standing on one of its cells.
+    /// </remarks>
+    public Position MuzzleOf(ITerrainPixelReadOnly terrain, Position from, Position tip, int ownerColor)
+    {
+        int dx = tip.X - from.X, dy = tip.Y - from.Y;
+        int cells = Math.Max(Math.Abs(dx), Math.Abs(dy));
+        for (int i = 1; i <= cells; i++)
+        {
+            var cell = new Position(from.X + dx * i / cells, from.Y + dy * i / cells);
+            if (!terrain.IsInside(cell))
+                break;
+            var pix = terrain.GetPixelRaw(cell);
+            if (Pixel.IsBase(pix) || (Pixel.IsBaseGate(pix) && _basePower?.IsGateShutTo(ownerColor, cell) == true))
+                return from;
+        }
+        return tip;
+    }
+
     private static void AdvanceShrapnel(Projectile p, CollisionSolver solver, ProjectileList self)
     {
         var terrain = solver.Terrain;

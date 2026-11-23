@@ -63,6 +63,18 @@ public sealed class BasePowerSystem
         !tankBase.IsDestroyed && StateOf(tankBase) is { GatesOpen: false, Shield: > 0.0 };
 
     /// <summary>
+    /// Whether <paramref name="cell"/> is a gate cell shut to side <paramref name="color"/>: a gate of another side's
+    /// base whose gates are shut (<see cref="GatesShut"/>).
+    /// </summary>
+    internal bool IsGateShutTo(int color, Position cell)
+    {
+        foreach (var state in _states)
+            if (state.Base.Color != color && state.Base.PartAt(cell) == BasePart.Gate && GatesShut(state.Base))
+                return true;
+        return false;
+    }
+
+    /// <summary>
     /// An enemy shell of <paramref name="damage"/> hits a gate: the shield takes it while the gates are shut. Spent,
     /// the gates open, and are drawn open in <paramref name="terrain"/>.
     /// </summary>

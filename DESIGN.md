@@ -397,7 +397,9 @@ island supplies charge. Cooling tanks and delivering ore still require base cove
 A base must not fall to a tank that drives up and shoots it. It is a keep (`BaseLayout`, numbers in `Tweaks.Keep`):
 
 - **Walls nothing gets through.** The same 35-cell square as before. Its walls stop tanks and shells and take no
-  damage, with or without power.
+  damage, with or without power. A barrel does not reach through them either: a shot whose barrel lies in or across a
+  wall, or a gate shut to the shooter, starts at the shooter and meets it (`ProjectileList.MuzzleOf`), so a tank or a
+  turret pressed against a keep does what one further back does.
 - **A gate in each side, 11 cells wide.** A tank is 7 wide, so the owner drives in from any direction without lining
   up. To its owner a gate is open ground, for the tank and for its shells.
 - **The core** is a disc 5 cells across at the centre (21 cells) and the only part of a base that takes damage. Its armor is
