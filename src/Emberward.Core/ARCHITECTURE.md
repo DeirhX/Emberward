@@ -555,7 +555,7 @@ Desktop:
    hint. Its `MachineSprite` in `MachineSprites` (`Rendering/Entities/MachineSprite.cs`,
    shared with the browser): shader shape kind, body size, whether it turns to its heading or stands upright with a
    gauge, its sense ring, capacitor gauge and preview reach. `MachineQuads` and `PreviewQuads` draw from it; neither
-   switches on the type. Its build sound in `StepEventSounds.BuildSound` (`Audio/StepEventSounds.cs`, also shared).
+   switches on the type. Its build sound in `StepEventSounds.BuildSound` (`Audio/StepEventSounds.Machines.cs`, also shared).
    `MachinePresentationTests` checks keys and slots are distinct and fit the panel, and that every sprite is complete.
 8. For a new `BuildKey`: `KeyboardController`, `GameSimulationStepper` (merges keyboard and scripted input) and
    `Game.ScriptedInput.cs` (scripted `Build` numbers). Browser: `BrowserApi`, `BrowserNetMatch`, `input.js` and the

@@ -496,7 +496,7 @@ test it); a body across a tunnel must never trap a tank for good (the overlap ex
 leaves).
 
 **4. Presentation.** `SandwormQuads.cs`, `EntityShape.cs`, `Layout.hlsli`, `Sandworms.hlsli`, `EntityPs.hlsl`,
-`EntityLayerBuilder.cs`, dust particles, `StepEventSounds.cs` and `AudioTweaks.cs`, the tremor gauge and warnings
+`EntityLayerBuilder.cs`, dust particles, a `StepEventSounds.Sandworms.cs` partial and `AudioTweaks.cs`, the tremor gauge and warnings
 (`MatchOverlay`, `GameEventWatcher`, `HudPalette`), radar targets in `SideSensing`, and the browser's `hud.js`,
 `audio.js` and `guidance.js`. Risks: three shader targets plus the web one; a looped rumble voice.
 

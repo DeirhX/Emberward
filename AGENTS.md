@@ -95,7 +95,7 @@ Adding a machine:
 4. Desktop: a `MachinePresentation` (name, key label, build slot, plant hint; `Presentation/MachinePresentation.cs`), a
    `MachineSprite` in `MachineSprites` (what the entity emitters draw on desktop and in the browser: shader shape,
    size, gauge, sense ring, capacitor gauge, preview reach; `Rendering/Entities/MachineSprite.cs`) and its build sound in
-   `StepEventSounds.BuildSound` (`Audio/StepEventSounds.cs`). `MachinePresentationTests` must pass. A new shape also needs a shader branch. Each machine
+   `StepEventSounds.BuildSound` (`Audio/StepEventSounds.Machines.cs`). `MachinePresentationTests` must pass. A new shape also needs a shader branch. Each machine
    needs a distinct `BuildKey` with desktop, browser and codec wiring. The gatling took bit 31 of the encoded input, the last
    free one: a sixth build key needs a wider encoding or a reused bit, and bumps the protocol. The full recipe is in `src/Emberward.Core/ARCHITECTURE.md`.
 
@@ -112,8 +112,9 @@ Removing a system (the gold pickup was the first; its commit is a worked example
    its `StepEventKind` values; its `TerrainPixel` rows (and the name list in `SimulationTableGuardTests`); its
    level-generation step. Delete what only it called (gold was the only pickup, so the pickup step went too) and
    rewrite comments that list it beside other things.
-3. Desktop: the HUD, guidance (its watch in `Gui/Guidance/Events` and its line in `GameEventWatcher`), sound
-   (`StepEventSounds`) and presentation that read it. In the renderer: its material
+3. Desktop: the HUD, guidance (its watch in `Gui/Guidance/Events` and its line in `GameEventWatcher`, its tutorial
+   steps in `Gui/Guidance/Tutorial` and their lines in `TutorialDirector`), sound (its `StepEventSounds` partial and
+   its line in `StepEventSounds.CueFor`) and presentation that read it. In the renderer: its material
    code in `TerrainAuxBuilder` and `Constants.hlsli`, its shader files and their `#include`, and any `PostParams`
    row. Remove a row from `PostParamsBlock` and `PostParams.hlsli` together and raise the layout version on both
    (`PostParamsLayoutGuardTests`).

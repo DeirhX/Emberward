@@ -75,7 +75,9 @@ public class GuidanceTests
         Assert.False(guidance.ShowUpgradePanel);
 
         var tutorial = new TutorialDirector();
+        // Both titles must be steps in the list: HasReached counts a title it cannot find as reached.
         Assert.False(tutorial.HasReached(TutorialDirector.NetworkStepTitle));
+        Assert.False(tutorial.HasReached(TutorialDirector.UpgradeStepTitle));
         tutorial.Skip();
         Assert.True(tutorial.HasReached(TutorialDirector.NetworkStepTitle));
         Assert.True(tutorial.HasReached(TutorialDirector.UpgradeStepTitle));

@@ -26,9 +26,10 @@ merge, before starting new work on top.
 ### 1. One watcher per system in the guidance
 
 Done for the toasts: `GameEventWatcher` holds one `IEventWatch` per system in `Gui/Guidance/Events` (base attack,
-upgrades, sector goal, network, base power, ore, radar, nests), each with its own state and messages. Still to do:
-`TutorialDirector` (one list of steps for every system), `HintSelector` and the `StepEventSounds` switch have the same
-shape and can follow the same way.
+upgrades, sector goal, network, base power, ore, radar, nests), each with its own state and messages. Done for the
+tutorial: `TutorialDirector` orders `TutorialStep` classes kept per system in `Gui/Guidance/Tutorial`, each with the
+state it watches for. Done for the sounds: `StepEventSounds` is a partial per system (tanks, base, machines, ore,
+emberites). Still to do: `HintSelector` has the same shape and can follow the same way.
 
 ### 2. Vision and radar tracking out of `World`
 
