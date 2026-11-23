@@ -140,7 +140,8 @@ public static partial class BrowserApi
     /// takes the input whenever it is given, and steps as the relay's ticks have arrived (<paramref name="due"/>:
     /// the page's clock says a step is due). <paramref name="thermalView"/> is the player's thermal view (H,
     /// <see cref="BrowserSession.ThermalView"/>). <paramref name="powerLabelCellSize"/> is the displayed CSS size of a
-    /// cell, or zero to hide the charge labels (G). <paramref name="machineUpgrade"/> is the machine upgrade panel's
+    /// cell, or zero to hide the charge labels (G); <paramref name="labelCellSize"/> is the same size for the enemy tanks'
+    /// name plates, which G does not hide. <paramref name="machineUpgrade"/> is the machine upgrade panel's
     /// key (F, or a tap on the lit machine), which opens or closes it (<see cref="BrowserSession.MachineUpgrades"/>);
     /// <paramref name="upgradeMachine"/> marks <paramref name="upgrade"/> as queued for the machine while the panel was open.
     /// <paramref name="now"/> is the page's clock in milliseconds, which <see cref="Receive"/> times arrivals by.
@@ -148,7 +149,7 @@ public static partial class BrowserApi
     [JSExport]
     public static Task Frame(bool step, int x, int y, bool fire, double aimX, double aimY, int build,
         int upgrade, bool recall, bool machineUpgrade, bool upgradeMachine, int width, int height, int scale, double alpha, double delta,
-        double time, bool thermalView, double powerLabelCellSize, bool due, double now)
+        double time, bool thermalView, double powerLabelCellSize, double labelCellSize, bool due, double now)
     {
         BrowserSession session = _net?.Session ?? _session ?? throw new InvalidOperationException("Start a match first.");
         session.ThermalView = thermalView;
@@ -177,7 +178,8 @@ public static partial class BrowserApi
         long stepped = Stopwatch.GetTimestamp();
         // A clock tick that took no world step (the relay's next tick has not arrived) leaves the world where it is drawn.
         bool hold = _net != null && due && steps == 0;
-        session.Scene.Render(width, height, scale, (float)alpha, (float)delta, (float)time, (float)powerLabelCellSize, hold);
+        session.Scene.Render(width, height, scale, (float)alpha, (float)delta, (float)time, (float)powerLabelCellSize, hold,
+            (float)labelCellSize);
         string? hud = null;
         if (_hudStale)
         {

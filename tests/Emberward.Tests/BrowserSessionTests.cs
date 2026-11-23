@@ -108,7 +108,7 @@ public class BrowserPresentationTests
         Assert.Contains("\"tickRate\":24", json, StringComparison.Ordinal);
         Assert.Empty(frame.Sounds.Play);
         var desktopEntities = new EntityLayerBuilder();
-        desktopEntities.CaptureStep(session.World, 0);
+        desktopEntities.CaptureStep(session.World, 0, session.Vision);
         desktopEntities.Build(session.Scene.View, 1, 0, false, 0, session.Vision, session.Radar);
         Assert.Equal(MemoryMarshal.AsBytes(desktopEntities.Vertices.AsSpan(0, desktopEntities.VertexCount)).ToArray(), session.Scene.Vertices.ToArray());
         Assert.Equal(Marshal.SizeOf<PostParamsBlock>(), session.Scene.Uniforms.Length);

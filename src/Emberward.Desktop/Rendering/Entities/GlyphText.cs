@@ -5,7 +5,7 @@ using Emberward.Core.Types;
 /// <summary>
 /// Short lines of text drawn in the world as entity quads: one <see cref="EntityShape.KindPowerLabel"/> quad per glyph of
 /// a 5x7 bitmap alphabet, packed into the quad's parameters (<c>PowerLabel.hlsli</c> unpacks it). The charge labels and
-/// the nest danger labels and the pyrite deposit labels (DepositQuads) use it.
+/// the nest danger labels, the pyrite deposit labels (DepositQuads) and the enemy tank name plates (TankPlateQuads) use it.
 /// </summary>
 internal static class GlyphText
 {
@@ -17,9 +17,11 @@ internal static class GlyphText
 
     /// <summary>
     /// Adds <paramref name="text"/> centred on (<paramref name="x"/>, <paramref name="y"/> + <paramref name="top"/>),
-    /// its top at <paramref name="top"/> cells, each dot <paramref name="dot"/> cells.
+    /// its top at <paramref name="top"/> cells, each dot <paramref name="dot"/> cells. <paramref name="motion"/> moves it
+    /// with what it labels (cells per step).
     /// </summary>
-    public static void AddLine(EntityQuads quads, float x, float y, float top, string text, float dot, Color color, float alpha)
+    public static void AddLine(EntityQuads quads, float x, float y, float top, string text, float dot, Color color, float alpha,
+        PositionF motion = default)
     {
         float advance = (GlyphWidth + 1) * dot;
         float left = -Width(text, dot) * 0.5f;
@@ -30,7 +32,7 @@ internal static class GlyphText
             {
                 // Both pieces fit exactly in floats. The quad includes one dot of room for the shadow.
                 quads.Add(x + left, y + top, 1f, 0f, 0f, advance, 0f, (GlyphHeight + 1) * dot,
-                    color, EntityShape.KindPowerLabel, glyph & 0xFFFFFUL, glyph >> 20, 1f / dot, alpha);
+                    color, EntityShape.KindPowerLabel, glyph & 0xFFFFFUL, glyph >> 20, 1f / dot, alpha, motion);
             }
             left += advance;
         }
@@ -60,18 +62,38 @@ internal static class GlyphText
         'g' => 0b00000_01111_10001_10001_01111_00001_01110UL,
         'e' => 0b00000_00000_01110_10001_11111_10000_01111UL,
         'n' => 0b00000_00000_11110_10001_10001_10001_10001UL,
+        '(' => 0b00010_00100_01000_01000_01000_00100_00010UL,
+        ')' => 0b01000_00100_00010_00010_00010_00100_01000UL,
+        '_' => 0b00000_00000_00000_00000_00000_00000_11111UL,
+        '\'' => 0b00100_00100_01000_00000_00000_00000_00000UL,
+        '!' => 0b00100_00100_00100_00100_00100_00000_00100UL,
+        ',' => 0b00000_00000_00000_00000_01100_00100_01000UL,
         'A' => 0b01110_10001_10001_11111_10001_10001_10001UL,
         'B' => 0b11110_10001_10001_11110_10001_10001_11110UL,
+        'C' => 0b01110_10001_10000_10000_10000_10001_01110UL,
         'D' => 0b11100_10010_10001_10001_10001_10010_11100UL,
         'E' => 0b11111_10000_10000_11110_10000_10000_11111UL,
+        'F' => 0b11111_10000_10000_11110_10000_10000_10000UL,
         'G' => 0b01110_10001_10000_10111_10001_10001_01111UL,
+        'H' => 0b10001_10001_10001_11111_10001_10001_10001UL,
         'I' => 0b01110_00100_00100_00100_00100_00100_01110UL,
+        'J' => 0b00111_00010_00010_00010_00010_10010_01100UL,
+        'K' => 0b10001_10010_10100_11000_10100_10010_10001UL,
+        'L' => 0b10000_10000_10000_10000_10000_10000_11111UL,
         'M' => 0b10001_11011_10101_10101_10001_10001_10001UL,
         'N' => 0b10001_11001_10101_10011_10001_10001_10001UL,
         'O' => 0b01110_10001_10001_10001_10001_10001_01110UL,
+        'P' => 0b11110_10001_10001_11110_10000_10000_10000UL,
+        'Q' => 0b01110_10001_10001_10001_10101_10010_01101UL,
         'R' => 0b11110_10001_10001_11110_10100_10010_10001UL,
         'S' => 0b01111_10000_10000_01110_00001_00001_11110UL,
         'T' => 0b11111_00100_00100_00100_00100_00100_00100UL,
+        'U' => 0b10001_10001_10001_10001_10001_10001_01110UL,
+        'V' => 0b10001_10001_10001_10001_10001_01010_00100UL,
+        'W' => 0b10001_10001_10001_10101_10101_10101_01010UL,
+        'X' => 0b10001_10001_01010_00100_01010_10001_10001UL,
+        'Y' => 0b10001_10001_01010_00100_00100_00100_00100UL,
+        'Z' => 0b11111_00001_00010_00100_01000_10000_11111UL,
         ' ' => 0UL,
         _ => 0b01110_10001_00010_00100_00100_00000_00100UL,
     };

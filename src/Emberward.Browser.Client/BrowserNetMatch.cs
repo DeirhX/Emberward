@@ -176,6 +176,8 @@ public sealed class BrowserNetMatch
         }
         int previousMask = net.HumanMask;
         Hold(input);
+        if (_begun)
+            NamePlayers(room, net, session);
 
         net.Receive();
         bool catchingUp = net.Buffered > NetworkTweaks.CatchUpTicks;
@@ -197,6 +199,17 @@ public sealed class BrowserNetMatch
         }
         Changed |= previousMask != net.HumanMask;
         return taken;
+    }
+
+    /// <summary>
+    /// Gives the enemy name plates the name of every player in the match, as on the desktop (<c>Game.NamePlayers</c>);
+    /// a seat a bot drives keeps its default name.
+    /// </summary>
+    private static void NamePlayers(RoomClient room, NetSession net, BrowserSession session)
+    {
+        for (int slot = 0; slot < session.World.TankList.Count; slot++)
+            session.Scene.TankPlates.SetPlayerName(slot,
+                (net.HumanMask & (1 << slot)) != 0 ? room.DriverName(slot, net.HumanMask) : null);
     }
 
     /// <summary>
