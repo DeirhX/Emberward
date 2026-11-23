@@ -33,6 +33,7 @@ public sealed class GameEventWatcher
             new RadarWatch(),
             new NestWatch(),
             new ArcadeWatch(),
+            new TankDeathWatch(),
         ];
     }
 
