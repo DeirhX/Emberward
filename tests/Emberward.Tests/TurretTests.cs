@@ -1,6 +1,7 @@
 using Emberward.Core;
 using Emberward.Core.Collision;
 using Emberward.Core.Config;
+using Emberward.Core.Entities;
 using Emberward.Core.Entities.Machines;
 using Emberward.Core.Entities.Tanks;
 using Emberward.Core.Input;
@@ -101,6 +102,27 @@ public class TurretTests
             Assert.True(Assert.Single(s.World.Machines.Machines).IsStanding);
         else
             Assert.Equal(Tweaks.Turret.OreCost, s.Tank.Hold.Ore);
+    }
+
+    [Fact]
+    public void ATurretsKill_IsItsOwners()
+    {
+        var (s, turret, enemy) = Duel();
+        enemy.TakeDamage(enemy.Reactor.Health - 1, DamageCause.Overheat); // one point left: the next shell destroys it
+
+        StepEvent? died = null;
+        for (int t = 0; t < 3 * Tweaks.Turret.FireIntervalTicks && died == null; t++)
+        {
+            s.World.Advance(_ => default);
+            foreach (var e in s.World.StepEvents)
+                if (e.Kind == StepEventKind.TankDied)
+                    died = e;
+        }
+
+        Assert.NotNull(died);
+        Assert.Equal(enemy.Color, died.Value.Color);
+        Assert.Equal(DamageCause.EnemyFire, died.Value.Cause);
+        Assert.Equal(turret.OwnerColor, died.Value.Killer);
     }
 
     [Fact]

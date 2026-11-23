@@ -75,7 +75,7 @@ public sealed class TankShieldSystem
         _tanks[tank.Color] = state;
     }
 
-    /// <summary>Gives <paramref name="tank"/> a full shield again (it died or respawned).</summary>
+    /// <summary>Gives <paramref name="tank"/> a full shield again (it died or respawned, or took an overhaul).</summary>
     internal void Clear(Tank tank)
     {
         if (tank.Color >= 0 && tank.Color < _tanks.Count)

@@ -23,12 +23,12 @@ public class BotProspectTests
     /// A field of dirt with two bases far apart (tank 0 the enemy, tank 1 the bot), ore seeded over it (or not), and
     /// the bot just outside its gate, roaming. The enemy's base is beyond the engage range.
     /// </summary>
-    private static (World World, Tank Bot, Tank Enemy, BotTankAI Ai) Field(bool seedOre = true)
+    private static (World World, Tank Bot, Tank Enemy, BotTankAI Ai) Field(bool seedOre = true, int timeLimitSeconds = 0)
     {
         var size = new Size(240, 100);
         var ground = new TerrainGrid(size);
         ground.Fill(TerrainPixel.Dirt);
-        var world = new World(size, rules: new MatchRules { TerrainRegrowth = false, SeedOre = seedOre });
+        var world = new World(size, rules: new MatchRules { TerrainRegrowth = false, SeedOre = seedOre, TimeLimitSeconds = timeLimitSeconds });
         world.Initialize(ground, [new Position(30, 50), new Position(210, 50)]);
         var enemy = world.TankList.Tanks[0];
         var bot = world.TankList.Tanks[1];
@@ -44,6 +44,18 @@ public class BotProspectTests
     }
 
     private static int Distance(Position a, Position b) => Math.Max(Math.Abs(a.X - b.X), Math.Abs(a.Y - b.Y));
+
+    [Fact]
+    public void InATimedMatch_TheBotDoesNotProspect_ItHuntsFromTheStart()
+    {
+        // A timed match (arcade) is won on kills alone: ore wins it nothing, so the bot leaves the deposits be.
+        var (world, bot, enemy, ai) = Field(timeLimitSeconds: Tweaks.Arcade.TimeLimitSeconds);
+        for (int tick = 0; tick < 20 * Fps; tick++)
+        {
+            world.Advance(i => i == 1 ? ai.GetInput(bot, enemy, world) : default);
+            Assert.False(ai.IsProspecting, $"tick {tick}: the bot prospected in a timed match");
+        }
+    }
 
     [Fact]
     public void ABotWithOreNearby_MinesIt_AndBanksItAtItsCore_InsteadOfHeadingForTheEnemy()

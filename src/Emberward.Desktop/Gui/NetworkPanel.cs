@@ -29,8 +29,16 @@ public sealed class NetworkPanel
         _ => HudTheme.Text,
     };
 
+    /// <summary>The panel's width.</summary>
+    public const float Width = 400f;
+
+    /// <summary>The panel's bottom edge as last drawn, for what must know where the panel covers the view.</summary>
+    public float Bottom { get; private set; }
+
     /// <param name="hint">The context hint (<see cref="Guidance.PlayerGuidance.Hint"/>).</param>
-    public void Draw((float x, float y, float w, float h) vp, Tank player, World world, (string Text, HintTone Tone) hint)
+    /// <param name="arcade">A timed match's board, shown where a core race has its goal lines.</param>
+    public void Draw((float x, float y, float w, float h) vp, Tank player, World world, (string Text, HintTone Tone) hint,
+        in ArcadePanel arcade = default)
     {
         var tankBase = player.Base;
         if (vp.w <= 0 || vp.h <= 0 || tankBase == null)
@@ -51,10 +59,10 @@ public sealed class NetworkPanel
 
         var hintColor = ToneColor(hint.Tone);
 
-        if (HudTheme.BeginWindow("##HeatNetworkOverlay", new Vector2(vp.x + vp.w - 14f, vp.y + 14f), new Vector2(1f, 0f), 400f))
+        if (HudTheme.BeginWindow("##HeatNetworkOverlay", new Vector2(vp.x + vp.w - 14f, vp.y + 14f), new Vector2(1f, 0f), Width))
         {
             HudTheme.TitleRow($"BASE        armor {tankBase.ArmorFill:P0}", 18f, tankBase.IsDestroyed ? HudTheme.Danger : HudTheme.Amber);
-            GoalLines.Draw(world, tankBase);
+            GoalLines.Draw(world, tankBase, arcade);
             ColoredText(HudTheme.Teal, $"Base ore store {tankBase.Store.Ore}" +
                 (player.IsUnloadingOre ? "   unloading" : player.IsInOwnNetwork ? "   in network" : ""));
 
@@ -118,6 +126,7 @@ public sealed class NetworkPanel
             HudTheme.KeyRow("H", "heat view", HudTheme.TextDim, 15f);
             if (world.Energy != null)
                 HudTheme.KeyRow("G", "charge labels", HudTheme.TextDim, 15f);
+            Bottom = ImGui.GetWindowPos().Y + ImGui.GetWindowSize().Y;
         }
         HudTheme.EndWindow();
     }

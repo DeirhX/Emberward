@@ -127,14 +127,27 @@ Binary frames, one message per WebSocket frame, `TCP_NODELAY` on.
 | both | `Ping { id }`, `Pong { id }` | Times the round trip, once a second |
 | C to S | `MatchOver { n }` | By this client's simulation the match was decided at tick `n`; the room is finished |
 
-Still to add: a lobby `Configure`.
+`config` is the room's match settings (`MatchConfig`): the seed, the map's width and height, the level generator,
+the number of slots, the tick rate, the input key mask and, last, the match mode as one byte (protocol 14; 0 is
+the standard match and 1 arcade, `MatchMode` in Core). The relay checks the numbers it depends on (slots, map
+sides, tick rate) and carries the generator and the mode without reading them: any byte is accepted, so a new
+mode needs no new relay. A client turns the byte into its own type (`NetMatch.ModeOf`), builds the rules from it
+(`MatchRules.ForMode` through `NetMatch.RulesOf`), and refuses a room whose generator or mode it does not know
+(`NetMatch.CannotBuild`). A returning player and a late joiner get the mode as everyone does, in `Welcome`; a
+world snapshot does not carry the rules. A match recording stores it as `mode=`, and a recording without the
+line is a standard match.
+
+Still to add: a lobby `Configure`. Until then the settings are the first player's and stay as they were when the
+room opened: the mode, like the map, is chosen before the room exists.
 
 Bandwidth: 4 players x 4 bytes x 24 Hz is under 0.5 kB/s down per client.
 
 ## 5. Session lifecycle
 
-1. **Lobby.** The first player into a room opens it, and their seed, map size and tank count become the room's.
-   Everyone sees the roster, slot by slot in tank colours. The host is the player in the lowest slot.
+1. **Lobby.** The first player into a room opens it, and their seed, map size, tank count and match mode become
+   the room's. Everyone sees them in a line under the room's name ("Arcade match   4 tanks   map 320x200",
+   `LobbyText.SettingsLine`) and the roster, slot by slot in tank colours. The host is the player in the lowest
+   slot.
 2. **Build.** On `Configure`, each client generates the level locally from the config and reports the hash of
    the initial world. Level generation in `--fast` mode produces a different map from the same seed, so
    `genMode` is part of the config, not a local flag.
@@ -399,6 +412,14 @@ Each step is testable without the next.
     input needs a wider encoding or a reused bit. The versions of the energy rules and of the emberite rules in the
     rules hash changed with it (a dying emberite now drops a unit of its nest's ore). The relay must be updated
     before clients of this build can join a public match.
+16. **The match mode** (protocol 14). `MatchConfig` ends with one more byte, the room's mode (standard or arcade),
+    which the relay carries and does not read. The first player chooses it (`--arcade` or `--mode=`, the Mode row
+    of the Create screen, the MODE choice on the browser's welcome screen), and everyone who joins gets it with
+    the room's other settings and builds the mode's rules from it, so their `Ready` hashes agree; the lobby names
+    it. An arcade room of up to four tanks defaults to the small map (`MapPresets.DefaultFor`). The relay must be
+    updated before clients of this build can join a public match: a client and a relay of different protocols
+    refuse each other at the hello, either way round, with "The relay speaks protocol X; you speak Y. Update the
+    game."
 
 ## 11. Open questions
 
@@ -412,4 +433,6 @@ Each step is testable without the next.
 - **Map size for four.** The default is 480 by 300, chosen to be cheap: every player's machine must simulate
   the map in real time, and one that cannot falls steadily behind (it is told so on screen). The timings in
   this document come from a fast development Mac; the default needs checking on the slowest machine that
-  will play.
+  will play. An arcade match of up to four tanks defaults to 320 by 200 instead: on 480 by 300 four bots split
+  toward two duels (54% of hits on the enemy with the nearest base, 7% between the pair that fought least), and
+  on 320 by 200 the fight was an even three-way mix and the time a player spent out of it fell from 5.6% to 0.3%.

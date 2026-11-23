@@ -105,7 +105,8 @@ public partial class GameHud
     /// <summary>A banner across the view for a few seconds once the player's base taps the core.</summary>
     private void DrawSectorComplete(Tank player, World world)
     {
-        if (world.CoreTapOf(player.Base) is not { HasTapped: true })
+        // A timed match is won on the score: the core is there, and tapping it completes nothing.
+        if (world.MatchClock.Active || world.CoreTapOf(player.Base) is not { HasTapped: true })
             return;
         if (float.IsNaN(_sectorCompleteAt))
             _sectorCompleteAt = _time;

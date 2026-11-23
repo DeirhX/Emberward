@@ -6,9 +6,11 @@ using Emberward.Core;
 using Emberward.Core.Config;
 using Emberward.Core.Input;
 using Emberward.Core.LevelGen;
+using Emberward.Core.Match;
 using Emberward.Core.Rendering;
 using Emberward.Core.Types;
 using Emberward.Desktop.Config;
+using Emberward.Desktop.Gui;
 using Emberward.Desktop.Net;
 using Emberward.Protocol;
 
@@ -47,14 +49,15 @@ public sealed class BrowserNetMatch
     }
 
     /// <summary>
-    /// The match the browser proposes when it opens a room, by the desktop's rule: its map for this many players
-    /// unless one is asked for, and a new seed each match unless one is given.
+    /// The match the browser proposes when it opens a room, by the desktop's rule: the map of its mode and this many
+    /// players (<see cref="MapPresets.DefaultSizeFor"/>) unless one is asked for, and a new seed each match unless
+    /// one is given.
     /// </summary>
-    public static MatchConfig Propose(int seed, int players, Size? mapSize = null)
+    public static MatchConfig Propose(int seed, int players, Size? mapSize = null, MatchMode mode = MatchMode.Standard)
     {
         players = Math.Clamp(players, 2, Tweaks.World.MaxPlayers);
-        Size size = mapSize ?? (players > 2 ? NetworkTweaks.LargeMatchMapSize : DesktopScreenTweaks.RenderSurfaceSize);
-        return NetMatch.ProposeConfig(seed, size, LevelGenMode.Deterministic, players);
+        return NetMatch.ProposeConfig(
+            seed, mapSize ?? MapPresets.DefaultSizeFor(mode, players), LevelGenMode.Deterministic, players, mode);
     }
 
     /// <summary>The room and what the relay has said; null until it has let this client in.</summary>
@@ -103,6 +106,7 @@ public sealed class BrowserNetMatch
                 Session = BrowserSession.ForNetwork(welcome.Config, welcome.Slot, _heatWorkers);
                 Room = new RoomClient(_hello, welcome, Send);
                 Net = new NetSession(Room, Session.World);
+                Session.Names = DriverName;
                 Room.SendReady(WorldStateHash.ComputeReady(Session.World));
                 break;
             case Refusal refusal:
@@ -259,6 +263,22 @@ public sealed class BrowserNetMatch
 
     private void Send(Message message) => _outbox.Add(MessageCodec.Encode(message));
 
+    /// <summary>
+    /// What the match calls the tank in a slot: its player's name, or <c>BOT n</c> for one a bot drives, as on the
+    /// desktop (<see cref="SlotNames.Seat"/>); before the match starts, the name in the lobby's roster.
+    /// </summary>
+    private string DriverName(int slot)
+    {
+        if (Room is not { } room)
+            return string.Empty;
+        if (_begun)
+        {
+            int humans = Net!.HumanMask;
+            return SlotNames.Seat(slot, humans, room.DriverName(slot, humans));
+        }
+        return slot < room.Roster.Length ? room.Roster[slot] : string.Empty;
+    }
+
     /// <summary>What the page shows of the network match; clears <see cref="Changed"/>.</summary>
     public NetStatus Status()
     {
@@ -271,18 +291,17 @@ public sealed class BrowserNetMatch
         var roster = new NetSlot[room.Config.Slots];
         for (int slot = 0; slot < roster.Length; slot++)
         {
-            string name = _begun ? room.DriverName(slot, Net!.HumanMask)
-                : slot < room.Roster.Length ? room.Roster[slot] : string.Empty;
+            string name = DriverName(slot);
             Color c = TankSprites.GetPixelColor(1, slot);
             roster[slot] = new NetSlot(name, string.Create(CultureInfo.InvariantCulture, $"#{c.R:x2}{c.G:x2}{c.B:x2}"),
                 slot == room.Slot, name.Length == 0);
         }
         var winner = Session?.World.MatchWinner?.Tank;
-        string? winnerName = winner != null && _begun ? room.DriverName(winner.Color, Net!.HumanMask) : null;
+        string? winnerName = winner != null && _begun ? DriverName(winner.Color) : null;
         return new NetStatus(room.Room, room.Slot, room.Config.Slots, roster, room.Started, room.IsHost, room.IsPaused,
             room.LatencyMs, Notice(room, buffered, out bool bad), bad,
             LobbyText.AssignedNameLine(room.RequestedName, room.AssignedName), room.Started ? null : LobbyHint(room),
-            winnerName, room.IsClosedToNewcomers, room.Started && room.IsHost);
+            winnerName, room.IsClosedToNewcomers, room.Started && room.IsHost, LobbyText.SettingsLine(room.Config));
     }
 
     /// <summary>
@@ -344,10 +363,11 @@ public sealed class BrowserNetMatch
 /// <param name="Winner">The name of the player whose base won, once the match is decided.</param>
 /// <param name="ClosedToNewcomers">The host has closed the running match to newcomers.</param>
 /// <param name="CanCloseToNewcomers">This player is the host of a started match, so may change that.</param>
+/// <param name="Settings">The room's match in a line (its mode, tanks and map); null until the relay has let the client in.</param>
 public sealed record NetStatus(
     string Room, int Slot, int Slots, NetSlot[] Roster, bool Started, bool IsHost, bool Paused, int? LatencyMs,
     string? Notice, bool Bad, string? NameLine, string? LobbyHint, string? Winner,
-    bool ClosedToNewcomers = false, bool CanCloseToNewcomers = false);
+    bool ClosedToNewcomers = false, bool CanCloseToNewcomers = false, string? Settings = null);
 
 /// <param name="Color">The tank's colour, as #rrggbb.</param>
 public sealed record NetSlot(string Name, string Color, bool You, bool Open);

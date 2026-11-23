@@ -191,6 +191,15 @@
                             <input id="net-room" maxlength="64" required
                         /></label>
                         <label
+                            >MODE
+                            <select id="net-mode">
+                                <option value="standard" selected>
+                                    Standard
+                                </option>
+                                <option value="arcade">Arcade</option>
+                            </select></label
+                        >
+                        <label
                             >TANKS
                             <select id="net-players">
                                 <option>2</option>
@@ -207,9 +216,9 @@
                         </button>
                     </form>
                     <p class="muted">
-                        The first player into a room opens it with their seed
-                        and tank count; bots take the slots nobody joins. Come
-                        back under the same name to rejoin a match.
+                        The first player into a room opens it with their seed,
+                        mode and tank count; bots take the slots nobody joins.
+                        Come back under the same name to rejoin a match.
                     </p>
                 </div>
                 <div
@@ -300,6 +309,7 @@
                 <div class="eyebrow">
                     NETWORK MATCH · ROOM <span id="lobby-room"></span>
                 </div>
+                <p id="lobby-settings"></p>
                 <ol id="lobby-roster"></ol>
                 <p id="lobby-name" class="tone-Good"></p>
                 <p id="lobby-hint"></p>
@@ -311,6 +321,25 @@
             </section>
             <div id="net-status" class="plate" role="status" hidden></div>
             <div id="net-latency" hidden></div>
+            <!-- A timed match (arcade.js): the clock with the powerup drops under it, the board, the running powerups. -->
+            <section id="arcade-clock" class="plate" hidden aria-label="Match clock and powerup drops">
+                <div id="clock-caption"></div>
+                <div id="clock-time" role="timer"></div>
+                <ul id="drop-lines" aria-label="Powerup drops"></ul>
+            </section>
+            <div id="arcade-dim" hidden aria-hidden="true"></div>
+            <section id="scoreboard" class="plate" hidden aria-label="Scoreboard">
+                <div id="final" role="status" hidden>
+                    <strong id="final-title"></strong>
+                    <p id="final-reason"></p>
+                    <p id="final-own"></p>
+                    <div class="eyebrow">FINAL STANDINGS</div>
+                </div>
+                <div class="score-head" aria-hidden="true"><span>KILLS</span><span>DEATHS</span></div>
+                <ol id="score-rows"></ol>
+                <p id="final-foot" hidden></p>
+            </section>
+            <div id="effects" hidden aria-label="Running powerups"></div>
             <div id="death" hidden></div>
             <button id="recall" class="plate" hidden><span id="recall-text">Drop cargo and respawn</span> <kbd>X</kbd></button>
             <section id="hud" hidden aria-label="Tank status">

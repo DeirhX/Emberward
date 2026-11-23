@@ -36,6 +36,7 @@ public static class EntityShape
     public const float KindDangerRing = 26f;
     public const float KindOreCrystal = 27f;
     public const float KindCoreHeat = 28f;
+    public const float KindPowerup = 29f;
 
     public const float MachineFlagStalled = 1f;
     public const float MachineFlagCarried = 2f;

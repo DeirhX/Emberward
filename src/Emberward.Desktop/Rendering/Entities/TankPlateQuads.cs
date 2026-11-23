@@ -69,10 +69,11 @@ public sealed class TankPlateQuads
 
     /// <summary>
     /// The name a tank goes by with no player name from the match (<see cref="SetPlayerName"/>): <c>BOT n</c> for a side
-    /// the computer plays, <c>PLAYER n</c> otherwise, n counting slots from 1.
+    /// the computer plays (<see cref="SlotNames.LocalBot"/>, as the board and the toasts say), <c>PLAYER n</c>
+    /// otherwise, n counting slots from 1.
     /// </summary>
     public static string DefaultName(int slot, bool botControlled) =>
-        string.Create(CultureInfo.InvariantCulture, $"{(botControlled ? "BOT" : "PLAYER")} {slot + 1}");
+        botControlled ? SlotNames.LocalBot(slot) : string.Create(CultureInfo.InvariantCulture, $"PLAYER {slot + 1}");
 
     /// <summary>
     /// The name of whoever drives <paramref name="slot"/>, from the match (a network match's roster), or null for the
@@ -92,14 +93,15 @@ public sealed class TankPlateQuads
 
     /// <summary>
     /// Updates every tank's plate after a simulation step. <paramref name="vision"/> is the player's (null: no fog, all
-    /// is seen).
+    /// is seen). Once a timed match is over the final standings have the view, and no tank has a plate.
     /// </summary>
     public void CaptureStep(World world, int localSlot, VisionMap? vision)
     {
         var tanks = world.TankList.Tanks;
         if (_plates.Length != tanks.Count)
             Array.Resize(ref _plates, tanks.Count);
-        Tank? player = localSlot >= 0 && localSlot < tanks.Count ? tanks[localSlot] : null;
+        bool standings = world.IsMatchOver && world.MatchClock.Active;
+        Tank? player = localSlot >= 0 && localSlot < tanks.Count && !standings ? tanks[localSlot] : null;
         for (int slot = 0; slot < tanks.Count; slot++)
         {
             Tank tank = tanks[slot];

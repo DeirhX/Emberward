@@ -14,6 +14,12 @@ public enum CueHeard
 
     /// <summary>Only the player's own tank: feedback on what the player did.</summary>
     Player,
+
+    /// <summary>
+    /// Every player, wherever they are: an announcement about the match (a drop, the clock), played at the listener
+    /// and not at the place it is about.
+    /// </summary>
+    Everyone,
 }
 
 /// <summary>How a one-shot varies from one play to the next.</summary>
@@ -43,7 +49,8 @@ public readonly record struct StepEventCue(SoundEffect Effect, float Gain, CueHe
 /// <summary>
 /// Which one-shot effect a simulation event (<see cref="World.StepEvents"/>) plays. This is the one table of event
 /// sounds: <see cref="GameAudio"/> plays what it says. Each system has its rows in a partial of its own
-/// (<c>StepEventSounds.Tanks.cs</c>, <c>.Base.cs</c>, <c>.Machines.cs</c>, <c>.Ore.cs</c>, <c>.Emberites.cs</c>), and
+/// (<c>StepEventSounds.Tanks.cs</c>, <c>.Base.cs</c>, <c>.Machines.cs</c>, <c>.Ore.cs</c>, <c>.Emberites.cs</c>,
+/// <c>.Arcade.cs</c>), and
 /// <see cref="CueFor(StepEventKind, MachineType)"/> asks each in turn: a new system's sounds are a new partial and a
 /// line there; retiring a system deletes its partial and that line. Events that make no one-shot of their own
 /// (moving, digging, base service and spent shrapnel, which drive loops and the debris rattle in
@@ -54,12 +61,14 @@ public static partial class StepEventSounds
 {
     /// <summary>
     /// The one-shot of <paramref name="e"/>: as <see cref="CueFor(StepEventKind, MachineType)"/>, except for the
-    /// events whose sound depends on more than their kind (<see cref="OreCueFor(in StepEvent)"/>).
+    /// events whose sound depends on more than their kind (<see cref="OreCueFor(in StepEvent)"/>). An event of the
+    /// player's own may sound different still (<see cref="PlayerCueFor"/>), and a kill and the clock of a timed match
+    /// have cues of their own (<see cref="KillCueFor"/>, <see cref="ClockCue"/>).
     /// </summary>
     public static StepEventCue? CueFor(in StepEvent e) => OreCueFor(in e) ?? CueFor(e.Kind, e.Machine);
 
     public static StepEventCue? CueFor(StepEventKind kind, MachineType machine) =>
-        TankCue(kind) ?? BaseCue(kind) ?? MachineCue(kind, machine) ?? OreCue(kind) ?? EmberiteCue(kind);
+        TankCue(kind) ?? BaseCue(kind) ?? MachineCue(kind, machine) ?? OreCue(kind) ?? EmberiteCue(kind) ?? PowerupCue(kind);
 
     /// <summary>
     /// Whether <paramref name="cue"/> is heard for an event of a tank that is <paramref name="tracked"/> or not, and
@@ -67,7 +76,7 @@ public static partial class StepEventSounds
     /// </summary>
     public static bool Hears(in StepEventCue cue, bool tracked, bool isPlayer) => cue.Heard switch
     {
-        CueHeard.Anywhere => true,
+        CueHeard.Anywhere or CueHeard.Everyone => true,
         CueHeard.TrackedTank => tracked,
         _ => tracked && isPlayer,
     };

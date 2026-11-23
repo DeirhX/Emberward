@@ -19,6 +19,7 @@
     <Compile Include="../Emberward.Desktop/Audio/SoundSpace.cs" Link="Audio/SoundSpace.cs" />
     <Compile Include="../Emberward.Desktop/Audio/SoundBank.cs" Link="Audio/SoundBank.cs" />
     <Compile Include="../Emberward.Desktop/Audio/SoundBank.Deposit.cs" Link="Audio/SoundBank.Deposit.cs" />
+    <Compile Include="../Emberward.Desktop/Audio/SoundBank.Arcade.cs" Link="Audio/SoundBank.Arcade.cs" />
     <Compile Include="../Emberward.Desktop/Rendering/Entities/*.cs" Link="Entities/%(Filename)%(Extension)" />
     <Compile Include="../Emberward.Desktop/Rendering/EntityLayerBuilder.cs" Link="EntityLayerBuilder.cs" />
     <Compile Include="../Emberward.Desktop/Rendering/IGameRenderBackend.cs" Link="IGameRenderBackend.cs" />
@@ -34,6 +35,7 @@
     <Compile Include="../Emberward.Desktop/Rendering/FogLayer.cs" Link="FogLayer.cs" />
     <Compile Include="../Emberward.Desktop/Rendering/RowParallel.cs" Link="RowParallel.cs" />
     <Compile Include="../Emberward.Desktop/Presentation/MachinePresentation.cs" Link="Presentation/MachinePresentation.cs" />
+    <Compile Include="../Emberward.Desktop/Presentation/PowerupPresentation.cs" Link="Presentation/PowerupPresentation.cs" />
     <Compile Include="../Emberward.Desktop/Gui/HintSelector.cs" Link="Gui/HintSelector.cs" />
     <Compile Include="../Emberward.Desktop/Gui/HeatScale.cs" Link="Gui/HeatScale.cs" />
     <Compile Include="../Emberward.Desktop/Gui/BuildSlotView.cs" Link="Gui/BuildSlotView.cs" />
@@ -44,6 +46,8 @@
     <Compile Include="../Emberward.Desktop/Gui/ReserveTags.cs" Link="Gui/ReserveTags.cs" />
     <Compile Include="../Emberward.Desktop/Gui/OreLedgerView.cs" Link="Gui/OreLedgerView.cs" />
     <Compile Include="../Emberward.Desktop/Gui/MaterialsView.cs" Link="Gui/MaterialsView.cs" />
+    <Compile Include="../Emberward.Desktop/Gui/Scoreboard.cs" Link="Gui/Scoreboard.cs" />
+    <Compile Include="../Emberward.Desktop/Gui/PowerupViews.cs" Link="Gui/PowerupViews.cs" />
     <Compile Include="../Emberward.Desktop/Gui/Guidance/**/*.cs" Link="Gui/Guidance/%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="../Emberward.Desktop/SlotStepper.cs" Link="SlotStepper.cs" />
     <Compile Include="../Emberward.Desktop/Config/NetworkTweaks.cs" Link="Config/NetworkTweaks.cs" />
@@ -51,5 +55,7 @@
     <Compile Include="../Emberward.Desktop/Net/Seats.cs" Link="Net/Seats.cs" />
     <Compile Include="../Emberward.Desktop/Net/NetMatch.cs" Link="Net/NetMatch.cs" />
     <Compile Include="../Emberward.Desktop/Net/LobbyText.cs" Link="Net/LobbyText.cs" />
+    <Compile Include="../Emberward.Desktop/Net/MapPreset.cs" Link="Net/MapPreset.cs" />
+    <Compile Include="../Emberward.Desktop/Net/MatchModes.cs" Link="Net/MatchModes.cs" />
   </ItemGroup>
 </Project>

@@ -37,7 +37,7 @@ internal sealed class OreWatch : IEventWatch
         _depositUnits = 0;
     }
 
-    public void OnStep() => _stepsSinceDeposit++;
+    public void OnStep(World world) => _stepsSinceDeposit++;
 
     public void OnStepEvent(World world, Tank player, in StepEvent e)
     {
