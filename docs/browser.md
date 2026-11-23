@@ -202,8 +202,9 @@ to carry it, followed by a tick that releases it. A step is drawn from when the 
 because ticks arrive by the relay's clock. A hidden tab stops drawing and stepping; when it comes back it catches up
 as a rejoining player does.
 
-Not yet in the browser: name tags over other tanks, the desync report file the desktop writes, and choosing a map
-size or seed for a new room from the page.
+Not yet in the browser: the desync report file the desktop writes, and choosing a map size or seed for a new room
+from the page. The name plates over enemy tanks come from the shared entity layer, with the drivers' names from the
+relay (`BrowserNetMatch`).
 
 The header says **SAVED FOR OFFLINE** after the entire app, including the .NET runtime, has been cached, and
 **OFFLINE · SOLO ONLY** without a connection; otherwise it says nothing.
@@ -513,4 +514,4 @@ What is intended next for the browser client, roughly in order:
 - Try the threaded runtime in Firefox. WebKit keeps to one thread, because its threaded runtime sometimes stops
   answering (Two runtimes, above).
 - Saving and resuming a match across closing the app.
-- Name tags over other tanks in a network match, and a desync report the player can download.
+- A desync report the player can download.

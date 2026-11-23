@@ -61,6 +61,12 @@ public class Tank
     public TankBase? Base { get; }
 
     /// <summary>
+    /// True when <paramref name="other"/> plays for another side: a side is a base, and a match has no teams, so every
+    /// other tank with a base of its own is a rival. A tank without a base (test worlds) is a rival of every other tank.
+    /// </summary>
+    public bool IsRivalOf(Tank other) => other != null && other != this && (Base == null || other.Base != Base);
+
+    /// <summary>
     /// True while the tank is alive and inside its own base: it builds from the base store, is cooled and
     /// unloads its ore there. Bases never overlap, so this is the same as asking which base the tank is in.
     /// </summary>

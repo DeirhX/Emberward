@@ -106,6 +106,18 @@ Core decides what is seen; the renderer only shows it.
 - **Nest danger rings.** `NestDangerQuads` asks Core for the player's discovered nests (`World.CopyNestDangers`) each
   step and draws a thin pink ring over each (`KindDangerRing`, `DangerRing` in `Shaders/Entity/Overlays.hlsli`) under the
   machines, and its title above it with the glyph quads the charge labels use (`GlyphText`), after them.
+- **Enemy name plates.** `TankPlateQuads` keeps one small record per tank, updated once a step in
+  `EntityLayerBuilder.CaptureStep` (which takes the player's vision for it) from Core's answers: `Tank.IsRivalOf`
+  (a side is a base; a match has no teams, so every other tank is a rival), `IsDead` and the tank sprites' fog rule
+  (`Sight`). A rival in sight gets a plate above it, its name in the tank's colour on a dark backing with a rule
+  under it (`GlyphText` and plain `KindPowerLabel` quads), moving with the tank as drawn. Out of sight the plate stays
+  at the cell where the tank was last seen and fades from `DesktopScreenTweaks.TankPlateGhostOpacity` to nothing
+  over `TankPlateFadeSeconds` (counted in steps, so a pause holds it); seen again anywhere, the record jumps to the
+  tank at once, and a dead tank's record is cleared. Names are `BOT n` for a side the computer plays and `PLAYER n`
+  otherwise; in a network match `Game.NamePlayers` (and `BrowserNetMatch` in the browser) hands in the drivers' names
+  from the relay (`TankPlateQuads.SetPlayerName`), shown in capitals and cut at 16 characters. They fade out zoomed
+  out like the charge labels (`PowerLabels.ZoomFade`; `Build`'s `labelCellSize`, which G does not turn off). They
+  replace the ImGui name tags network matches drew before. Cost follows the number of tanks; nothing scans the map.
 - **Pyrite deposits.** `DepositQuads` reads each step's `OreUnloaded` and `RestartOreBurned` (Position is the
   receiver, Target says core or relay) and pours up to 12 crystals from the tank's hold into it (`KindOreCrystal`), a
   crystal a step, each flying 0.45 s on a short arc; events from one tank a few steps apart join one pour. Each base

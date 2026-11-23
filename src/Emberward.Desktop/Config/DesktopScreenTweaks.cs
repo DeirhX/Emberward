@@ -61,6 +61,15 @@ public static class DesktopScreenTweaks
     /// <summary>UI points a cell from which the charge labels show fully.</summary>
     public const float PowerLabelZoomFull = 4f;
 
+    // Name plates over enemy tanks (Rendering/Entities/TankPlateQuads.cs)
+    /// <summary>
+    /// Seconds an enemy tank's name plate stays where the tank was last seen, fading out, once the tank is out of sight
+    /// (game time: it counts simulation steps, so a paused match holds it).
+    /// </summary>
+    public const float TankPlateFadeSeconds = 3.5f;
+    /// <summary>How bright a plate left where its tank was last seen starts fading from (a plate over a tank in sight is 1).</summary>
+    public const float TankPlateGhostOpacity = 0.8f;
+
     // GPU post-processing / lighting tuning
     public const float PostVignetteStrength = 0.18f;
     public const float PostVignetteInnerRadius = 0.35f;

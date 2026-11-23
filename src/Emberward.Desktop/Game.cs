@@ -124,7 +124,6 @@ public partial class Game : IDisposable
             Players: relay?.Config.Slots ?? Tweaks.LevelGen.DefaultPlayers, CoreTapWins: relay != null));
         _world = built.World;
         _terrainSize = built.TerrainSize;
-        _entityLayer.CaptureStep(_world, _localSlot);
         // The terrain test has no tanks, and so no fog.
         if (fogOfWar && LocalTank is { } localTank)
         {
@@ -132,6 +131,8 @@ public partial class Game : IDisposable
             _fogLayer = new FogLayer(_terrainSize);
             _radar = _world.TrackRadar(localTank);
         }
+        // After the vision, so the enemy name plates start from what the player sees.
+        _entityLayer.CaptureStep(_world, _localSlot, _vision);
         _terrainView = _vision != null ? TerrainView.Fogged(_world.Terrain, _vision) : TerrainView.Live(_world.Terrain);
 
         _worldPixels = new uint[_terrainSize.Area];
@@ -301,7 +302,7 @@ public partial class Game : IDisposable
     {
         _simFrameCounter++;
         _steppedSinceRender = true;
-        _entityLayer.CaptureStep(_world, _localSlot);
+        _entityLayer.CaptureStep(_world, _localSlot, _vision);
 
         // With fog the renderer follows what the player knows of the terrain, not the terrain: a change out of
         // sight is drawn when the player next sees the cell.
