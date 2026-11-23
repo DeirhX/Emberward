@@ -134,7 +134,11 @@ public static class Scoreboards
         return new Scoreboard(rows, ClockText(clock), phase, Caption(phase));
     }
 
-    /// <summary>Where <paramref name="clock"/> stands; <paramref name="matchOver"/> is <see cref="World.IsMatchOver"/>.</summary>
+    /// <summary>
+    /// Where <paramref name="clock"/> stands; <paramref name="matchOver"/> is <see cref="World.IsMatchOver"/>. A step the
+    /// score holds at 0:00 for a death still to be told (<see cref="MatchClock.IsSuddenDeath"/>) is still in
+    /// <see cref="ClockPhase.LastSeconds"/>, so the next step goes from it to the horn or to sudden death.
+    /// </summary>
     public static ClockPhase PhaseOf(in MatchClock clock, bool matchOver) =>
         matchOver ? ClockPhase.Final
         : clock.IsSuddenDeath ? ClockPhase.SuddenDeath
@@ -208,6 +212,14 @@ public static class SlotNames
 
     /// <summary>A local match's names: <see cref="You"/> for <paramref name="localSlot"/>, a numbered bot for the rest.</summary>
     public static Func<int, string> Local(int localSlot) => slot => slot == localSlot ? You : LocalBot(slot);
+
+    /// <summary>
+    /// A seat of a network match that has begun: its player's name (<paramref name="driverName"/>, the room's
+    /// <c>RoomClient.DriverName</c>) while a player holds it in <paramref name="humanMask"/>, else a numbered bot, as
+    /// in a local match. The desktop and the browser both ask this.
+    /// </summary>
+    public static string Seat(int slot, int humanMask, string driverName) =>
+        (humanMask & (1 << slot)) != 0 ? driverName : LocalBot(slot);
 }
 
 /// <summary>

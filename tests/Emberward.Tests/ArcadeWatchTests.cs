@@ -348,4 +348,26 @@ public class ArcadeWatchTests
         Assert.DoesNotContain("core", first.Body);
         Assert.Contains("tap the hot core", new TutorialDirector().Update(plain, plain.TankList.Tanks[0], 0f)!.Value.Body);
     }
+
+    [Fact]
+    public void ARematch_HearsItsFirstStep_WithoutTheDecidedMatchBefore()
+    {
+        var guidance = new PlayerGuidance();
+        var old = Create(ArcadeWorlds.Timed(1), tanks: 2);
+        Kill(old, killer: 0, old.TankList.Tanks[1]);
+        RunClockDownTo(old, 0);
+        Assert.True(old.IsMatchOver);
+        old.Advance(_ => default);
+        guidance.AfterStep(old, old.TankList.Tanks[0]);
+        guidance.Update(old, old.TankList.Tanks[0], now: 0f, offerThermalView: false);
+
+        // The first step of the rematch the guidance hears is the one in which its player is destroyed.
+        var rematch = Create(ArcadeWorlds.Timed(480), tanks: 2);
+        Kill(rematch, killer: 1, rematch.TankList.Tanks[0]);
+        guidance.AfterStep(rematch, rematch.TankList.Tanks[0]);
+        guidance.Update(rematch, rematch.TankList.Tanks[0], now: 1f, offerThermalView: false);
+
+        Notification lost = Assert.Single(guidance.Notifications, n => n.Key == "kill-own");
+        Assert.Equal("BOT 2 destroyed you", lost.Title);
+    }
 }

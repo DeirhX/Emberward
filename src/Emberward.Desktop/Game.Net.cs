@@ -160,8 +160,7 @@ public partial class Game
     /// in a network match, <c>YOU</c> and <c>BOT n</c> in a local one, and <c>BOT n</c> for a seat a bot drives.
     /// </summary>
     private string SlotName(int slot) =>
-        _relay is { } relay && _netSession is { } session && (session.HumanMask & (1 << slot)) != 0
-            ? relay.DriverName(slot, session.HumanMask)
+        _relay is { } relay && _netSession is { } session ? SlotNames.Seat(slot, session.HumanMask, relay.DriverName(slot, session.HumanMask))
         : slot == _localSlot && _relay == null ? SlotNames.You
         : SlotNames.LocalBot(slot);
 
@@ -189,7 +188,7 @@ public partial class Game
 
         _hud.CanRestartMatch = _world.IsMatchOver;
         var winner = _world.MatchWinner?.Tank;
-        _hud.WinnerName = winner != null && _netPlaying ? relay.DriverName(winner.Color, _netSession!.HumanMask) : null;
+        _hud.WinnerName = winner != null && _netPlaying ? SlotName(winner.Color) : null;
 
         var play = _hud.PlayRect;
         // Below the clock plate of a timed match, when the HUD has one at the top of the view.

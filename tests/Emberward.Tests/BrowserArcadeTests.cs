@@ -42,7 +42,7 @@ public class BrowserArcadeTests
         Assert.NotNull(arcade);
         Assert.Equal(("8:00", "TIME", nameof(ClockPhase.Running), false), (arcade.Clock, arcade.Caption, arcade.Phase, arcade.Urgent));
         Assert.Equal(HudPalette.Hex(Scoreboards.Of(session.World, 0, Names)!.ClockColor), arcade.ClockColor);
-        Assert.Equal(Scoreboards.Objective, arcade.Objective);
+        Assert.Equal(Scoreboards.Objective, frame.Objective);
         Assert.Equal("YOU,BOT 2,BOT 3,BOT 4", string.Join(',', arcade.Rows.OrderBy(r => r.Slot).Select(r => r.Name)));
         Assert.Equal(0, Assert.Single(arcade.Rows, r => r.Local).Slot);
         Assert.DoesNotContain(arcade.Rows, r => r.Leader);
@@ -77,8 +77,9 @@ public class BrowserArcadeTests
         using var json = JsonDocument.Parse(JsonSerializer.Serialize(frame, BrowserJsonContext.Default.BrowserFrame));
 
         var arcade = json.RootElement.GetProperty("arcade");
-        foreach (string name in (string[])["clock", "caption", "phase", "clockColor", "urgent", "objective", "over"])
+        foreach (string name in (string[])["clock", "caption", "phase", "clockColor", "urgent", "over"])
             Assert.True(arcade.TryGetProperty(name, out _), name);
+        Assert.Equal(Scoreboards.Objective, json.RootElement.GetProperty("objective").GetString());
         var row = arcade.GetProperty("rows")[0];
         foreach (string name in (string[])["rank", "slot", "name", "color", "kills", "deaths", "local", "leader"])
             Assert.True(row.TryGetProperty(name, out _), name);
@@ -102,6 +103,7 @@ public class BrowserArcadeTests
         var frame = BrowserFrameBuilder.Capture(session, includeEvents: false);
 
         Assert.Null(frame.Arcade);
+        Assert.Null(frame.Objective);
         Assert.NotNull(frame.Goal);
         string json = JsonSerializer.Serialize(frame, BrowserJsonContext.Default.BrowserFrame);
         Assert.Contains("\"arcade\":null", json, StringComparison.Ordinal);

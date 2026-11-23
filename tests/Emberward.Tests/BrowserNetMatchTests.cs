@@ -10,6 +10,7 @@ using Emberward.Core.LevelGen;
 using Emberward.Core.Match;
 using Emberward.Core.Types;
 using Emberward.Desktop;
+using Emberward.Desktop.Gui;
 using Emberward.Desktop.Net;
 using Emberward.Protocol;
 using Emberward.Relay;
@@ -162,7 +163,7 @@ public class BrowserNetMatchTests
             .Select(i => ControllerOutputCodec.Decode(i.Encoded).Upgrade).ToArray();
         Assert.Equal("2,0,0", string.Join(',', upgrades));
         // The slot nobody took is a bot's.
-        Assert.Equal("Ann,Bot", string.Join(',', match.Status().Roster.Select(s => s.Name)));
+        Assert.Equal("Ann,BOT 2", string.Join(',', match.Status().Roster.Select(s => s.Name)));
     }
 
     [Fact]
@@ -248,7 +249,13 @@ public class BrowserNetMatchTests
         Feed(match, new Welcome(1, config), new Roster(["Bob", "Ann", ""]));
 
         // The lobby is the page's to draw: the match has no clock running and no board yet.
-        Assert.Null(BrowserFrameBuilder.Capture(match.Session!, includeEvents: false, net: match).Arcade);
+        var lobby = BrowserFrameBuilder.Capture(match.Session!, includeEvents: false, net: match);
+        Assert.Null(lobby.Arcade);
+        // The objective is the arcade match's, not the core race's: the room says what it will play.
+        Assert.Equal(Scoreboards.Objective, lobby.Objective);
+        Assert.Null(lobby.Goal);
+        // In the lobby a seat is called by the roster, and an open one by nothing.
+        Assert.Equal(("Bob", ""), (match.Session!.Names(0), match.Session.Names(2)));
 
         Feed(match, new Start(0b011), Tick(0, [0u, 0u, 0u], 0b011), Tick(1, [0u, 0u, 0u], 0b011));
         Assert.Equal(2, match.Advance(default, dueByClock: 1, Now));
@@ -256,13 +263,15 @@ public class BrowserNetMatchTests
 
         var arcade = frame.Arcade;
         Assert.NotNull(arcade);
-        Assert.Equal("Bob,Ann,Bot", string.Join(',', arcade.Rows.OrderBy(r => r.Slot).Select(r => r.Name)));
+        // A bot's seat is a numbered bot, as on the desktop and on the page's own plates.
+        Assert.Equal("Bob,Ann,BOT 3", string.Join(',', arcade.Rows.OrderBy(r => r.Slot).Select(r => r.Name)));
         Assert.Equal("Ann", Assert.Single(arcade.Rows, r => r.Local).Name);
         Assert.Equal("8:00", arcade.Clock);
         Assert.Null(frame.Goal);
         // The toasts name a tank as the board does.
         Assert.Equal("Bob", match.Session!.Guidance.Names!(0));
-        Assert.Equal("Bot", match.Session.Names(2));
+        Assert.Equal("BOT 3", match.Session.Names(2));
+        Assert.Equal(["Bob", "Ann", "BOT 3"], match.Status().Roster.Select(r => r.Name));
     }
 
     private static Tick Tick(int tick, System.Collections.Immutable.ImmutableArray<uint> inputs, int mask) =>

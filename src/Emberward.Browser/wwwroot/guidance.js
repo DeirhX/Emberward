@@ -14,7 +14,8 @@ export class GuidanceView {
     tutorialHidden = false;
     guidance = null;
     goal = null;
-    // A timed match's objective line (BrowserArcade), which stands where a race's core goal does; null in a race.
+    // A timed match's objective line (BrowserFrame.Objective, from the lobby on), which stands where a race's core goal
+    // does; null in a race.
     objective = null;
     toasts = new Map();
 

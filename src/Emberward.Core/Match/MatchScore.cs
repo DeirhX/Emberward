@@ -14,6 +14,13 @@ using Emberward.Core.Types;
 /// Kills and deaths are read off the step's own <see cref="StepEventKind.TankDied"/> events, after the tanks have
 /// advanced, so a step costs one pass over its events and, once the clock has run out, one over the tanks. The tallies
 /// are kept here, by the tank's colour, not on the tank. A side whose base has fallen cannot win on score.
+/// <para>
+/// A tank destroyed after its own tick in a step (heat or cold at its end, a creature, a machine's shell) is told dead
+/// one step late, on its next tick (<see cref="Tank.IsDeathUntold"/>). Once the clock has run out the score decides
+/// nothing while such a death is untold, so a kill credited on the deciding tick still counts: the match is held one
+/// step. The clock stands at 0:00 through a held step and is not yet in sudden death, which starts only when a step
+/// finds every death told and the top score tied; its overtime is counted from there.
+/// </para>
 /// </remarks>
 public sealed class MatchScore
 {
@@ -29,6 +36,9 @@ public sealed class MatchScore
     // The colour of the tank that has won on score; -1 until one has.
     private int _winner = -1;
 
+    // The clock has run out, every death was told and the top score was tied: the match is in sudden death.
+    private bool _suddenDeath;
+
     /// <param name="tanks">The match's tanks, a live list.</param>
     /// <param name="events">The step's events, which say who died and whose kill it was.</param>
     public MatchScore(IReadOnlyList<Tank> tanks, StepEventLog events, int timeLimitSeconds)
@@ -41,8 +51,9 @@ public sealed class MatchScore
 
     /// <summary>
     /// One step, after the tanks have advanced and before the result is latched: counts the step's deaths, runs the
-    /// clock, and once it has run out names the winner as soon as one tank leads alone. Call it only while the match is
-    /// undecided, so the board and the clock stand as they were when it ended.
+    /// clock, and once it has run out names the winner as soon as one tank leads alone with every death told (else
+    /// goes into sudden death). Call it only while the match is undecided, so the board and the clock stand as they
+    /// were when it ended.
     /// </summary>
     public void Advance()
     {
@@ -61,9 +72,25 @@ public sealed class MatchScore
             killer.Kills++;
             _tallies[e.Killer] = killer;
         }
-        _ticks++;
-        if (_ticks >= _limitTicks && SoleLeader() is { } leader)
+        // The clock stands at 0:00 through a held step: overtime runs only in sudden death.
+        if (_ticks < _limitTicks || _suddenDeath)
+            _ticks++;
+        // Checked only once the clock has run out: a running match pays nothing for it.
+        if (_ticks < _limitTicks || AnyDeathUntold())
+            return;
+        if (SoleLeader() is { } leader)
             _winner = leader.Color;
+        else
+            _suddenDeath = true;
+    }
+
+    /// <summary>Whether a tank lies destroyed with its death not yet told, which may be a kill still to count.</summary>
+    private bool AnyDeathUntold()
+    {
+        for (int i = 0; i < _tanks.Count; i++)
+            if (_tanks[i].IsDeathUntold)
+                return true;
+        return false;
     }
 
     /// <summary>The tank that has won on score, or null: the clock has not run out, or the top score is still tied.</summary>
@@ -93,7 +120,7 @@ public sealed class MatchScore
     }
 
     /// <summary>The clock as the HUD reads it.</summary>
-    public MatchClock Clock => new(true, _ticks, _limitTicks, IsSuddenDeath: _ticks >= _limitTicks && _winner < 0);
+    public MatchClock Clock => new(true, _ticks, _limitTicks, IsSuddenDeath: _suddenDeath && _winner < 0);
 
     /// <summary><paramref name="tank"/>'s line on the board: its kills, deaths and place.</summary>
     public TankScore ScoreOf(Tank tank) => Ranked(Line(tank));
@@ -145,7 +172,7 @@ public sealed class MatchScore
     /// <summary>Mixes the clock, the winner and every tally, for <see cref="WorldStateHash.Compute"/>.</summary>
     internal ulong MixState(ulong hash)
     {
-        hash = Fnv1a.Mix(Fnv1a.Mix(hash, _ticks), _winner);
+        hash = Fnv1a.Mix(Fnv1a.Mix(Fnv1a.Mix(hash, _ticks), _winner), _suddenDeath);
         hash = Fnv1a.Mix(hash, _tallies.Count);
         foreach (Tally tally in _tallies)
             hash = Fnv1a.Mix(Fnv1a.Mix(hash, tally.Kills), tally.Deaths);
@@ -196,9 +223,11 @@ public readonly record struct TankScore(bool Active, int Color, int Kills, int D
 /// second. <see cref="Active"/> is false (and the rest zero) when the match rules set no time limit. It stops when the
 /// match is over.
 /// </summary>
-/// <param name="ElapsedTicks">Ticks played.</param>
+/// <param name="ElapsedTicks">Ticks the clock has run: the ticks played, less any the score held at 0:00 for a death still to be told.</param>
 /// <param name="LimitTicks">The length of the match.</param>
-/// <param name="IsSuddenDeath">The clock has run out with the top score tied: the match goes on until one tank leads alone.</param>
+/// <param name="IsSuddenDeath">The clock has run out with the top score tied: the match goes on until one tank leads alone.
+/// Not yet on a step the score is held for a death still to be told (<see cref="Tank.IsDeathUntold"/>), which reads
+/// 0:00.</param>
 public readonly record struct MatchClock(bool Active, int ElapsedTicks, int LimitTicks, bool IsSuddenDeath)
 {
     /// <summary>Ticks left on the clock; 0 from the limit on.</summary>

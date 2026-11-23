@@ -69,7 +69,9 @@ public static class BrowserFrameBuilder
             includeDial ? Dial() : null, net?.Status(), BasePower(world, player), MachineUpgrade(session),
             Reserve(world.ReserveOf(player)),
             // In a network lobby the match has not begun: no clock, board or drops to show yet, as on the desktop.
-            net?.Room is { Started: false } ? null : BrowserArcade.Capture(world, player, session.Board, session.Drops, session.Names));
+            net?.Room is { Started: false } ? null : BrowserArcade.Capture(world, player, session.Board, session.Drops, session.Names),
+            // The objective is the match's, lobby or not: an arcade room never says it is a core race.
+            world.MatchClock.Active ? Scoreboards.Objective : null);
     }
 
     /// <summary>The reserve's stage tag and burn prompt, as the desktop shows them (<see cref="ReserveTags"/>).</summary>

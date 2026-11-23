@@ -95,7 +95,7 @@ public sealed record MatchRecording(
         }
     }
 
-    /// <exception cref="InvalidDataException">The text is not a recording.</exception>
+    /// <exception cref="InvalidDataException">The text is not a recording, or it is of a match mode this build does not know.</exception>
     public static MatchRecording Load(TextReader reader)
     {
         ArgumentNullException.ThrowIfNull(reader);
@@ -136,6 +136,9 @@ public sealed record MatchRecording(
                 uint.Parse(header["inputKeyMask"], NumberStyles.HexNumber, CultureInfo.InvariantCulture),
                 // A recording from before matches had modes has no such line: it is of a standard match.
                 header.TryGetValue("mode", out string? mode) ? byte.Parse(mode, CultureInfo.InvariantCulture) : (byte)0);
+            if (!Enum.IsDefined(NetMatch.ModeOf(config)))
+                throw new InvalidDataException(string.Create(CultureInfo.InvariantCulture,
+                    $"This recording is of match mode {config.Mode}, which this build does not know."));
             byte[]? snapshot = header.TryGetValue("snapshot", out string? base64) ? Convert.FromBase64String(base64) : null;
             // A recording from before bots had a number is of the first.
             return new MatchRecording(config, Number("humanMask"), bundles, snapshot) { Bots = header.ContainsKey("bots") ? Number("bots") : 1 };

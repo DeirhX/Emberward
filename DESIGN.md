@@ -944,7 +944,10 @@ same heat, network and machines (`MatchMode.Arcade`, `MatchRules.Arcade`; number
   nobody: the death is counted, and no one scores. (In 100 four-bot matches 21% of deaths scored for nobody, and
   nearly half of those tanks had been hit by an enemy within 5 seconds; with the credit 10% do.)
 - **The sole leader wins.** When the clock runs out the tank with the most kills has won. While the top score is
-  shared the match goes on in sudden death, and ends the moment one tank leads alone.
+  shared the match goes on in sudden death, and ends the moment one tank leads alone. A kill on the last tick
+  counts: a tank destroyed after its own part of a step (by heat or frost at its end, a creature, a machine's shell)
+  is told dead the step after, and the score waits that one step at 0:00, not yet in sudden death, before it names
+  the winner or starts sudden death.
 - **Bases hold.** A core takes no damage, so no base falls and nobody is eliminated. A shell bursts on an enemy core
   as on a wall. Gates, shields and machines are as in the standard match, and can still be shot.
 - **A quick respawn.** A destroyed tank is back in its base after 3 seconds, whatever its base has stored.

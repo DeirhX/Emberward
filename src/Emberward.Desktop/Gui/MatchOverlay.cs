@@ -14,6 +14,13 @@ using static Emberward.Desktop.Gui.HudDraw;
 /// </summary>
 public static class MatchOverlay
 {
+    // The words of the final standings, made once per result: the board stands still once the match is over, and the
+    // overlay is drawn every frame. The board is the ScoreboardCache's, the same object while it does not change.
+    private static Scoreboard? _finalBoard;
+    private static bool _finalWon;
+    private static string? _finalWinner;
+    private static (string Result, string? Own) _finalLines;
+
     /// <param name="canRestart">Whether Enter starts a new match once this one is over.</param>
     /// <param name="winnerName">What to call a winner that is not the player; null for "another tank".</param>
     /// <param name="board">The board of a timed match, or null.</param>
@@ -97,9 +104,9 @@ public static class MatchOverlay
     {
         dl.AddRectFilled(new Vector2(vp.x, vp.y), new Vector2(vp.x + vp.w, vp.y + vp.h), 0x70000000u);
         DrawCenteredText(dl, 44f, cx, cy - 30f, won ? "VICTORY" : "DEFEAT", won ? 0xFF40FF80u : 0xFF4040FFu);
-        DrawCenteredText(dl, 20f, cx, cy + 20f,
-            won ? Scoreboards.VictoryLine(board) : Scoreboards.DefeatLine(board, winnerName), 0xFFFFFFFFu);
-        if (board.OwnResult is { } own)
+        var (result, ownResult) = FinalLines(board, won, winnerName);
+        DrawCenteredText(dl, 20f, cx, cy + 20f, result, 0xFFFFFFFFu);
+        if (ownResult is { } own)
             DrawCenteredText(dl, 18f, cx, cy + 46f, own, HudTheme.Amber);
 
         const float width = 340f, pad = 14f;
@@ -111,6 +118,17 @@ public static class MatchOverlay
         ArcadeLines.DrawRows(dl, min + new Vector2(pad + 6f, pad + 22f), width - 2f * pad - 12f, board);
         if (canRestart)
             DrawCenteredText(dl, 20f, cx, max.Y + 14f, "Press Enter to play again", 0xFFC0E0FFu);
+    }
+
+    /// <summary>The result line and the player's own line of <paramref name="board"/>, made again only when the result changes.</summary>
+    private static (string Result, string? Own) FinalLines(Scoreboard board, bool won, string? winnerName)
+    {
+        if (!ReferenceEquals(board, _finalBoard) || won != _finalWon || !string.Equals(winnerName, _finalWinner, StringComparison.Ordinal))
+        {
+            (_finalBoard, _finalWon, _finalWinner) = (board, won, winnerName);
+            _finalLines = (won ? Scoreboards.VictoryLine(board) : Scoreboards.DefeatLine(board, winnerName), board.OwnResult);
+        }
+        return _finalLines;
     }
 
     /// <summary>Why the player lost, in a line. A match of two has "the enemy"; one of more says who won, if it knows.</summary>

@@ -10,6 +10,7 @@ using Emberward.Core.Match;
 using Emberward.Core.Rendering;
 using Emberward.Core.Types;
 using Emberward.Desktop.Config;
+using Emberward.Desktop.Gui;
 using Emberward.Desktop.Net;
 using Emberward.Protocol;
 
@@ -263,14 +264,19 @@ public sealed class BrowserNetMatch
     private void Send(Message message) => _outbox.Add(MessageCodec.Encode(message));
 
     /// <summary>
-    /// What the match calls the tank in a slot: its player's name, or <c>Bot</c> for one a bot drives; before the
-    /// match starts, the name in the lobby's roster.
+    /// What the match calls the tank in a slot: its player's name, or <c>BOT n</c> for one a bot drives, as on the
+    /// desktop (<see cref="SlotNames.Seat"/>); before the match starts, the name in the lobby's roster.
     /// </summary>
     private string DriverName(int slot)
     {
         if (Room is not { } room)
             return string.Empty;
-        return _begun ? room.DriverName(slot, Net!.HumanMask) : slot < room.Roster.Length ? room.Roster[slot] : string.Empty;
+        if (_begun)
+        {
+            int humans = Net!.HumanMask;
+            return SlotNames.Seat(slot, humans, room.DriverName(slot, humans));
+        }
+        return slot < room.Roster.Length ? room.Roster[slot] : string.Empty;
     }
 
     /// <summary>What the page shows of the network match; clears <see cref="Changed"/>.</summary>

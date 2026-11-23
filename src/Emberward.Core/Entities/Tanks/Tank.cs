@@ -258,6 +258,13 @@ public class Tank
     /// </summary>
     public int KillerColor => _lifecycle.Killer;
 
+    /// <summary>
+    /// The tank is destroyed and its <see cref="StepEventKind.TankDied"/> is not yet recorded: something after its own
+    /// tick in a step (heat or cold at the end of it, a creature, a machine's shell) destroyed it, and its next tick
+    /// tells it.
+    /// </summary>
+    public bool IsDeathUntold => _lifecycle.IsDeathUntold;
+
     /// <summary>Counts down from <see cref="HitFlashDuration"/> after a hit by enemy fire.</summary>
     public int HitFlashTicks => _lifecycle.HitFlashTicks;
 

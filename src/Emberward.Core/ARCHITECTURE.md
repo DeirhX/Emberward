@@ -272,8 +272,11 @@ is a new entry, in the place its order needs; the profile picks up its label. Th
 10. **score** (only when `MatchRules.TimeLimitSeconds` is set): `MatchScore.Advance`, while the match is undecided.
     It reads the step's own `TankDied` events (a death for the tank, a kill for the `Killer` it names), runs the
     clock in ticks, and once the clock has run out names the winner as soon as one tank whose base stands leads
-    alone; until then the match is in sudden death. One pass over the step's events, and past the limit one over
-    the tanks. The tallies are kept in the system by tank colour, saved in the snapshot and mixed into
+    alone; until then the match is in sudden death. A tank destroyed after its own tick (heat or frost at its end, a
+    creature, a machine's shell) records its `TankDied` on its next tick (`Tank.IsDeathUntold` meanwhile), so past
+    the limit the score decides nothing while such a death is untold: that step is held, the clock standing at 0:00
+    and not in sudden death, and a kill credited on the deciding tick still counts. One pass over the step's events,
+    and past the limit one or two over the tanks. The tallies are kept in the system by tank colour, saved in the snapshot and mixed into
     `WorldStateHash.Compute`.
 11. **match**: `MatchResult.Latch`, the result, fixed once the referee has one: the first base to tap the core, else
     the last base standing, else the tank the score names (`MatchWinReason.TopScore`).

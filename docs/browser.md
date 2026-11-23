@@ -181,8 +181,9 @@ map whatever the count; an arcade one gets the map a room of its size would (320
 `BrowserSession.LocalMapSize`), and `?map=WxH` chooses another for either.
 
 An arcade match shows what the desktop's HUD does, in its words: `BrowserArcade` turns `Scoreboards` and
-`DropBoard` into the frame's `arcade` field after each step (null in a match without a clock), and `arcade.js` only
-places it. The clock plate stands at the top of the view with the drop lines under it (the next drop, where and
+`DropBoard` into the frame's `arcade` field after each step (null in a match without a clock and in a network
+lobby), and `arcade.js` only places it. The frame's `objective` (`Scoreboards.Objective`, null without a clock) is
+there from the lobby on, so the card of an arcade room never shows the core race's objective. The clock plate stands at the top of the view with the drop lines under it (the next drop, where and
 when; one on the ground and how long it lies; who took the last), the board (place, colour, name, kills, deaths;
 the player's line and the sole leader marked) at the right above the other panels, the running powerups as tags
 over the bottom of the view, and a badge at the edge of the view for each drop out of sight. Below 1080 pixels of
@@ -225,7 +226,8 @@ as a rejoining player does.
 
 Not yet in the browser: the desync report file the desktop writes, and choosing a map size or seed for a new room
 from the page. The name plates over enemy tanks come from the shared entity layer (`BOT n` over a bot, as on the
-desktop), with the drivers' names from the relay (`BrowserNetMatch`).
+desktop), with the drivers' names from the relay (`BrowserNetMatch`). The board, the toasts and the result line call
+a seat by its player's name and a bot's seat `BOT n`, as the desktop does (`SlotNames.Seat`).
 
 The header says **SAVED FOR OFFLINE** after the entire app, including the .NET runtime, has been cached, and
 **OFFLINE · SOLO ONLY** without a connection; otherwise it says nothing.

@@ -93,6 +93,16 @@ public class MatchRecordingTests
     }
 
     [Fact]
+    public void ARecordingOfAModeThisBuildDoesNotKnow_IsRejectedAsBadData_NamingTheMode()
+    {
+        using var text = new StringWriter();
+        new MatchRecording(Config with { Mode = 7 }, HumanMask, [new(0, [1u, 2u], HumanMask)]).Save(text);
+
+        var refused = Assert.Throws<InvalidDataException>(() => MatchRecording.Load(new StringReader(text.ToString())));
+        Assert.Contains("match mode 7", refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ARecordingWithBots_FromABuildWhoseBotsDecidedOtherwise_IsRefusedByReplay()
     {
         TickBundle[] bundles = [new(0, [1u, 2u], HumanMask)];

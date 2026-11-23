@@ -44,6 +44,9 @@ internal sealed class TankLifecycle
     public VectorF LastHitVelocity { get; private set; }
     public int SpawnProtectionTicks { get; private set; }
 
+    /// <summary>Destroyed, and the death not yet told: <see cref="AdvanceDeath"/> records it on the tank's next tick.</summary>
+    public bool IsDeathUntold => _tank.IsDead && !_respawning;
+
     public TimeSpan RespawnRemaining =>
         _respawning && _tank.Base is { IsDestroyed: false } ? _respawnTimer : TimeSpan.Zero;
 

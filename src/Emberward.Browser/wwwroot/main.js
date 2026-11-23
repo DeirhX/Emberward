@@ -614,7 +614,7 @@ function updateHud(f) {
     const stripBegan = performance.now();
     strip.update(f, visualTime, wideScreen.matches);
     const stripMs = performance.now() - stripBegan;
-    guidance.update(f.guidance, f.goal, f.arcade?.objective);
+    guidance.update(f.guidance, f.goal, f.objective);
     arcade.update(f);
     updateNet(f.net);
     renderer.pointerTarget = guidance.target;

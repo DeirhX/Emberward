@@ -16,13 +16,12 @@ using Emberward.Desktop.Presentation;
 /// <param name="Caption">The word over the clock: <c>TIME</c>, <c>LAST MINUTE</c>, <c>SUDDEN DEATH</c>, <c>FINAL</c>.</param>
 /// <param name="Phase">A <see cref="ClockPhase"/> name.</param>
 /// <param name="Urgent">From the last minute on, until the match is over (<see cref="Scoreboard.IsUrgent"/>).</param>
-/// <param name="Objective">What the match asks of the player, in a line (<see cref="Scoreboards.Objective"/>).</param>
 /// <param name="Rows">Every tank, in rank order.</param>
 /// <param name="Drops">The drop lines, the next drop first; empty once the match is over.</param>
 /// <param name="Effects">The powerups running on the player's tank; empty while it is dead.</param>
 /// <param name="Over">The match-over lines of a match the score decided; null while it plays.</param>
 public sealed record ArcadeStatus(
-    string Clock, string Caption, string Phase, string ClockColor, bool Urgent, string Objective,
+    string Clock, string Caption, string Phase, string ClockColor, bool Urgent,
     ScoreLine[] Rows, DropStatus[] Drops, EffectStatus[] Effects, MatchOverStatus? Over);
 
 /// <summary>One tank's line on the board (<see cref="ScoreRow"/>).</summary>
@@ -84,7 +83,7 @@ public static class BrowserArcade
             rows[i] = new ScoreLine(row.Rank, row.Slot, row.Name, row.Hex, row.Kills, row.Deaths, row.IsLocal, row.IsLeader);
         }
         return new ArcadeStatus(now.Clock, now.Caption, now.Phase.ToString(), HudPalette.Hex(now.ClockColor),
-            now.IsUrgent, Scoreboards.Objective, rows,
+            now.IsUrgent, rows,
             // Over, the match has its final board to show; what drops next is no longer anyone's business.
             world.IsMatchOver ? [] : Drops(drops.Lines(world, player, names)),
             player.IsDead ? [] : Effects(drops.EffectsNow(world.PowerupsOf(player))),
