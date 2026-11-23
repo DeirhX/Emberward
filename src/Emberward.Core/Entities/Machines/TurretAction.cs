@@ -146,7 +146,7 @@ public static class TurretAction
     {
         Position muzzle = Aim(turret, target.X - turret.Position.X, target.Y - turret.Position.Y, out DirectionF direction);
         projectiles.Add(Projectile.CreateBullet(muzzle, direction.ToVector(Tweaks.Weapon.CannonBulletSpeed),
-            turret.OwnerColor, stats.Damage));
+            turret.OwnerColor, stats.Damage, turret.Type));
     }
 
     /// <summary>
@@ -168,7 +168,7 @@ public static class TurretAction
         Position muzzle = Aim(gatling, dx + motion.X * flight, dy + motion.Y * flight, out DirectionF direction);
         int life = (int)MathF.Ceiling((stats.Range + Tweaks.Gatling.RoundSpareCells) / speed);
         projectiles.Add(Projectile.CreateRound(muzzle, direction.ToVector(speed), gatling.OwnerColor, stats.Damage, life,
-            stats.SoilPierce));
+            stats.SoilPierce, gatling.Type));
     }
 
     /// <summary>

@@ -240,6 +240,9 @@ public class Tank
     /// <summary>What destroyed the tank; <see cref="DamageCause.None"/> while it is alive.</summary>
     public DamageCause DeathCause => _lifecycle.DeathCause;
 
+    /// <summary>Who dealt the killing hit; null while alive, and for a death no other side caused (heat, cold, a recall).</summary>
+    public Killer? DeathBy => _lifecycle.DeathBy;
+
     /// <summary>Counts down from <see cref="HitFlashDuration"/> after a hit by enemy fire.</summary>
     public int HitFlashTicks => _lifecycle.HitFlashTicks;
 
@@ -335,8 +338,9 @@ public class Tank
     /// Takes armor off the tank and records why, so the cause can be shown to the player. Returns false when nothing
     /// was taken (no damage, already dead, or enemy fire against the respawn shield).
     /// </summary>
-    public bool TakeDamage(int amount, DamageCause cause, VectorF hitVelocity = default) =>
-        _lifecycle.TakeDamage(amount, cause, hitVelocity);
+    /// <param name="by">Who dealt the hit, when another side did; kept as <see cref="DeathBy"/> if it kills.</param>
+    public bool TakeDamage(int amount, DamageCause cause, VectorF hitVelocity = default, Killer? by = null) =>
+        _lifecycle.TakeDamage(amount, cause, hitVelocity, by);
 
     /// <summary>What the last <see cref="TakeDamage"/> took from the shield and from the hull; nothing when it took nothing.</summary>
     public DamageTaken LastDamageTaken => _lifecycle.LastDamageTaken;

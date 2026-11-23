@@ -1,5 +1,5 @@
-// The scoreboard shown while Tab is held: every tank in its colour, with its driver in a network match, how many times
-// it died and when. What it says is chosen in .NET (TankDeathView, shared with the desktop; BrowserFrameBuilder).
+// The scoreboard shown while Tab is held: every tank in its colour, with its driver in a network match, how many tanks
+// it killed, how many times it died, and when and to whom. What it says is chosen in .NET (TankDeathView, shared with the desktop; BrowserFrameBuilder).
 // It writes to the page only while it shows, and only when what it shows changed.
 
 const $ = (id) => document.getElementById(id);
@@ -32,6 +32,10 @@ export class ScoreboardView {
                 name.textContent =
                     (driver ? `${row.name}  ${driver}` : row.name) +
                     (row.tank === board.you ? " (you)" : "");
+                const kills = document.createElement("b");
+                kills.className = "kills";
+                kills.textContent = String(row.kills);
+                kills.classList.toggle("none", row.kills === 0);
                 const count = document.createElement("b");
                 count.textContent = String(row.deaths.length);
                 const times = document.createElement("span");
@@ -39,7 +43,7 @@ export class ScoreboardView {
                 times.textContent = row.deaths.length
                     ? row.deaths.join("    ")
                     : "no deaths";
-                item.append(swatch, name, count, times);
+                item.append(swatch, name, kills, count, times);
                 item.classList.toggle("you", row.tank === board.you);
                 item.classList.toggle("none", row.deaths.length === 0);
                 return item;

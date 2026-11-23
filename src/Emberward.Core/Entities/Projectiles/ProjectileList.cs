@@ -109,7 +109,8 @@ public class ProjectileList
                 onTank: tank =>
                 {
                     if (tank.Color == p.OwnerColor) return false;
-                    if (tank.TakeDamage(p.Damage, DamageCause.EnemyFire, p.Speed))
+                    Killer? by = p.OwnerColor >= 0 ? new Killer(p.OwnerColor, p.FiredBy) : null;
+                    if (tank.TakeDamage(p.Damage, DamageCause.EnemyFire, p.Speed, by))
                         TankDamageEvents.Record(self._events, tank, ipos, hullEvent: true);
                     if (bursts)
                         self.RecordImpact(ipos, p, ImpactTarget.Tank);

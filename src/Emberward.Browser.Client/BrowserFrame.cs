@@ -24,8 +24,11 @@ public sealed record BrowserFrame(
 /// </summary>
 public sealed record ScoreboardStatus(string Clock, int You, ScoreboardRow[] Rows);
 
-/// <summary>A tank's row: its slot, colour name and colour (#rrggbb), and each death as "3:07 shot", oldest first.</summary>
-public sealed record ScoreboardRow(int Tank, string Name, string Color, string[] Deaths);
+/// <summary>
+/// A tank's row: its slot, colour name and colour (#rrggbb), the tanks it killed, and each death as "3:07 shot by Red",
+/// oldest first.
+/// </summary>
+public sealed record ScoreboardRow(int Tank, string Name, string Color, int Kills, string[] Deaths);
 
 /// <summary>
 /// The tank's reserve (<c>ReserveTags</c>, shared with the desktop): the stage tag drawn beside OFF NETWORK with its
@@ -67,6 +70,7 @@ public sealed record HeatDial(string[] Bands, float Ambient, float Safe, float M
 /// <param name="FireLevel">How big the fire on the damaged hull is, 0 to 1 (0: not burning).</param>
 /// <param name="HitFresh">The first frames after a hit, when the shield crystal flashes white.</param>
 /// <param name="Plate">What the SHIELD/HULL plate shows.</param>
+/// <param name="DeathLine">While the tank is dead: what destroyed it, and who (<c>TankDeathView.DeathLine</c>).</param>
 /// <param name="Materials">What the MATERIALS plate shows: its HOLD and BASE line, the hold's pile, the ore line and a
 /// deposit's pour (<c>MaterialsView</c>).</param>
 public sealed record PlayerStatus(
@@ -76,7 +80,7 @@ public sealed record PlayerStatus(
     bool Docked, bool OffNetwork, float SafeSeconds, bool Dead, double RespawnSeconds, bool CanRecall,
     string Outcome, string? Carrying, bool BaseDestroyed,
     int Health, float Frozen, float Boil, bool Burning, bool HullLow, bool HitFresh,
-    bool OffNetworkUrgent, HullPlate Plate, MaterialsView Materials);
+    bool OffNetworkUrgent, HullPlate Plate, MaterialsView Materials, string? DeathLine = null);
 
 /// <summary>What the desktop's SHIELD/HULL plate shows (<c>HudStrip</c>, <c>LiquidGauges</c>); colours as #rrggbb.</summary>
 /// <param name="HullLabelColor">The HULL label's colour (<c>HullStatuses</c>: what the hull is doing), alternating four

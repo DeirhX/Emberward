@@ -63,7 +63,7 @@ public static class BrowserFrameBuilder
             Math.Max(0, player.Reactor.Health), HeatScale.Frozen(player.Heat), HeatScale.Boil(player.Heat),
             player.IsOverheating || player.IsAboveSafeHeat, player.IsHullLow(latched: false),
             player.HitFlashTicks > Tank.HitFlashDuration - HitFreshTicks, player.IsOffNetworkUrgent, Plate(player, shield),
-            materials);
+            materials, player.IsDead ? TankDeathView.DeathLine(player) : null);
         return new BrowserFrame(session.Seed, world.AdvanceCount, Tweaks.Perf.TargetFps, status,
             session.Sounds.Frame(takePlays: includeEvents), builds, upgrades, preview, goal, Guidance(session.Guidance),
             includeDial ? Dial() : null, net?.Status(), BasePower(world, player), MachineUpgrade(session),
@@ -78,7 +78,7 @@ public static class BrowserFrameBuilder
         var rows = TankDeathView.Rows(world).Select(row =>
         {
             Color c = TankSprites.GetPixelColor(1, row.Tank);
-            return new ScoreboardRow(row.Tank, row.Name, HudPalette.Hex(HudPalette.Rgba(c.R, c.G, c.B)),
+            return new ScoreboardRow(row.Tank, row.Name, HudPalette.Hex(HudPalette.Rgba(c.R, c.G, c.B)), row.Kills,
                 row.Deaths.Select(d => $"{d.Clock} {d.Cause}").ToArray());
         }).ToArray();
         return new ScoreboardStatus(TankDeathView.Clock(world.MatchTime), player.Color, rows);

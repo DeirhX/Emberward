@@ -26,6 +26,7 @@ internal sealed class TankLifecycle
 
     public DamageCause LastDamageCause { get; private set; }
     public DamageCause DeathCause { get; private set; }
+    public Killer? DeathBy { get; private set; }
     public int HitFlashTicks { get; private set; }
     public VectorF LastHitVelocity { get; private set; }
     public int SpawnProtectionTicks { get; private set; }
@@ -47,7 +48,7 @@ internal sealed class TankLifecycle
     /// base and a recall go straight to the hull: a shield stops shells, not the temperature, and never keeps a tank
     /// alive through the last two.
     /// </summary>
-    public bool TakeDamage(int amount, DamageCause cause, VectorF hitVelocity)
+    public bool TakeDamage(int amount, DamageCause cause, VectorF hitVelocity, Killer? by)
     {
         LastDamageTaken = default;
         if (amount <= 0 || _tank.IsDead)
@@ -66,7 +67,10 @@ internal sealed class TankLifecycle
             LastHitVelocity = hitVelocity;
         }
         if (_tank.IsDead)
+        {
             DeathCause = cause;
+            DeathBy = by;
+        }
         return true;
     }
 
@@ -127,7 +131,8 @@ internal sealed class TankLifecycle
     {
         if (!_respawning)
         {
-            ctx.Events?.Record(new StepEvent(StepEventKind.TankDied, _tank.Position, _tank.Color, Cause: DeathCause));
+            ctx.Events?.Record(new StepEvent(StepEventKind.TankDied, _tank.Position, _tank.Color, Cause: DeathCause,
+                By: DeathBy));
             ctx.Deaths?.Record(_tank);
             var delay = _tank.Base is { } home ? ctx.BasePower?.RespawnDelay(home) : null;
             Die(ctx.Projectiles, ctx.Terrain, ctx.IsOccupied, delay, recall);
@@ -149,6 +154,7 @@ internal sealed class TankLifecycle
     {
         _respawning = false;
         DeathCause = DamageCause.None;
+        DeathBy = null;
         LastDamageCause = DamageCause.None;
         HitFlashTicks = 0;
         SpawnProtectionTicks = Tank.SpawnProtectionCap;

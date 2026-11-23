@@ -1,16 +1,22 @@
 using Emberward.Browser.Client;
 using Emberward.Core;
+using Emberward.Core.Config;
 using Emberward.Core.Entities;
+using Emberward.Core.Entities.Machines;
+using Emberward.Core.Entities.Projectiles;
 using Emberward.Core.Entities.Tanks;
 using Emberward.Core.Match;
+using Emberward.Core.Terrain;
+using Emberward.Core.Types;
 using Emberward.Desktop.Gui;
 using Emberward.Desktop.Gui.Guidance;
 
 namespace Emberward.Tests;
 
 /// <summary>
-/// Tank deaths on the HUD: <see cref="World.Deaths"/> records each one, an enemy's posts a toast, and the scoreboard
-/// (<see cref="TankDeathView"/>) lists every tank with the times it died.
+/// Tank deaths on the HUD: <see cref="World.Deaths"/> records each one and who dealt the killing hit, another tank's
+/// posts a toast saying who killed it, and the scoreboard (<see cref="TankDeathView"/>) lists every tank with its kills
+/// and the times it died.
 /// </summary>
 public class TankDeathTests
 {
@@ -59,6 +65,7 @@ public class TankDeathTests
         Step(s, events, feed, 1f);
         Notification toast = Assert.Single(feed.Active, n => n.Key.StartsWith("tank-died-", StringComparison.Ordinal));
         Assert.Equal($"{TankDeathView.ColorName(enemy.Color)} tank destroyed", toast.Title);
+        Assert.Equal("Shot down.", toast.Detail);
         Assert.Equal(NotificationKind.Good, toast.Kind);
 
         feed.Clear();
@@ -129,4 +136,92 @@ public class TankDeathTests
         Assert.Equal(["0:00 froze"], board.Rows[enemy.Color].Deaths);
         Assert.Matches("^#[0-9a-f]{6}$", board.Rows[enemy.Color].Color);
     }
+
+    /// <summary>The scenario's tank, out of its base in an open pocket and past its respawn shield.</summary>
+    private static RelayHeatTests.Scenario ExposedInTheOpen()
+    {
+        var s = RelayHeatTests.CreateScenario();
+        for (int dy = -12; dy <= 12; dy++)
+            for (int dx = -12; dx <= 12; dx++)
+                s.World.Terrain.SetPixel(s.RelayPos + new Offset(dx, dy), TerrainPixel.Blank);
+        s.Tank.Position = s.RelayPos;
+        for (int i = 0; i < Tank.SpawnProtectionDuration + 2; i++)
+            s.World.Advance(_ => default);
+        Assert.Equal(0, s.Tank.SpawnProtectionTicks);
+        return s;
+    }
+
+    /// <summary>Fires <paramref name="shot"/> into the scenario's tank and steps until it dies.</summary>
+    private static List<StepEvent> ShootDown(RelayHeatTests.Scenario s, Projectile shot)
+    {
+        s.World.Projectiles.Add(shot);
+        var events = new List<StepEvent>();
+        for (int i = 0; i < 60 && !events.Any(e => e.Kind == StepEventKind.TankDied); i++)
+        {
+            s.World.Advance(_ => default);
+            events.AddRange(s.World.StepEvents.ToArray());
+        }
+        return events;
+    }
+
+    [Fact]
+    public void AnEnemyShell_IsTheKiller_InTheLog_TheEvent_AndTheDeathScreen()
+    {
+        var s = ExposedInTheOpen();
+        int enemy = Enemy(s).Color;
+        var events = ShootDown(s, Projectile.CreateBullet(s.Tank.Position + new Offset(-10, 0),
+            new VectorF(Tweaks.Weapon.CannonBulletSpeed, 0), enemy, damage: 100_000));
+
+        var expected = new Killer(enemy);
+        Assert.Equal(expected, Assert.Single(events, e => e.Kind == StepEventKind.TankDied).By);
+        Assert.Equal(expected, Assert.Single(s.World.Deaths).By);
+        Assert.Equal(expected, s.Tank.DeathBy);
+        Assert.Equal($"Destroyed by {TankDeathView.ColorName(enemy)}", TankDeathView.DeathLine(s.Tank));
+        Assert.Equal($"shot by {TankDeathView.ColorName(enemy)}", TankDeathView.Rows(s.World)[s.Tank.Color].Deaths[0].Cause);
+        Assert.Equal(1, TankDeathView.Rows(s.World)[enemy].Kills);
+
+        // Once the tank is back, it is no longer dead to anyone.
+        for (int i = 0; i < 400 && s.Tank.IsDead; i++)
+            s.World.Advance(_ => default);
+        Assert.False(s.Tank.IsDead);
+        Assert.Null(s.Tank.DeathBy);
+    }
+
+    [Fact]
+    public void ATurretsShot_NamesTheTurret_AsTheKiller()
+    {
+        var s = ExposedInTheOpen();
+        int enemy = Enemy(s).Color;
+        ShootDown(s, Projectile.CreateBullet(s.Tank.Position + new Offset(-10, 0),
+            new VectorF(Tweaks.Weapon.CannonBulletSpeed, 0), enemy, damage: 100_000, firedBy: MachineType.Turret));
+
+        Assert.Equal(new Killer(enemy, MachineType.Turret), Assert.Single(s.World.Deaths).By);
+        Assert.Equal($"Destroyed by {TankDeathView.ColorName(enemy)}'s turret", TankDeathView.DeathLine(s.Tank));
+        Assert.Equal($"{TankDeathView.ColorName(enemy)}'s turret", TankDeathView.Rows(s.World)[s.Tank.Color].Deaths[0].Cause);
+    }
+
+    [Fact]
+    public void AKillByThePlayer_IsToastedAsTheirs()
+    {
+        var s = RelayHeatTests.CreateScenario();
+        var feed = new NotificationFeed();
+        var events = new GameEventWatcher();
+        Step(s, events, feed, 0f);
+
+        Tank enemy = Enemy(s);
+        enemy.TakeDamage(100_000, DamageCause.EnemyFire, by: new Killer(s.Tank.Color));
+        Step(s, events, feed, 1f);
+        Notification toast = Assert.Single(feed.Active, n => n.Key.StartsWith("tank-died-", StringComparison.Ordinal));
+        Assert.Equal($"You destroyed the {TankDeathView.ColorName(enemy.Color)} tank", toast.Title);
+        Assert.Equal(NotificationKind.Good, toast.Kind);
+        Assert.Equal(1, TankDeathView.Rows(s.World)[s.Tank.Color].Kills);
+    }
+
+    [Theory]
+    [InlineData(0, null, "You destroyed the Red tank")]
+    [InlineData(0, MachineType.Turret, "Your turret destroyed the Red tank")]
+    [InlineData(1, null, "Green destroyed the Red tank")]
+    [InlineData(1, MachineType.Gatling, "Green's gatling destroyed the Red tank")]
+    public void TheToast_SaysWhoKilledWhom(int killer, MachineType? machine, string title) =>
+        Assert.Equal(title, TankDeathView.DeathToast(2, DamageCause.EnemyFire, new Killer(killer, machine), player: 0).Title);
 }

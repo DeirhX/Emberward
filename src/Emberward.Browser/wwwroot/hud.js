@@ -103,7 +103,7 @@ export class StatusView {
                   ? p.baseDestroyed
                       ? "BASE DESTROYED\nOpen the menu to try a new world."
                       : "DIVE ENDED\nOpen the menu to try a new world."
-                  : `TANK LOST\nRespawning in ${Math.ceil(p.respawnSeconds)}s`,
+                  : `TANK LOST\n${p.deathLine ? p.deathLine + "\n" : ""}Respawning in ${Math.ceil(p.respawnSeconds)}s`,
         );
     }
 

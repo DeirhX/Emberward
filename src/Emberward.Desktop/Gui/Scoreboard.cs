@@ -9,8 +9,8 @@ using Emberward.Core.Types;
 using Emberward.Core.Entities.Tanks;
 
 /// <summary>
-/// The scoreboard shown while Tab is held: every tank in its colour, with its driver's name in a network match, how
-/// many times it died and when (<see cref="TankDeathView.Rows"/>), over the match clock.
+/// The scoreboard shown while Tab is held: every tank in its colour, with its driver's name in a network match, how many
+/// tanks it killed, how many times it died and when and to whom (<see cref="TankDeathView.Rows"/>), over the match clock.
 /// </summary>
 public static class Scoreboard
 {
@@ -22,7 +22,7 @@ public static class Scoreboard
     private const float NameSize = 17f;
     private const float TimeSize = 15f;
     private const float Swatch = 20f;
-    private const float CountColumn = 36f;
+    private const float CountColumn = 40f;
 
     /// <param name="driverName">The driver of a tank by its slot in a network match; null outside one.</param>
     public static void Draw((float x, float y, float w, float h) vp, World world, Tank player, Func<int, string>? driverName)
@@ -44,7 +44,8 @@ public static class Scoreboard
                 names[i] += " (you)";
             nameWidth = MathF.Max(nameWidth, HudTheme.Measure(NameSize, names[i]).X);
         }
-        float countX = Swatch + nameWidth + 18f;
+        float killsX = Swatch + nameWidth + 18f;
+        float countX = killsX + CountColumn;
         float timesX = countX + CountColumn;
         float width = MathF.Min(MathF.Max(MinWidth, timesX + MinTimesWidth + 2 * Pad), MathF.Max(MinWidth, vp.w - 32f));
         float timesWidth = MathF.Max(80f, width - 2 * Pad - timesX);
@@ -67,7 +68,9 @@ public static class Scoreboard
         HudTheme.DrawPanel(dl, min, max);
 
         var at = min + new Vector2(Pad, Pad);
-        HudTheme.DrawTitle(dl, at, width - 2 * Pad, "DEATHS", 19f);
+        HudTheme.DrawTitle(dl, at, width - 2 * Pad, "SCOREBOARD", 19f);
+        HudTheme.TextAt(dl, 12f, at + new Vector2(killsX, 5f), "KILLS", HudTheme.TextDim);
+        HudTheme.TextAt(dl, 12f, at + new Vector2(countX, 5f), "DEATHS", HudTheme.TextDim);
         string clock = TankDeathView.Clock(world.MatchTime);
         var clockSize = HudTheme.Measure(16f, clock);
         HudTheme.TextAt(dl, 16f, new Vector2(max.X - Pad - clockSize.X, at.Y + 2f), clock, HudTheme.TextDim);
@@ -80,6 +83,8 @@ public static class Scoreboard
             dl.AddRectFilled(at + new Vector2(0f, 3f), at + new Vector2(12f, 15f), HudTheme.Rgba(c.R, c.G, c.B));
             HudTheme.TextAt(dl, NameSize, at + new Vector2(Swatch, 0f), names[i],
                 row.Tank == player.Color ? HudTheme.Amber : HudTheme.Text);
+            string kills = row.Kills.ToString(CultureInfo.InvariantCulture);
+            HudTheme.TextAt(dl, NameSize, at + new Vector2(killsX, 0f), kills, row.Kills == 0 ? HudTheme.TextDim : HudTheme.Good);
             string count = row.Deaths.Count.ToString(CultureInfo.InvariantCulture);
             HudTheme.TextAt(dl, NameSize, at + new Vector2(countX, 0f), count,
                 row.Deaths.Count == 0 ? HudTheme.TextDim : HudTheme.Danger);

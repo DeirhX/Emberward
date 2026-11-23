@@ -28,7 +28,7 @@ public enum StepEventKind
 
     /// <summary>
     /// A tank was destroyed. <see cref="StepEvent.Position"/> is where it died, <see cref="StepEvent.Cause"/> why (a
-    /// recall is one too).
+    /// recall is one too) and <see cref="StepEvent.By"/> who dealt the killing hit, if another side did.
     /// </summary>
     TankDied,
 
@@ -207,7 +207,8 @@ public readonly record struct StepEvent(
     ImpactTarget Target = default,
     int Count = 0,
     bool Torch = false,
-    Entities.DamageCause Cause = default);
+    Entities.DamageCause Cause = default,
+    Entities.Killer? By = null);
 
 /// <summary>
 /// The events of the current step, cleared when the next one begins. It is output only: nothing in the simulation

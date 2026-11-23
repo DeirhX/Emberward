@@ -64,14 +64,7 @@ public static class MatchOverlay
         }
 
         dl.AddRectFilled(new Vector2(vp.x, vp.y), new Vector2(vp.x + vp.w, vp.y + vp.h), 0x70000000u);
-        string cause = player.DeathCause switch
-        {
-            DamageCause.EnemyFire => "Destroyed by enemy fire",
-            DamageCause.Overheat => "Destroyed by overheating",
-            DamageCause.Frostbite => "Destroyed by frostbite",
-            DamageCause.Emberite => "Destroyed by emberites",
-            _ => "Destroyed",
-        };
+        string cause = TankDeathView.DeathLine(player);
 
         DrawCenteredText(dl, 44f, cx, cy - 30f, "TANK DESTROYED", 0xFF4060FFu);
         DrawCenteredText(dl, 20f, cx, cy + 20f, cause, 0xFFFFFFFFu);

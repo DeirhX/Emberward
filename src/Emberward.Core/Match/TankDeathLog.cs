@@ -3,8 +3,11 @@ namespace Emberward.Core.Match;
 using Emberward.Core.Entities;
 using Emberward.Core.Entities.Tanks;
 
-/// <summary>One tank's death: which tank (its colour, the same as its place in the tank list), the step and why.</summary>
-public readonly record struct TankDeath(int Tank, int Step, DamageCause Cause);
+/// <summary>
+/// One tank's death: which tank (its colour, the same as its place in the tank list), the step, why, and who dealt the
+/// killing hit (null when no other side did).
+/// </summary>
+public readonly record struct TankDeath(int Tank, int Step, DamageCause Cause, Killer? By = null);
 
 /// <summary>
 /// Every tank death of the match, oldest first, for the HUD's scoreboard. It is output only: nothing in the simulation
@@ -21,5 +24,5 @@ public sealed class TankDeathLog
     /// <summary>Stamps the deaths recorded from now on with <paramref name="step"/> (<see cref="World.AdvanceCount"/>).</summary>
     internal void BeginStep(int step) => _step = step;
 
-    internal void Record(Tank tank) => _deaths.Add(new TankDeath(tank.Color, _step, tank.DeathCause));
+    internal void Record(Tank tank) => _deaths.Add(new TankDeath(tank.Color, _step, tank.DeathCause, tank.DeathBy));
 }
