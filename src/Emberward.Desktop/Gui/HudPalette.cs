@@ -2,6 +2,8 @@ namespace Emberward.Desktop.Gui;
 
 using System.Globalization;
 using Emberward.Core;
+using Emberward.Core.Rendering;
+using Emberward.Core.Types;
 
 /// <summary>
 /// The HUD's colours and colour arithmetic, with no ImGui in it, so that the browser client (which compiles this file
@@ -56,6 +58,20 @@ public static class HudPalette
     public static readonly uint Shield = Rgba(160, 224, 255);
     public static readonly uint ShieldEmpty = Rgba(95, 127, 153);
     public static readonly uint HullNeutral = Rgba(255, 184, 112);
+
+    // The arcade powerups (PowerupPresentations). Yellow, orange, violet and lime: none is a tank's colour (blue,
+    // green, red, pink, purple, white, aqua, gray), and each kind also has a mark, so colour is never the only sign.
+    public static readonly uint PowerupOverhaul = Rgba(255, 226, 72);
+    public static readonly uint PowerupOvercharge = Rgba(255, 132, 40);
+    public static readonly uint PowerupBulwark = Rgba(178, 140, 255);
+    public static readonly uint PowerupDrill = Rgba(160, 242, 62);
+
+    /// <summary>The body colour of the tank in <paramref name="slot"/>, as the scoreboard, the name tags and the lobby show it.</summary>
+    public static uint TankColor(int slot)
+    {
+        Color c = TankSprites.GetPixelColor(1, slot);
+        return Rgba(c.R, c.G, c.B);
+    }
 
     /// <summary>The hull fraction where the heat ramp starts: above it the hull is not hot.</summary>
     public const float HullHeatStart = 0.75f;

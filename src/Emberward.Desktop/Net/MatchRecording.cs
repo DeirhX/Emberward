@@ -15,11 +15,19 @@ using Emberward.Protocol;
 /// the match in progress records from the snapshot it loaded (docs/late-join-design.md §6.2).
 /// </summary>
 /// <remarks>
-/// As text: <c>key=value</c> header lines, then one line per tick with each slot's input in hexadecimal. A line
+/// As text: <c>key=value</c> header lines, then one line per tick with each slot's input in hexadecimal. The header's
+/// <c>mode</c> is the room's match mode, which decides the rules the replay builds its world with; a recording without
+/// the line is of a standard match. A line
 /// <c>mask=</c> among the ticks gives the human mask (in hexadecimal) from the next tick on; the header's
 /// <c>humanMask</c> is the mask before the first. A recording from a snapshot has it in the header as
 /// <c>snapshot=</c>, compressed and in base 64, with <c>firstTick</c>, the tick it was saved at. Lines starting with
 /// <c>#</c> are notes and are skipped on loading.
+/// <para>
+/// A recording holds the players' inputs and none of the bots': a replay has the bots decide again. The header's
+/// <c>bots</c> is the <see cref="CurrentBots"/> of the build that recorded it (1 without the line). A recording a bot
+/// played in, from a build whose bots decided otherwise, cannot be replayed, and <see cref="Replay"/> says so; one of
+/// players only replays whatever its number.
+/// </para>
 /// </remarks>
 /// <param name="HumanMask">Which slots players drove before the first recorded tick.</param>
 /// <param name="Bundles">Every tick from the first recorded one, each with its human mask.</param>
@@ -27,6 +35,32 @@ using Emberward.Protocol;
 public sealed record MatchRecording(
     MatchConfig Config, int HumanMask, IReadOnlyList<TickBundle> Bundles, byte[]? Snapshot = null)
 {
+    /// <summary>
+    /// Which bots a recording made by this build was played with. Raise it whenever a bot would decide otherwise in
+    /// the same match, so an older recording with bots fails to replay instead of replaying another match. 1: a bot
+    /// was asked during the step, after the tanks in the slots before it had moved. 2: every bot decides before the
+    /// step (<see cref="SlotStepper"/>).
+    /// </summary>
+    public const int CurrentBots = 2;
+
+    /// <summary>The <see cref="CurrentBots"/> of the build that recorded this.</summary>
+    public int Bots { get; init; } = CurrentBots;
+
+    /// <summary>Whether a bot drove a tank at any recorded tick.</summary>
+    public bool HasBots
+    {
+        get
+        {
+            int everySlot = (1 << Config.Slots) - 1;
+            if ((HumanMask & everySlot) != everySlot)
+                return true;
+            foreach (TickBundle bundle in Bundles)
+                if ((bundle.HumanMask & everySlot) != everySlot)
+                    return true;
+            return false;
+        }
+    }
+
     public void Save(TextWriter writer)
     {
         ArgumentNullException.ThrowIfNull(writer);
@@ -37,6 +71,8 @@ public sealed record MatchRecording(
         writer.WriteLine(string.Create(inv, $"slots={Config.Slots}"));
         writer.WriteLine(string.Create(inv, $"ticksPerSecond={Config.TicksPerSecond}"));
         writer.WriteLine(string.Create(inv, $"inputKeyMask={Config.InputKeyMask:X}"));
+        writer.WriteLine(string.Create(inv, $"mode={Config.Mode}"));
+        writer.WriteLine(string.Create(inv, $"bots={Bots}"));
         writer.WriteLine(string.Create(inv, $"humanMask={HumanMask}"));
         if (Snapshot != null)
         {
@@ -94,9 +130,12 @@ public sealed record MatchRecording(
             var config = new MatchConfig(
                 Number("seed"), int.Parse(map[0], CultureInfo.InvariantCulture), int.Parse(map[1], CultureInfo.InvariantCulture),
                 Number("genMode"), Number("slots"), Number("ticksPerSecond"),
-                uint.Parse(header["inputKeyMask"], NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+                uint.Parse(header["inputKeyMask"], NumberStyles.HexNumber, CultureInfo.InvariantCulture),
+                // A recording from before matches had modes has no such line: it is of a standard match.
+                header.TryGetValue("mode", out string? mode) ? byte.Parse(mode, CultureInfo.InvariantCulture) : (byte)0);
             byte[]? snapshot = header.TryGetValue("snapshot", out string? base64) ? Convert.FromBase64String(base64) : null;
-            return new MatchRecording(config, Number("humanMask"), bundles, snapshot);
+            // A recording from before bots had a number is of the first.
+            return new MatchRecording(config, Number("humanMask"), bundles, snapshot) { Bots = header.ContainsKey("bots") ? Number("bots") : 1 };
         }
         catch (Exception e) when (e is KeyNotFoundException or FormatException or IndexOutOfRangeException or OverflowException)
         {
@@ -107,15 +146,19 @@ public sealed record MatchRecording(
     /// <summary>The world a client builds for these settings, before the first tick.</summary>
     public static World BuildWorld(MatchConfig config) => WorldFactory.Build(new WorldLaunchOptions(
         TerrainTest: false, new Size(config.MapWidth, config.MapHeight), (LevelGenMode)config.GenMode, config.Seed,
-        Players: config.Slots, CoreTapWins: true)).World;
+        Players: config.Slots, CoreTapWins: true, Mode: NetMatch.ModeOf(config))).World;
 
     /// <summary>
     /// Plays the match again from the start (or from the snapshot) and returns the world after the first
     /// <paramref name="ticks"/> recorded ticks (all of them by default), with the bots playing in it then.
     /// <paramref name="afterTick"/> is called after each one.
     /// </summary>
+    /// <exception cref="InvalidDataException">A bot played in it, and this build's bots are not the ones it was recorded with.</exception>
     public (World World, IReadOnlyList<BotTankAI?> Bots) Replay(int? ticks = null, Action<World>? afterTick = null)
     {
+        if (Bots != CurrentBots && HasBots)
+            throw new InvalidDataException(string.Create(CultureInfo.InvariantCulture,
+                $"This recording was played with bots of version {Bots} and this build has version {CurrentBots}: its bots would not decide as they did, so the replay would be another match. Replay it with the build that recorded it."));
         World world = BuildWorld(Config);
         Seats seats = Snapshot is { } snapshot
             ? new Seats(Config.Seed, WorldSnapshot.Load(world, WorldSnapshot.Decompress(snapshot)))

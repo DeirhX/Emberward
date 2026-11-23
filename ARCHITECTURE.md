@@ -153,7 +153,8 @@ worldPixels[w*h]                      terrain aux data (heat, solid field, mater
               terrain + post-process shaders (SDL_GPU)  ->  game texture
               (the post pass ends with the fog: remembered ground drained and dimmed, unknown ground black)
                          |
-              entity layer: link, machine, placement preview, tank and projectile quads (EntityLayerBuilder -> EntityPs)
+              entity layer: link, machine, placement preview, tank and projectile quads, powerup sites and drops
+              (EntityLayerBuilder -> EntityPs)
                          |
               whole-screen effects, only while one shows: hit, overheat, freeze (ScreenEffects -> ScreenFxPs)
                          |
@@ -187,7 +188,9 @@ updates it after each step on the match's time (`BrowserSession.HudSeconds`) and
 - `GameEventWatcher` posts toasts to a `NotificationFeed` through one watch per system in `Guidance/Events`
   (`IEventWatch`): base attacks, upgrades, the sector goal, the network (relays linking or lost, harvesters started,
   stalled or out of charge, off network), the base's power (heat store, low charge, engine), ore (first ore, first pyrite banked,
-  full hold, full store, harvester deliveries), radar scattered by heat, and nests. Each watch compares its system's state with
+  full hold, full store, harvester deliveries), radar scattered by heat, nests, and a timed match with its powerup
+  drops (`ArcadeWatch`: the rules as it starts, a drop landed, who took it, who destroyed whom, the lead changing
+  hands, the last minute, sudden death; kills share one toast that the next replaces). Each watch compares its system's state with
   the previous frame and hears the step's events (`AfterStep`); harvester deliveries are counted from
   `StepEventKind.OreHarvested`, not from the store, so a tank unloading in the same frame is not mistaken for them. A
   new system's toasts are a new watch and a line in the watcher's list; retiring a system deletes both. The feed
@@ -205,6 +208,18 @@ updates it after each step on the match's time (`BrowserSession.HudSeconds`) and
   stretched over its pour, the hold draining as the store counts up, the store's number flashing once and a `+N`
   rising out of it. `LedgerLayout` places the MATERIALS and SHIELD/HULL lines, and tests check they fit their plates.
 
+- A timed match (`MatchRules.TimeLimitSeconds`, arcade mode; DESIGN.md §6.8) is worded once for both hosts, without
+  ImGui: `Presentation/PowerupPresentation.cs` says how each powerup is shown (name, tag, mark, colour, effect line),
+  `Gui/Scoreboard.cs` words the board and the clock (`Scoreboards.Of`: rows in rank order, `7:15`, `+0:12` in sudden
+  death, the clock's phase and caption, the lines of the match-over screen) and `Gui/PowerupViews.cs` the drops
+  (`DropBoard`: the next drop as `D DRILL  in 0:32  120 m`, each drop on the ground with the seconds it still lies,
+  who took the last one; `DropBoard.Effects`: the player's running powerups as `B BULWARK 14s`). They only read Core
+  (`World.MatchClock`, `CopyStandings`, `ScoreLeader`, `PowerupForecast`, `CopyPowerupRenderStates`, `PowerupsOf`).
+  On the desktop `GameHud.Arcade` and `ArcadeLines` draw them: the clock and the drop lines on a plate at the top
+  centre, the board in the BASE panel where a core race has its goal lines, a round badge at the edge of the view
+  toward each drop that is off screen, the effect tags above the HUD strip, and the final standings on the
+  match-over screen (`MatchOverlay`). In a timed match the core race's toasts, tutorial step and banner keep quiet.
+
 Every overlay (tutorial card, toasts, status and upgrade panels, warning banners, pause and controls menus, tags) is
 drawn with `HudTheme`, which follows the bottom HUD art: chamfered gunmetal plates, a bronze frame with an amber inner
 line, amber corner brackets, amber titles, segmented bars and key caps. `HudTheme.BeginWindow` turns an ImGui window
@@ -221,7 +236,9 @@ stereo by direction, attenuated by distance from the player's tank and muffled b
 (`SoundSpace`), into an `ISoundSink`. All effects are synthesised
 (`SoundBank`). On the desktop `GameAudio` gives the director its mixer (`SoundMixer`), played through an SDL audio
 device; automated runs open no device. The browser shares `SoundDirector` and `SoundBank`: its sink records each
-step's sounds into the frame, and the page plays them with the bank's samples (`docs/browser.md`). Detail is in `src/Emberward.Desktop/ARCHITECTURE.md`.
+step's sounds into the frame, and the page plays them with the bank's samples (`docs/browser.md`). An announcement
+about the match (a powerup drop decided, landed, taken or gone; a kill confirmed; the clock's last minute, last ten
+seconds, sudden death and the end) is not placed: every player hears it alike, wherever the thing lies. Detail is in `src/Emberward.Desktop/ARCHITECTURE.md`.
 
 ## Tests
 
@@ -234,7 +251,9 @@ step's sounds into the frame, and the page plays them with the bank's samples (`
 - **Desktop logic that needs no window**: HUD decisions (`HudLogicTests`: hints, heat scale, the HUD's scale,
   gap and covered area), the tutorial and
   event notifications (`GuidanceTests`), entity
-  motion (`EntityMotionTests`), beam fading (`BeamFaderTests`), machine presentation (`MachinePresentationTests`), terrain aux upload
+  motion (`EntityMotionTests`), beam fading (`BeamFaderTests`), machine presentation (`MachinePresentationTests`), a timed
+  match's presentation (`PowerupPresentationTests`, `ScoreboardTests`, `DropBoardTests`, `ArcadeWatchTests`,
+  `ArcadeSoundTests`, `PowerupQuadsTests`, `ArcadeLinesTests`), terrain aux upload
   planning (`TerrainAuxUploaderTests`), fog rendering (`FogRenderingTests`), world construction (`WorldFactoryTests`), and the solid field and material
   coverage the terrain shader samples.
 - **Network matches**: the input codec and messages (`MessageCodecTests`), the relay's rooms and tick rule

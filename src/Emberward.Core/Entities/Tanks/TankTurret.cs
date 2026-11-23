@@ -4,6 +4,7 @@ using System.Diagnostics;
 using Emberward.Core.Types;
 using Emberward.Core.Config;
 using Emberward.Core.Entities.Projectiles;
+using Emberward.Core.Terrain;
 
 public class TankTurret
 {
@@ -42,15 +43,19 @@ public class TankTurret
             tankPos.Y + _direction.Y * Tweaks.Tank.TurretLength);
     }
 
+    /// <param name="terrain">The ground the barrel reaches over: the shell starts where <see cref="ProjectileList.MuzzleOf"/> says.</param>
     /// <param name="delayFactor">How many times the usual delay the next shot waits (a degraded reserve slows the gun).</param>
-    public Projectile? TryShoot(Position tankPos, ProjectileList projectileList, int delayFactor = 1)
+    /// <param name="damage">What the shell deals (an overcharged tank's deal more).</param>
+    public Projectile? TryShoot(Position tankPos, ProjectileList projectileList, ITerrainPixelReadOnly terrain, int delayFactor = 1,
+        int damage = Tweaks.Weapon.BulletDamage)
     {
         if (!IsShooting || _cooldown > 0) return null;
 
         _cooldown = Tweaks.Tank.TurretDelay * delayFactor;
         var barrel = GetBarrelTip(tankPos);
         var speed = _direction.ToVector(Tweaks.Weapon.CannonBulletSpeed);
-        var bullet = Projectile.CreateBullet((Position)barrel, speed, _ownerColor);
+        var muzzle = projectileList.MuzzleOf(terrain, tankPos, (Position)barrel, _ownerColor);
+        var bullet = Projectile.CreateBullet(muzzle, speed, _ownerColor, damage);
         projectileList.Add(bullet);
         return bullet;
     }

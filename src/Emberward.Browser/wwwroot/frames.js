@@ -106,6 +106,8 @@ export async function startRuntime(dotnet, { config = {}, report = () => {}, byt
                     data.mapWidth || 0,
                     data.mapHeight || 0,
                     data.machines || 0,
+                    data.players || 0,
+                    data.mode || "",
                 );
                 report({ stage: "world", state: "end" });
             }
@@ -118,6 +120,7 @@ export async function startRuntime(dotnet, { config = {}, report = () => {}, byt
                     data.mapWidth || 0,
                     data.mapHeight || 0,
                     data.heatWorkers,
+                    data.mode || "",
                 );
             if (data.type === "join" || data.received || data.lost) {
                 const waiting = await api.Receive(

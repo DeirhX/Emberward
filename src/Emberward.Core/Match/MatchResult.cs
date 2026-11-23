@@ -25,21 +25,28 @@ public sealed class MatchResult
     /// destroyed. Once <see cref="Latch"/> has recorded a result, it never changes.
     /// </summary>
     /// <param name="raceWinner">The base that won the race to the core, or null (also when the match is not a race).</param>
-    public (Tank Tank, MatchWinReason Reason)? Winner(TankBase? raceWinner) =>
+    /// <param name="scoreWinner">The tank a timed match's score has named the winner, or null (also when the match has no clock).</param>
+    public (Tank Tank, MatchWinReason Reason)? Winner(TankBase? raceWinner, Tank? scoreWinner = null) =>
         _decided
             ? _winner is { } winner ? (_tanks[winner.TankIndex], winner.Reason) : null
-            : MatchReferee.Winner(_tanks, raceWinner);
+            : MatchReferee.Winner(_tanks, raceWinner, scoreWinner);
 
     /// <summary>A match is over once a tank has won, or every base is destroyed. It stays over.</summary>
-    public bool IsOver(TankBase? raceWinner) =>
-        _decided || Winner(raceWinner) != null || MatchReferee.NobodyIsLeft(_tanks);
+    public bool IsOver(TankBase? raceWinner, Tank? scoreWinner = null) =>
+        _decided || Winner(raceWinner, scoreWinner) != null || MatchReferee.NobodyIsLeft(_tanks);
 
-    /// <summary>Records the result the first time the referee has one; called once per step, after the goal has advanced.</summary>
-    public void Latch(TankBase? raceWinner)
+    /// <summary>Whether <see cref="Latch"/> has recorded the result: the match is over and nothing can change how.</summary>
+    public bool IsDecided => _decided;
+
+    /// <summary>
+    /// Records the result the first time the referee has one; called once per step, after the goal and the score have
+    /// advanced.
+    /// </summary>
+    public void Latch(TankBase? raceWinner, Tank? scoreWinner = null)
     {
         if (_decided)
             return;
-        var winner = Winner(raceWinner);
+        var winner = Winner(raceWinner, scoreWinner);
         if (winner == null && !MatchReferee.NobodyIsLeft(_tanks))
             return;
         _winner = winner is { } won ? (IndexOf(won.Tank), won.Reason) : null;

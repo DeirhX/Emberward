@@ -29,9 +29,11 @@ Run from the repository root.
   - `Rendering/SdlGpu`: the SDL_GPU backend (Metal, Direct3D 12, Vulkan).
   - `Rendering/Shaders`: the HLSL it draws.
 - `src/Emberward.Rendering`: the rendering code every host shares (terrain fields and what a frame uploads of them,
-  entity emitters and machine sprites, the shader constant block, sound (the step-event table, `SoundDirector` and `SoundBank`), the heat colours (`HeatScale`), what a build slot says (`BuildSlotView`), the HUD palette and the charge labels (`HudPalette`, `PowerLabels`) and the HUD's
+  entity emitters and machine sprites, the shader constant block, sound (the step-event table, `SoundDirector` and `SoundBank`), the heat colours (`HeatScale`), what a build slot says (`BuildSlotView`), the HUD palette and the charge labels (`HudPalette`, `PowerLabels`), a timed match's words
+  (how each powerup is shown, `PowerupPresentations`; the board and the clock, `Scoreboards`; the drop lines and effect tags, `DropBoard`) and the HUD's
   guidance: tutorial, toasts, build-key hint and warnings), and a client's part in a network match (`NetSession`,
-  `SlotStepper`, `NetMatch`). Its sources are the files of `src/Emberward.Desktop` listed in
+  `SlotStepper`, `NetMatch`; the match mode's names and the map a match gets by default, `MatchModes` and
+  `MapPresets`). Its sources are the files of `src/Emberward.Desktop` listed in
   `Emberward.Rendering.csproj`, which `Emberward.Desktop.csproj` leaves out: sharing a file means adding it to both
   lists. It references only Core and the protocol (`ArchitectureGuardTests`).
 - `src/Emberward.Browser.Client`: the browser's match (local, or network through `BrowserNetMatch`) and what it
@@ -150,8 +152,8 @@ that tests can inject their own values.
     macros.
   - `EntityLayoutGuardTests`: `EntityVertex` matches the vertex attribute table, and the shape kinds and machine
     flags in `EntityShape` match `Shaders/Entity/Layout.hlsli` and the dispatch in `EntityPs.hlsl`.
-  - `SimulationTableGuardTests`, `MachineBehaviorTableTests`, `MachinePresentationTests`: every enum value has its
-    table entries.
+  - `SimulationTableGuardTests`, `MachineBehaviorTableTests`, `MachinePresentationTests`, `PowerupPresentationTests`:
+    every enum value has its table entries.
   - `SnapshotCoverageTests`: every field a snapshot reaches can be saved, and every `NotSaved` mark is listed with
     its reason.
 - **A machine looks at what is near it, not at every machine.** `MachineList.CollectNear` returns the machines
@@ -175,6 +177,17 @@ that tests can inject their own values.
   creature's drop of its nest's ore (`DropHomeOre`) looks at the nest's ground once per drop: a deposit is its cells, so
   do not add a count of what a nest has left to give. Flow fields are built only while a creature reads them. Its heat is conserved (booked in the
   ledger, counted in `World.SumSystemThermalEnergy`).
+- **Powerup drops cost what lies on the ground, and the next one is always public.** `PowerupDrops`
+  (`MatchRules.Powerups`, arcade mode) decides each drop's site, kind and time a full period before it lands and tells
+  every side, fog or no fog (`World.PowerupForecast`); do not put a drop or its forecast behind vision, and do not
+  decide one later than the landing of the drop before it. A step tests each drop on the ground against each tank and
+  counts the tanks' timers down; a site is the best of a bounded number of draws (`Tweaks.Powerups.WideDraws`,
+  `RefineDraws`), so do not add a pass over the map to find one. It keeps each tank's running effects by the tank's
+  colour and the tank asks it (`EffectsOf`, `ReduceDamage`): a new kind is a `PowerupKind`, its row in `PowerupKinds`
+  and its place in `TankEffects`, not a field on `Tank`. It draws from a stream of its own, so a match without the
+  rule plays and hashes as before (`PowerupDropsTests`, `PowerupSiteTests`). A new kind is shown by its row in
+  `PowerupPresentations` (name, tag, mark, colour, effect line; `PowerupPresentationTests`): the HUD, the markers on
+  the ground, the toasts and the browser read it, and a kind is never told by its colour alone.
 - **Entities are drawn by extrapolation in the vertex shader.** An `EntityVertex` carries its corner in world cells and
   its motion in cells per step; `EntityVs.hlsl` draws it at `corner + motion * StepAlpha` and moves the camera the same
   way. Give a new moving quad its motion (`EntityQuads.Add(..., motion)`), and keep `EntityVertex`, `EntityVertexAttributes`,

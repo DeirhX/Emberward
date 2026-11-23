@@ -28,6 +28,7 @@
 #include "Entity/TankFire.hlsli"
 #include "Entity/Emberites.hlsli"
 #include "Entity/Deposit.hlsli"
+#include "Entity/Powerup.hlsli"
 
 float4 main(PSIn input) : SV_Target
 {
@@ -96,7 +97,9 @@ float4 main(PSIn input) : SV_Target
         result = DangerRing(p, input.color.rgb, input.params, aa);
     else if (kind < kKindOreCrystal + 0.5)
         result = OreCrystal(p, input.color.rgb, input.params, aa);
-    else // kKindCoreHeat
+    else if (kind < kKindCoreHeat + 0.5)
         result = CoreHeat(p, input.color.rgb, input.params);
+    else // kKindPowerup
+        result = Powerup(p, input.color.rgb, input.params, aa);
     return result;
 }

@@ -49,6 +49,24 @@ public class MatchRoomTests
     }
 
     [Fact]
+    public void TheRoomsMode_ReachesEveryoneWhoJoins()
+    {
+        // The first player's settings made the room; the relay hands them on without reading the mode.
+        var arcade = Config with { Mode = 1 };
+        var room = new MatchRoom("r", Build, arcade);
+        var a = new FakePeer();
+        var b = new FakePeer();
+
+        room.Join(a, "Ann", Build, out _);
+        room.Join(b, "Bob", Build, out _);
+
+        Assert.Equal(new Welcome(0, arcade), a.Received[0]);
+        Assert.Equal(new Welcome(1, arcade), b.Received[0]);
+        var overTheWire = (Welcome)MessageCodec.Decode(MessageCodec.Encode(b.Received[0]));
+        Assert.Equal(1, overTheWire.Config.Mode);
+    }
+
+    [Fact]
     public void AnotherBuild_AFullRoom_AndARunningMatch_AreRefused()
     {
         var room = new MatchRoom("r", Build, Config);

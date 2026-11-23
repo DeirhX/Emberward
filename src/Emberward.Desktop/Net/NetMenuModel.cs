@@ -1,6 +1,7 @@
 namespace Emberward.Desktop.Net;
 
 using System.Globalization;
+using Emberward.Core.Match;
 using Emberward.Desktop.Config;
 using Emberward.Protocol;
 
@@ -19,6 +20,7 @@ public enum NetMenuField
     Room,
     Secret,
     CreateName,
+    Mode,
     Tanks,
     Map,
     SeedMode,
@@ -88,6 +90,7 @@ public sealed class NetMenuModel
 
     private bool _createNameEdited;
     private int _players;
+    private MatchMode _mode;
     private MapPreset? _chosenMap;
 
     public NetMenuModel(PlayerSettings settings, string userName, NetMenuRequest? request = null)
@@ -105,8 +108,9 @@ public sealed class NetMenuModel
         CreateNameField = new TextField(MessageCodec.MaxTextLength);
         SeedField = new TextField(10, accepts: c => c is >= '0' and <= '9');
         _players = previous?.Players ?? settings.CreatePlayers ?? NetworkTweaks.DefaultPlayers;
-        // A launch that asked for the map its tanks get anyway chose nothing; one that asked for another did.
-        _chosenMap = previous?.MapSize is { } asked && MapPresets.PresetOf(asked) is { } preset && preset != MapPresets.DefaultFor(_players)
+        _mode = previous?.Mode ?? settings.CreateMode ?? MatchMode.Standard;
+        // A launch that asked for the map its mode and tanks get anyway chose nothing; one that asked for another did.
+        _chosenMap = previous?.MapSize is { } asked && MapPresets.PresetOf(asked) is { } preset && preset != MapPresets.DefaultFor(_mode, _players)
             ? preset
             : settings.CreateMap;
         if (settings.CreateSeed is { } seed)
@@ -155,8 +159,11 @@ public sealed class NetMenuModel
     /// <summary>Tanks in a room this player creates.</summary>
     public int Players => _players;
 
-    /// <summary>The map of a room this player creates: the one chosen, else the one the number of tanks gets.</summary>
-    public MapPreset Map => _chosenMap ?? MapPresets.DefaultFor(_players);
+    /// <summary>The mode of a room this player creates.</summary>
+    public MatchMode Mode => _mode;
+
+    /// <summary>The map of a room this player creates: the one chosen, else the one the mode and the number of tanks get.</summary>
+    public MapPreset Map => _chosenMap ?? MapPresets.DefaultFor(_mode, _players);
 
     /// <summary>True when the rooms get a seed typed in, and false when each match gets a new map.</summary>
     public bool FixedSeed { get; private set; }
@@ -168,12 +175,12 @@ public sealed class NetMenuModel
             ? [NetMenuField.Name, NetMenuField.Room, NetMenuField.Secret]
             : [NetMenuField.Name, NetMenuField.Room],
         _ => FixedSeed
-            ? [NetMenuField.Name, NetMenuField.CreateName, NetMenuField.Tanks, NetMenuField.Map, NetMenuField.SeedMode, NetMenuField.SeedValue]
-            : [NetMenuField.Name, NetMenuField.CreateName, NetMenuField.Tanks, NetMenuField.Map, NetMenuField.SeedMode],
+            ? [NetMenuField.Name, NetMenuField.CreateName, NetMenuField.Mode, NetMenuField.Tanks, NetMenuField.Map, NetMenuField.SeedMode, NetMenuField.SeedValue]
+            : [NetMenuField.Name, NetMenuField.CreateName, NetMenuField.Mode, NetMenuField.Tanks, NetMenuField.Map, NetMenuField.SeedMode],
     };
 
     /// <summary>
-    /// The text field that has the keyboard, or null when a row that is not text (tanks, map, seed mode) has it. While
+    /// The text field that has the keyboard, or null when a row that is not text (mode, tanks, map, seed mode) has it. While
     /// this is not null, every key and character goes to it and the game's hotkeys (Q quits, M mutes) do nothing.
     /// </summary>
     public TextField? FocusedText => TextFieldOf(Focus);
@@ -345,11 +352,15 @@ public sealed class NetMenuModel
         Focus = fields[(at + step + fields.Count) % fields.Count];
     }
 
-    /// <summary>Changes a row that is not text: tanks and map by a step, the seed between new and fixed.</summary>
+    /// <summary>Changes a row that is not text: mode, tanks and map by a step, the seed between new and fixed.</summary>
     public void Adjust(NetMenuField field, int step)
     {
         switch (field)
         {
+            case NetMenuField.Mode:
+                // A map nobody chose follows the mode: an arcade match of a few tanks plays on the small one.
+                _mode = MatchModes.Step(_mode, step);
+                break;
             case NetMenuField.Tanks:
                 _players = Math.Clamp(_players + step, MessageCodec.MinSlots, MessageCodec.MaxSlots);
                 break;
@@ -414,7 +425,7 @@ public sealed class NetMenuModel
     {
         Notice = null;
         var launch = new NetLaunchOptions(
-            Relay, room, NameField.Text.Trim(), _players, SecretField.Text, MapPresets.SizeOf(Map), seed);
+            Relay, room, NameField.Text.Trim(), _players, SecretField.Text, MapPresets.SizeOf(Map), seed, _mode);
         return new NetMenuResult(NetMenuAction.Launch, launch);
     }
 
@@ -428,6 +439,7 @@ public sealed class NetMenuModel
         if (SecretRequired)
             settings.Secret = launched.Secret.Length > 0 ? launched.Secret : null;
         settings.CreatePlayers = _players;
+        settings.CreateMode = _mode;
         settings.CreateMap = _chosenMap;
         settings.CreateSeed = FixedSeed ? ParseSeed(SeedField.Text) : null;
     }

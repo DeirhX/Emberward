@@ -32,6 +32,11 @@ public class StepEventSoundsTests
     [InlineData(StepEventKind.Docked, SoundEffect.Dock)]
     [InlineData(StepEventKind.NestStirred, SoundEffect.WarnEnergy)]
     [InlineData(StepEventKind.OreCollected, SoundEffect.Pickup)]
+    [InlineData(StepEventKind.PowerupAnnounced, SoundEffect.DropAnnounce)]
+    [InlineData(StepEventKind.PowerupLanded, SoundEffect.DropLand)]
+    [InlineData(StepEventKind.PowerupCollected, SoundEffect.DropTaken)]
+    [InlineData(StepEventKind.PowerupExpired, SoundEffect.DropAnnounce)]
+    [InlineData(StepEventKind.PowerupEnded, SoundEffect.EffectEnd)]
     public void PlayerEvents_PlayTheirEffect(StepEventKind kind, SoundEffect expected) =>
         Assert.Equal(expected, Cue(kind));
 
@@ -57,6 +62,7 @@ public class StepEventSoundsTests
     [InlineData(StepEventKind.BuildRefused)]
     [InlineData(StepEventKind.OreUnloaded)]
     [InlineData(StepEventKind.Docked)]
+    [InlineData(StepEventKind.PowerupEnded)]
     public void PlayerOnlyEvents_AreSilentForTheEnemy(StepEventKind kind)
     {
         Assert.True(Hears(kind, tracked: true, isPlayer: true));

@@ -150,23 +150,41 @@ public partial class Game
         Console.WriteLine($"[Net] Match {(relay.Rejoined ? "rejoined" : "started")}: {string.Join(", ", names)}.");
     }
 
-    private static uint SlotColor(int slot)
-    {
-        Color c = TankSprites.GetPixelColor(1, slot);
-        return HudTheme.Rgba(c.R, c.G, c.B);
-    }
+    private static uint SlotColor(int slot) => HudPalette.TankColor(slot);
 
     /// <summary>In the room's lobby: connected, and the match has not started (and nothing has gone wrong).</summary>
     private bool InNetLobby => _relay is { Started: false, Failure: null };
 
+    /// <summary>A local match with several bots: each has its name over it, as the players of a network match do.</summary>
+    private bool _localBotTags;
+
+    /// <summary>What a local match calls the bot in <paramref name="slot"/> when it has more than one.</summary>
+    public static string LocalBotName(int slot) => SlotNames.LocalBot(slot);
+
+    /// <summary>
+    /// What the board and the toasts call the tank in <paramref name="slot"/>: the driver's name in a network match,
+    /// <c>YOU</c> and <c>BOT n</c> in a local one.
+    /// </summary>
+    private string SlotName(int slot) =>
+        _relay is { } relay && _netSession is { } session ? relay.DriverName(slot, session.HumanMask)
+        : slot == _localSlot ? SlotNames.You
+        : SlotNames.LocalBot(slot);
+
     /// <summary>
     /// The network overlays of a frame: the lobby before the start, a warning plate when something is wrong, and a
-    /// name over every other tank in sight.
+    /// name over every other tank in sight. A local match has only the names, and only among several bots.
     /// </summary>
     private void DrawNetOverlays(ReadOnlySpan<PositionF> drawnTankPositions)
     {
         if (_relay is not { } relay)
+        {
+            if (_localBotTags)
+            {
+                _hud.WinnerName = _world.MatchWinner?.Tank is { } won && won.Color != _localSlot ? LocalBotName(won.Color) : null;
+                DrawNameTags(drawnTankPositions);
+            }
             return;
+        }
 
         SaveLastMatch(relay);
         if (InNetLobby)
@@ -181,7 +199,8 @@ public partial class Game
         DrawNameTags(drawnTankPositions);
 
         var play = _hud.PlayRect;
-        var anchor = new Vector2(play.x + play.w * 0.5f, play.y + 18f);
+        // Below the clock plate of a timed match, when the HUD has one at the top of the view.
+        var anchor = new Vector2(play.x + play.w * 0.5f, MathF.Max(play.y, _hud.TopCentreBottom) + 18f);
         string? notice = NetNotice(relay, _netSession?.Buffered ?? 0, out bool bad);
         if (notice == null)
         {
@@ -228,6 +247,7 @@ public partial class Game
         if (HudTheme.BeginWindow("##NetLobby", anchor, new Vector2(0.5f, 0f), 520f))
         {
             HudTheme.TitleRow($"NETWORK MATCH    room {relay.Room}", 19f);
+            HudTheme.WrappedRow(LobbyText.SettingsLine(relay.Config), HudTheme.TextDim, 15f);
             var dl = ImGui.GetWindowDrawList();
             for (int slot = 0; slot < relay.Config.Slots; slot++)
             {
@@ -268,16 +288,19 @@ public partial class Game
     /// <summary>The name of every other living tank the player can see, over the tank, in its colour.</summary>
     private void DrawNameTags(ReadOnlySpan<PositionF> drawnTankPositions)
     {
+        // A timed match that is over shows its final standings where the tags would be.
+        if (_world.IsMatchOver && _world.MatchClock.Active)
+            return;
         var tanks = _world.TankList.Tanks;
         var dl = ImGui.GetForegroundDrawList();
-        for (int slot = 0; slot < tanks.Count && slot < drawnTankPositions.Length && _netPlaying; slot++)
+        for (int slot = 0; slot < tanks.Count && slot < drawnTankPositions.Length && (_netPlaying || _localBotTags); slot++)
         {
             // Names follow the same rule as the tanks themselves: nothing is shown of a tank out of sight.
             if (slot == _localSlot || tanks[slot].IsDead || !Rendering.Entities.Sight.Sees(_vision, tanks[slot].Position))
                 continue;
             Vector2 at = _hud.CellToScreen(drawnTankPositions[slot].X + 0.5f, drawnTankPositions[slot].Y - 5f);
             if (_hud.IsInView(at))
-                HudTheme.DrawTag(dl, at, _relay!.DriverName(slot, _netSession!.HumanMask), SlotColor(slot), 14f);
+                HudTheme.DrawTag(dl, at, _relay?.DriverName(slot, _netSession!.HumanMask) ?? LocalBotName(slot), SlotColor(slot), 14f);
         }
     }
 }

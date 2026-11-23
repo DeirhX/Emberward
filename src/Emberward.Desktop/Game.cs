@@ -6,6 +6,7 @@ using static SDL3.SDL;
 using Emberward.Core;
 using Emberward.Core.Config;
 using Emberward.Core.LevelGen;
+using Emberward.Core.Match;
 using Emberward.Core.Sensing;
 using Emberward.Core.Terrain;
 using Emberward.Core.Types;
@@ -84,7 +85,9 @@ public partial class Game : IDisposable
         Net.RelayConnection? relay = null,
         Net.NetMenuRequest? openNetMenu = null,
         string launchSecret = "",
-        Uri? launchRelay = null)
+        Uri? launchRelay = null,
+        int localPlayers = Tweaks.LevelGen.DefaultPlayers,
+        MatchMode localMode = MatchMode.Standard)
     {
         _launchSecret = launchSecret;
         _launchRelay = launchRelay;
@@ -111,17 +114,17 @@ public partial class Game : IDisposable
         _textures = new SdlGpuTextureLoader(sdlGpuBackend);
         if (!DesktopDisplayOptions.Hidden)
             DrawStartupSplash();
-        _hud = new GameHud();
+        _hud = new GameHud { Names = SlotName };
         LoadHudSprites();
         // Only a person playing a match hears sound.
         _audio = GameAudio.Create(!IsInteractiveSession);
 
-        ReplayArguments = genMode == LevelGenMode.Optimized
-            ? $"--fast --seed={Seed.ToString(CultureInfo.InvariantCulture)}"
-            : $"--seed={Seed.ToString(CultureInfo.InvariantCulture)}";
+        // A network match is what its room says; a local one what the command line asked for.
+        int players = relay?.Config.Slots ?? localPlayers;
+        MatchMode matchMode = relay != null ? Net.NetMatch.ModeOf(relay.Config) : localMode;
+        ReplayArguments = Net.LaunchArguments.ReplayArguments(Seed, genMode == LevelGenMode.Optimized, players, matchMode);
         var built = WorldFactory.Build(new WorldLaunchOptions(
-            terrainTestMode, terrainSizeOverride, genMode, Seed,
-            Players: relay?.Config.Slots ?? Tweaks.LevelGen.DefaultPlayers, CoreTapWins: relay != null));
+            terrainTestMode, terrainSizeOverride, genMode, Seed, players, CoreTapWins: relay != null, Mode: matchMode));
         _world = built.World;
         _terrainSize = built.TerrainSize;
         _entityLayer.CaptureStep(_world, _localSlot);
@@ -149,6 +152,8 @@ public partial class Game : IDisposable
         // The terrain test has no match: no player input to script or record, and no enemy tank.
         bool aiTanks = !terrainTestMode && StartMatchInput(enableAiTanks && relay == null);
         var bots = CreateBots(built, aiTanks);
+        // Against one bot the other tank needs no name; among several each says which it is.
+        _localBotTags = aiTanks && relay == null && _world.TankList.Count > 2;
         _simulationStepper = new GameSimulationStepper(
             world: _world,
             localSlot: _localSlot,

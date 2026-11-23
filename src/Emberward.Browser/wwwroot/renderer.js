@@ -1,5 +1,6 @@
 import { WebGlRenderer } from "./webgl.js";
 import { ResolutionGovernor } from "./pace.js";
+import { drawDropPointers } from "./arcade.js";
 
 export class GameRenderer {
     constructor(canvas) {
@@ -15,6 +16,8 @@ export class GameRenderer {
         this.target = null;
         // The charge labels over machines (G), drawn while the frame carries them (a match with the energy network).
         this.showPower = true;
+        // Where a timed match's drop pointers may go (ArcadeView.layout); set by main.js.
+        this.arcadeLayout = null;
         this.governor = new ResolutionGovernor();
         this.resize();
         window.addEventListener("resize", () => this.resize());
@@ -122,6 +125,10 @@ export class GameRenderer {
                 this.bearing(c, this.frame.player.home, "HOME", "#83d9cf") ||
                 drawn;
         if (this.target) drawn = this.pointer(c, this.target, now) || drawn;
+        // A timed match: the next powerup drop and the one on the ground, while they are out of sight (arcade.js).
+        const drops = this.frame.arcade?.drops;
+        if (drops?.length && this.arcadeLayout)
+            drawn = drawDropPointers(c, this, drops, this.arcadeLayout, now) || drawn;
         drawn = this.machineUpgrade(c, this.frame.machineUpgrade) || drawn;
         if (shaken) drawn = this.crosshair(c, aim) || drawn;
         this.overlayDrawn = drawn;

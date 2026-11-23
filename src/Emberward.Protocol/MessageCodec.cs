@@ -10,7 +10,7 @@ using System.Text;
 public static class MessageCodec
 {
     /// <summary>Changes whenever the bytes of any message change. Client and relay must match.</summary>
-    public const int ProtocolVersion = 13;
+    public const int ProtocolVersion = 14;
 
     /// <summary>Maximum size of an ordinary message. Only a snapshot chunk may exceed it.</summary>
     public const int MaxMessageBytes = 4096;
@@ -310,12 +310,16 @@ public static class MessageCodec
         w.Write((byte)c.Slots);
         w.Write((byte)c.TicksPerSecond);
         w.Write(c.InputKeyMask);
+        w.Write(c.Mode);
     }
 
+    // The mode, like the level generator, is read as any byte: what a value means is the game's business, and a
+    // client that does not know the room's refuses to build it. A relay that checked would need redeploying for
+    // every new mode.
     private static MatchConfig ReadConfig(BinaryReader r)
     {
         var config = new MatchConfig(
-            r.ReadInt32(), r.ReadUInt16(), r.ReadUInt16(), r.ReadByte(), r.ReadByte(), r.ReadByte(), r.ReadUInt32());
+            r.ReadInt32(), r.ReadUInt16(), r.ReadUInt16(), r.ReadByte(), r.ReadByte(), r.ReadByte(), r.ReadUInt32(), r.ReadByte());
         if (config.Slots is < MinSlots or > MaxSlots)
             throw new InvalidDataException($"A match of {config.Slots} slots is not allowed.");
         if (config.MapWidth is < MinMapSide or > MaxMapSide || config.MapHeight is < MinMapSide or > MaxMapSide)

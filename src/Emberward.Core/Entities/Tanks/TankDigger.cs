@@ -30,9 +30,12 @@ internal sealed class TankDigger
     /// Moves one step by <paramref name="speed"/>. Blocked by terrain, the tank digs instead; with the torch firing
     /// along the move it may get through in the same tick. Another tank or another side's machine stops it
     /// (<see cref="CollisionSolver.BlocksTank"/>). <paramref name="speedFactor"/> slows it further (a stranded tank
-    /// crawls), and a reserve stage may slow the dig (<see cref="TankReserveSystem.ReadyToDig"/>).
+    /// crawls), and a reserve stage may slow the dig (<see cref="TankReserveSystem.ReadyToDig"/>). With
+    /// <paramref name="drill"/> (a powerup) the tank steps into what its plain dig cleared in the same tick, so soil
+    /// no longer halves its speed; rock and ore stop it as before.
     /// </summary>
-    public void Move(in SimulationContext ctx, Offset speed, DirectionF torchHeading, bool torchUse, float speedFactor = 1f)
+    public void Move(in SimulationContext ctx, Offset speed, DirectionF torchHeading, bool torchUse, float speedFactor = 1f,
+        bool drill = false)
     {
         if (speed.X == 0 && speed.Y == 0)
         {
@@ -62,7 +65,7 @@ internal sealed class TankDigger
                 (int)MathF.Round(torchHeading.X),
                 (int)MathF.Round(torchHeading.Y)));
 
-            if (!(torchUse && torchDir == dir))
+            if (!(torchUse && torchDir == dir) && !drill)
                 return;
 
             if (CollisionSolver.TestTankTerrain(ctx.Terrain, newPos, dir) != StepObstacle.None)

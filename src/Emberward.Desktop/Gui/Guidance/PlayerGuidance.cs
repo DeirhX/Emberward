@@ -43,6 +43,12 @@ public sealed class PlayerGuidance
     /// <summary>The warning banner, or null for none.</summary>
     public PlayerWarning? Warning { get; private set; }
 
+    /// <summary>
+    /// What a toast calls the tank in a slot (a kill, a drop taken, a new leader). The host of a network match sets the
+    /// players' names; null, as in a local match, says <c>YOU</c> and <c>BOT n</c> (<see cref="SlotNames.Local"/>).
+    /// </summary>
+    public Func<int, string>? Names { get; set; }
+
     /// <summary>Call after each simulation step, while <see cref="World.StepEvents"/> still holds that step's events.</summary>
     public void AfterStep(World world, Tank player) => _events.AfterStep(world, player);
 
@@ -60,7 +66,7 @@ public sealed class PlayerGuidance
         }
 
         _events.Update(world, player, _feed, now,
-            introQuiet: !_tutorial.HasReached(TutorialDirector.NetworkStepTitle));
+            introQuiet: !_tutorial.HasReached(TutorialDirector.NetworkStepTitle), Names);
         _feed.Update(now);
         Tutorial = player.IsDead ? null : _tutorial.Update(world, player, now);
         if (Tutorial == null && _tutorial.IsComplete && float.IsNaN(_tutorialDoneAt))

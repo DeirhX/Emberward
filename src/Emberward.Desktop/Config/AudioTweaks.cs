@@ -92,6 +92,25 @@ public static class AudioTweaks
     // Ore burned to restart a dark base: the same sound, pitched down.
     public const float DepositBurnPitch = 0.75f;
     public const float WarningGain = 0.38f;
+    // Powerup drops: announcements every player hears wherever they are. The next drop decided is a soft ping (it
+    // comes with every landing); a landing is clear; taking one yourself is the loudest. One that ran out is the ping
+    // again, lower and quieter.
+    public const float DropAnnounceGain = 0.16f;
+    public const float DropLandGain = 0.50f;
+    public const float DropTakenGain = 0.36f;
+    public const float DropGainedGain = 0.55f;
+    public const float DropExpiredGain = 0.12f;
+    public const float DropExpiredPitch = 0.6f;
+    public const float EffectEndGain = 0.34f;
+    // The player destroyed a tank: heard over the blast itself.
+    public const float KillConfirmGain = 0.50f;
+    // The clock of a timed match: the last minute, each of the last seconds (the last three higher), sudden death and
+    // the end.
+    public const float ClockWarningGain = 0.40f;
+    public const float ClockTickGain = 0.34f;
+    public const float ClockLastTicksPitch = 1.35f;
+    public const float SuddenDeathGain = 0.50f;
+    public const float MatchHornGain = 0.60f;
     public const float EngineIdleGain = 0.10f;
     public const float EngineMovingGain = 0.22f;
     public const float DigGain = 0.34f;

@@ -889,6 +889,9 @@ footer i {
 #lobby p {
     margin: 6px 0;
 }
+#lobby-settings {
+    color: var(--hud-dim);
+}
 #lobby-hint {
     color: var(--hud-amber);
 }

@@ -46,7 +46,8 @@ public static class BrowserFrameBuilder
                 MachineBehaviors.Get(carried).RequiresLinkToPlant ? placement.Link.Status.ToString() : "Ready",
                 placement.Link.Target, placement.SenseHeat);
         }
-        GoalStatus? goal = world.CorePocket is Position core && world.CoreTapOf(home) is { } tap
+        // A timed match is won on the clock: its HUD has no core goal to show, as on the desktop (GoalLines).
+        GoalStatus? goal = !world.MatchClock.Active && world.CorePocket is Position core && world.CoreTapOf(home) is { } tap
             ? new GoalStatus(core, tap.TapPerTick * Tweaks.Perf.TargetFps, Tweaks.Goal.GoalChargePerSecond,
                 tap.HoldSeconds, Tweaks.Goal.GoalHoldSeconds, tap.HasTapped) : null;
         var (hitFromX, hitFromY) = HitFrom(player);
@@ -66,7 +67,9 @@ public static class BrowserFrameBuilder
         return new BrowserFrame(session.Seed, world.AdvanceCount, Tweaks.Perf.TargetFps, status,
             session.Sounds.Frame(takePlays: includeEvents), builds, upgrades, preview, goal, Guidance(session.Guidance),
             includeDial ? Dial() : null, net?.Status(), BasePower(world, player), MachineUpgrade(session),
-            Reserve(world.ReserveOf(player)));
+            Reserve(world.ReserveOf(player)),
+            // In a network lobby the match has not begun: no clock, board or drops to show yet, as on the desktop.
+            net?.Room is { Started: false } ? null : BrowserArcade.Capture(world, player, session.Drops, session.Names));
     }
 
     /// <summary>The reserve's stage tag and burn prompt, as the desktop shows them (<see cref="ReserveTags"/>).</summary>

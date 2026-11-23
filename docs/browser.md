@@ -173,14 +173,23 @@ from the warning on X (or the button over the HUD) burns a unit of pyrite from t
 The on-screen controls support touch devices; tap the game to aim and fire, or hold FIRE while driving.
 Escape opens the pause menu. Switching away from the page pauses the local match.
 
+A solo match is the player's tank against one bot in a standard match. The address asks for another:
+`?players=N` (2 to 8) puts a bot in every tank but the player's, and `?mode=arcade` plays the arcade mode (the
+desktop's `--players=N` and `--arcade`). The page passes both on as it found them and `BrowserLaunch` reads them:
+a count outside 2 to 8 is two tanks, a mode nobody knows the standard one. A standard solo match keeps the large
+map whatever the count; an arcade one gets the map a room of its size would (320x200 up to four tanks,
+`BrowserSession.LocalMapSize`), and `?map=WxH` chooses another for either.
+
 ## Network play
 
 The welcome screen has two tabs, **Solo** and **Online**, and keeps the one last chosen. **Online** joins a room on
-the relay (docs/multiplayer-design.md): a name, a room and the number of tanks. The page remembers them
-(`localStorage`). The page sends no secret: the public relay is open to everyone, and a relay that asks for a secret
-refuses the browser. The first player into
-a room opens it with a new seed and that many tanks, on the desktop's map for the count (480x300 for more than two,
-`?map=WxH` for another); bots take the slots nobody joins. The lobby shows who is in each slot in their tank's
+the relay (docs/multiplayer-design.md): a name, a room, the match mode (**MODE**: Standard or Arcade) and the number
+of tanks. The page remembers them (`localStorage`); `?mode=arcade` in the address presets the mode. The page sends
+no secret: the public relay is open to everyone, and a relay that asks for a secret refuses the browser. The first
+player into a room opens it with a new seed, that mode and that many tanks, on the desktop's map for them (480x300
+for more than two, 320x200 for an arcade room of up to four, `?map=WxH` for another); bots take the slots nobody
+joins. Someone who joins a room that exists gets the room's mode and tanks, not the page's. The lobby names the
+room's match in a line ("Arcade match   4 tanks   map 320x200") and shows who is in each slot in their tank's
 colour; the host (the lowest slot) starts with **Start match** or Enter, and a full room starts by itself. P pauses
 the match for everyone and resumes it. Escape opens the menu over a running match, which does not stop for one
 player, **Leave match** leaves the room, and the host's **Close to new players** shuts the running match to newcomers (and **Open to new players** reopens it); the button shows the state, disabled, to everyone else. A player who left or lost the connection joins again under the same
@@ -202,7 +211,8 @@ to carry it, followed by a tick that releases it. A step is drawn from when the 
 because ticks arrive by the relay's clock. A hidden tab stops drawing and stepping; when it comes back it catches up
 as a rejoining player does.
 
-Not yet in the browser: name tags over other tanks, the desync report file the desktop writes, and choosing a map
+Not yet in the browser: name tags over other tanks (in a network match, and over the bots of a solo match of more
+than two, which the desktop tags "BOT 2" and so on), the desync report file the desktop writes, and choosing a map
 size or seed for a new room from the page.
 
 The header says **SAVED FOR OFFLINE** after the entire app, including the .NET runtime, has been cached, and

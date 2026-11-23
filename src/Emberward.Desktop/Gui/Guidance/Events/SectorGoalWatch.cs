@@ -5,7 +5,10 @@ using Emberward.Core.Config;
 using Emberward.Core.Entities.Tanks;
 using Emberward.Core.Match;
 
-/// <summary>The sector goal: tapping the core, holding the goal rate, the sector complete.</summary>
+/// <summary>
+/// The sector goal: tapping the core, holding the goal rate, the sector complete. Silent in a timed match
+/// (<see cref="World.MatchClock"/>), whose goal is the score: the core is there, and tapping it is not the point.
+/// </summary>
 internal sealed class SectorGoalWatch : IEventWatch
 {
     private Latch _tapping;
@@ -18,7 +21,7 @@ internal sealed class SectorGoalWatch : IEventWatch
 
     public void Update(in GuidanceFrame f)
     {
-        CoreTap? core = f.World.CoreTapOf(f.Home);
+        CoreTap? core = f.World.MatchClock.Active ? null : f.World.CoreTapOf(f.Home);
         if (_tapping.Rose(core?.TapPerSecond > 1.0) && f.Primed)
             f.Feed.Post(f.Now, "core-tap", "Tapping the core",
                 $"Your relays by the core make charge. Reach {Tweaks.Goal.GoalChargePerSecond / 1000:0}k/s and hold it for {Tweaks.Goal.GoalHoldSeconds:0} s.",

@@ -22,9 +22,10 @@ public struct EntityVertex
 }
 
 /// <summary>
-/// Turns simulation snapshots into the entity layer's quads: radar blips, network coverage, links, the placement preview,
-/// the core heat glows, machines, the light of tank fires, tanks, the deposit crystals, projectiles, emberites, tank
-/// fires, shields, charge labels and deposit labels, in that order (later ones draw on top). <see cref="EntityMotion"/> says where
+/// Turns simulation snapshots into the entity layer's quads: radar blips, nest danger rings, the powerup site and drops,
+/// network coverage, links, the placement preview, the core heat glows, machines, the light of tank fires, tanks, the
+/// deposit crystals, projectiles, emberites, tank fires, shields, powerup halos, charge labels, nest, deposit and
+/// powerup labels, in that order (later ones draw on top). <see cref="EntityMotion"/> says where
 /// tanks and machines start and how they move through a simulation step (the vertex shader does the rest); each family's emitter in <c>Rendering/Entities</c>
 /// writes its quads. The layer reads simulation state solely for drawing.
 /// </summary>
@@ -50,6 +51,7 @@ public sealed class EntityLayerBuilder
     private readonly NestDangerQuads _nestDangers = new();
     private readonly PowerLabelQuads _powerLabels = new();
     private readonly DepositQuads _deposits = new();
+    private readonly PowerupQuads _powerups = new();
     private TankRenderState[] _tankScratch = [];
     private MachineRenderState[] _machineScratch = [];
 
@@ -58,6 +60,9 @@ public sealed class EntityLayerBuilder
 
     /// <summary>The pyrite deposits drawn (pours, core glows, floaters, the store label).</summary>
     public DepositQuads Deposits => _deposits;
+
+    /// <summary>The powerup site, drops and halos drawn.</summary>
+    public PowerupQuads Powerups => _powerups;
 
     public EntityVertex[] Vertices => _quads.Vertices;
     public int VertexCount => _quads.VertexCount;
@@ -87,6 +92,7 @@ public sealed class EntityLayerBuilder
         _powerLabels.CaptureStep(world, localSlot);
         OreLedger.CaptureStep(world, localSlot);
         _deposits.CaptureStep(world, localSlot, OreLedger);
+        _powerups.CaptureStep(world);
     }
 
     /// <summary>
@@ -138,6 +144,7 @@ public sealed class EntityLayerBuilder
 
         // Danger rings and beams (links, the tether) under machines, machines under tanks (a tank carrying one draws on top).
         _nestDangers.EmitRings(_quads);
+        _powerups.EmitGround(_quads);
         _coverage.Emit(_quads);
         _beams.Begin(visualSeconds);
         if (tankPositions.Length > 0)
@@ -158,9 +165,11 @@ public sealed class EntityLayerBuilder
         _emberites.Emit(_quads, vision);
         _tankFires.Emit(_quads, _motion, vision);
         _tankShields.Emit(_quads, _motion, vision);
+        _powerups.EmitHalos(_quads, _motion, vision);
         _baseShields.Emit(_quads, vision);
         _powerLabels.Emit(_quads, vision, powerLabelCellSize);
         _nestDangers.EmitLabels(_quads);
         _deposits.EmitLabels(_quads);
+        _powerups.EmitLabels(_quads);
     }
 }

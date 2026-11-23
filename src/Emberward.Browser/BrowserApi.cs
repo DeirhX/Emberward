@@ -26,12 +26,15 @@ public static partial class BrowserApi
     /// <param name="width">The map's width in cells (<c>?map=WxH</c>); 0 for the normal map.</param>
     /// <param name="height">The map's height in cells; 0 for the normal map.</param>
     /// <param name="machines">For measuring (<c>?machines=N</c>): machines planted before play; 0 in a normal match.</param>
+    /// <param name="players">The tanks of the match (<c>?players=N</c>): the player's, and a bot in every other; 0 for the normal two.</param>
+    /// <param name="mode">The kind of match (<c>?mode=arcade</c>), as the address has it; empty for the standard one.</param>
     [JSExport]
-    public static Task Start(int seed, int heatWorkers, int width, int height, int machines)
+    public static Task Start(int seed, int heatWorkers, int width, int height, int machines, int players, string mode)
     {
         _net = null;
         _session = new BrowserSession(seed, heatWorkers,
-            width > 0 && height > 0 ? new Size(width, height) : null, Math.Max(0, machines));
+            width > 0 && height > 0 ? new Size(width, height) : null, Math.Max(0, machines),
+            BrowserLaunch.Players(players), BrowserLaunch.Mode(mode));
         _hudStale = true;
         _dialSent = false;
         return Task.CompletedTask;
@@ -44,14 +47,16 @@ public static partial class BrowserApi
     /// </summary>
     /// <param name="players">The tanks of the match, if this browser opens the room.</param>
     /// <param name="seed">The seed it proposes if it opens the room.</param>
-    /// <param name="width">The map it proposes (<c>?map=WxH</c>); 0 for the desktop's map for the player count.</param>
+    /// <param name="width">The map it proposes (<c>?map=WxH</c>); 0 for the desktop's map for the mode and the player count.</param>
+    /// <param name="mode">The kind of match it proposes if it opens the room, as the form has it; empty for the standard one.</param>
     [JSExport]
     public static Task Join(string room, string name, int players, int seed, int width, int height,
-        int heatWorkers)
+        int heatWorkers, string mode)
     {
         _session = null;
         _net = new BrowserNetMatch(room, name,
-            BrowserNetMatch.Propose(seed, players, width > 0 && height > 0 ? new Size(width, height) : null),
+            BrowserNetMatch.Propose(
+                seed, players, width > 0 && height > 0 ? new Size(width, height) : null, BrowserLaunch.Mode(mode)),
             Math.Max(1, heatWorkers));
         _hudStale = true;
         _dialSent = false;

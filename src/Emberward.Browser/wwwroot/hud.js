@@ -94,7 +94,8 @@ export class StatusView {
         const burn = f.reserve?.burn;
         setText($("recall-text"), burn ?? "Drop cargo and respawn");
         setHidden($("recall"), !(p.canRecall || burn) || p.outcome !== "InProgress");
-        setHidden($("death"), !p.dead && p.outcome === "InProgress");
+        // A match the score decided ends on its final standings (arcade.js), which say who won and how.
+        setHidden($("death"), (!p.dead && p.outcome === "InProgress") || Boolean(f.arcade?.over));
         setText(
             $("death"),
             p.outcome === "Victory"

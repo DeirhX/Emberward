@@ -3,10 +3,12 @@ namespace Emberward.Desktop.Audio;
 using Emberward.Core;
 using Emberward.Core.Collision;
 using Emberward.Core.Entities.Tanks;
+using Emberward.Core.Match;
 using Emberward.Core.Terrain;
 using Emberward.Core.Types;
 using Emberward.Desktop.Config;
 using Emberward.Desktop.Rendering.Entities;
+using Emberward.Desktop.Gui;
 using Emberward.Desktop.Gui.Guidance;
 
 /// <summary>Where <see cref="SoundDirector"/> sends what to play: the desktop's mixer, or the browser's frame.</summary>
@@ -30,10 +32,13 @@ public interface ISoundSink
 /// Turns what happens in the simulation into sound, for the desktop and the browser alike. It is called once after
 /// every simulation step (never per displayed frame) and plays the events that step recorded
 /// (<see cref="World.StepEvents"/>): one-shots for shots, impacts, deaths and the like, the engine, digging, torch,
-/// tread and recharge loops from the tanks' activity, and the player's warning tones. Everything is heard from the
-/// player's tank (<see cref="SoundSpace"/>): loudness follows distance, stereo position follows direction, rock and
-/// dirt in between muffle it, and another tank's engine and treads rise a little in pitch while it comes closer. It
-/// only reads simulation output; nothing here feeds back into the simulation.
+/// tread and recharge loops from the tanks' activity, the player's warning tones, and in a timed match the clock
+/// (<see cref="StepEventSounds.ClockCue"/>). Everything is heard from the player's tank (<see cref="SoundSpace"/>):
+/// loudness follows distance, stereo position follows direction, rock and dirt in between muffle it, and another
+/// tank's engine and treads rise a little in pitch while it comes closer. An announcement about the match
+/// (<see cref="CueHeard.Everyone"/>: a powerup drop, the clock, a kill confirmed) is the exception: it plays at the
+/// listener, as loud wherever the thing it is about lies. It only reads simulation output; nothing here feeds back
+/// into the simulation.
 /// </summary>
 public sealed class SoundDirector
 {
@@ -68,6 +73,7 @@ public sealed class SoundDirector
     private int _lastDebrisStep = -1000;
     private bool _runningHot, _lowShield;
     private int _nextWarningStep, _lastWarningStep = -1000, _lastWarningRank;
+    private ClockPhase _clockPhase;
 
     // The world last heard: a new match (or a late join's copy) starts each tank's fire from silence.
     private WeakReference<World>? _world;
@@ -98,7 +104,8 @@ public sealed class SoundDirector
     public void AfterStep(World world, int localSlot)
     {
         ArgumentNullException.ThrowIfNull(world);
-        if (_world == null || !_world.TryGetTarget(out World? last) || !ReferenceEquals(last, world))
+        bool newWorld = _world == null || !_world.TryGetTarget(out World? last) || !ReferenceEquals(last, world);
+        if (newWorld)
         {
             for (int i = 0; i < _tanks.Length; i++)
                 _tanks[i].Fire = 0f;
@@ -149,14 +156,17 @@ public sealed class SoundDirector
                         PlayCue(wake, e.Position, index, ref impacts);
                     break;
                 default:
-                    if (StepEventSounds.CueFor(e) is { } cue &&
-                        StepEventSounds.Hears(cue, tracked: index >= 0, isPlayer: e.Color == playerColor))
+                    bool own = e.Color == playerColor;
+                    if (((own ? StepEventSounds.PlayerCueFor(e) : null) ?? StepEventSounds.CueFor(e)) is { } cue &&
+                        StepEventSounds.Hears(cue, tracked: index >= 0, isPlayer: own))
                     {
                         // A pour sounds once, on its first event: loud for the whole load, what is left aboard included.
                         if (cue.Voice == CueVoice.Pour && index >= 0)
                             cue = cue with { Gain = StepEventSounds.DepositGain(e.Count + tanks[index].OreHeld) };
                         PlayCue(cue, e.Position, index, ref impacts);
                     }
+                    if (StepEventSounds.KillCueFor(e, playerColor) is { } kill)
+                        PlayCue(kill, e.Position, -1, ref impacts);
                     break;
             }
         }
@@ -176,6 +186,21 @@ public sealed class SoundDirector
 
         if (player != null)
             ObserveWarnings(player);
+        ObserveClock(world, newWorld);
+    }
+
+    /// <summary>The clock of a timed match: its last minute, its last seconds, sudden death and the end (<see cref="StepEventSounds.ClockCue"/>).</summary>
+    /// <param name="newWorld">The first step heard of this world: where its clock stands is no news (a late join may start anywhere).</param>
+    private void ObserveClock(World world, bool newWorld)
+    {
+        MatchClock clock = world.MatchClock;
+        if (!clock.Active)
+            return;
+        ClockPhase phase = Scoreboards.PhaseOf(clock, world.IsMatchOver);
+        int none = 0;
+        if (!newWorld && StepEventSounds.ClockCue(_clockPhase, phase, clock) is { } cue)
+            PlayCue(cue, _listener, -1, ref none);
+        _clockPhase = phase;
     }
 
     /// <summary>
@@ -206,7 +231,8 @@ public sealed class SoundDirector
                 track.LastPourStep = _step;
                 break;
             default:
-                Play(cue.Effect, position, cue.Gain, 1f, index);
+                // An announcement is heard where the listener is, whatever place it is about.
+                Play(cue.Effect, cue.Heard == CueHeard.Everyone ? _listener : position, cue.Gain, cue.Pitch, index);
                 break;
         }
     }

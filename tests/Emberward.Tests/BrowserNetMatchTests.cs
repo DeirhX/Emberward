@@ -7,6 +7,7 @@ using Emberward.Browser.Client;
 using Emberward.Core;
 using Emberward.Core.Input;
 using Emberward.Core.LevelGen;
+using Emberward.Core.Match;
 using Emberward.Core.Types;
 using Emberward.Desktop;
 using Emberward.Desktop.Net;
@@ -46,6 +47,52 @@ public class BrowserNetMatchTests
         Assert.Equal(Core.Config.Tweaks.World.MaxPlayers, BrowserNetMatch.Propose(7, 99).Slots);
 
         static Size Size(MatchConfig config) => new(config.MapWidth, config.MapHeight);
+    }
+
+    [Fact]
+    public void Propose_CarriesTheMode_AndAnArcadeRoomOfUpToFourTanksGetsTheSmallMap()
+    {
+        Assert.Equal(0, BrowserNetMatch.Propose(7, 4).Mode);
+
+        var arcade = BrowserNetMatch.Propose(7, 4, mode: MatchMode.Arcade);
+        Assert.Equal((1, 320, 200), (arcade.Mode, arcade.MapWidth, arcade.MapHeight));
+        var five = BrowserNetMatch.Propose(7, 5, mode: MatchMode.Arcade);
+        Assert.Equal((1, 480, 300), (five.Mode, five.MapWidth, five.MapHeight));
+        var chosen = BrowserNetMatch.Propose(7, 4, new Size(1500, 750), MatchMode.Arcade);
+        Assert.Equal((1500, 750), (chosen.MapWidth, chosen.MapHeight));
+    }
+
+    [Fact]
+    public void TheRoomsMode_IsTheMatchThatIsBuilt_WhateverThisClientProposed()
+    {
+        var proposed = BrowserNetMatch.Propose(42, 2);
+        var room = BrowserNetMatch.Propose(99, 4, mode: MatchMode.Arcade);
+        var match = new BrowserNetMatch("room", "Bob", proposed);
+        Assert.Null(match.Status().Settings);
+
+        Feed(match, new Welcome(1, room), new Roster(["Ann", "Bob", "", ""]));
+
+        Assert.Null(match.Failure);
+        Assert.Equal(MatchMode.Arcade, match.Session!.Mode);
+        Assert.Equal(MatchRules.ForMode(MatchMode.Arcade, coreTapWins: true), match.Session.World.Rules);
+        Assert.Equal(4, match.Session.World.TankList.Count);
+        Assert.Equal("Arcade match   4 tanks   map 320x200", match.Status().Settings);
+        // The hash the relay compares before the start is of the room's world, rules included.
+        var ready = match.TakeOutgoing().Select(b => MessageCodec.Decode(b)).OfType<Ready>().Single();
+        Assert.Equal(WorldStateHash.ComputeReady(MatchRecording.BuildWorld(room)), ready.WorldHash);
+    }
+
+    [Fact]
+    public void ARoomWhoseModeThisBuildDoesNotKnow_IsNotJoined()
+    {
+        var config = BrowserNetMatch.Propose(42, 2);
+        var match = new BrowserNetMatch("room", "Bob", config);
+
+        Feed(match, new Welcome(1, config with { Mode = 9 }));
+
+        Assert.Null(match.Session);
+        Assert.Contains("mode", match.Failure, StringComparison.Ordinal);
+        Assert.Contains("Update the game", match.Failure, StringComparison.Ordinal);
     }
 
     /// <summary>The relay's side of a short exchange, by hand: what the browser sends back to each message.</summary>
@@ -179,6 +226,31 @@ public class BrowserNetMatchTests
         Assert.StartsWith("Disconnected: lost the connection to the relay. Join again", status.Notice, StringComparison.Ordinal);
         Feed(match, Tick(1, [0u, 0u], 3));
         Assert.Equal(0, match.Advance(default, 1, Now));
+    }
+
+    [Fact]
+    public void AnArcadeRoom_ShowsNoBoardInTheLobby_AndThenCallsEveryTankByItsDriver()
+    {
+        var config = NetMatch.ProposeConfig(42, new Size(320, 200), LevelGenMode.Deterministic, 3, MatchMode.Arcade);
+        var match = new BrowserNetMatch("room", "Ann", config);
+        Feed(match, new Welcome(1, config), new Roster(["Bob", "Ann", ""]));
+
+        // The lobby is the page's to draw: the match has no clock running and no board yet.
+        Assert.Null(BrowserFrameBuilder.Capture(match.Session!, includeEvents: false, net: match).Arcade);
+
+        Feed(match, new Start(0b011), Tick(0, [0u, 0u, 0u], 0b011), Tick(1, [0u, 0u, 0u], 0b011));
+        Assert.Equal(2, match.Advance(default, dueByClock: 1, Now));
+        var frame = BrowserFrameBuilder.Capture(match.Session!, includeEvents: false, net: match);
+
+        var arcade = frame.Arcade;
+        Assert.NotNull(arcade);
+        Assert.Equal("Bob,Ann,Bot", string.Join(',', arcade.Rows.OrderBy(r => r.Slot).Select(r => r.Name)));
+        Assert.Equal("Ann", Assert.Single(arcade.Rows, r => r.Local).Name);
+        Assert.Equal("8:00", arcade.Clock);
+        Assert.Null(frame.Goal);
+        // The toasts name a tank as the board does.
+        Assert.Equal("Bob", match.Session!.Guidance.Names!(0));
+        Assert.Equal("Bot", match.Session.Names(2));
     }
 
     private static Tick Tick(int tick, System.Collections.Immutable.ImmutableArray<uint> inputs, int mask) =>

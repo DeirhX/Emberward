@@ -11,6 +11,7 @@ using Emberward.Core.Thermal;
 using Emberward.Core.Entities.Machines;
 using Emberward.Core.Network;
 using Emberward.Core.Entities.Bases;
+using Emberward.Core.Entities.Powerups;
 
 /// <summary>What touching its core does with a tank's hold (<see cref="Tank.CoreDropOff"/>).</summary>
 public enum CoreDropOff
@@ -46,6 +47,12 @@ public class Tank
 
     [NotSaved("fixed for the match: the world's shield system, handed over at construction; the world saves it once")]
     private readonly TankShieldSystem? _shield;
+
+    /// <summary>The world's powerup drops, when the rules run them (<see cref="Match.MatchRules.Powerups"/>); they keep this tank's running powerups.</summary>
+    internal PowerupDrops? Powerups => _powerups;
+
+    [NotSaved("fixed for the match: the world's powerup drops, handed over at construction; the world saves them once")]
+    private readonly PowerupDrops? _powerups;
 
     public Position Position { get; set; }
     public int Color { get; }
@@ -107,6 +114,9 @@ public class Tank
 
     /// <summary>A burn of carried pyrite lowers the off-network floor (<see cref="TankReserveSystem"/>).</summary>
     internal void LowerOffNetworkFloor(float degrees) => _thermals.LowerOffNetworkFloor(degrees);
+
+    /// <summary>An overhaul's coolant (<see cref="PowerupKind.Overhaul"/>): the tank's heat leaves the system, booked in <paramref name="ledger"/>.</summary>
+    internal void CoolFromPickup(ThermalLedger ledger) => _thermals.CoolFromPickup(ledger);
 
     /// <summary>Seconds until the rising off-network heat floor reaches the safe maximum (zero once it has).</summary>
     public float OffNetworkSecondsToOverheat =>
@@ -234,6 +244,14 @@ public class Tank
     /// <summary>What destroyed the tank; <see cref="DamageCause.None"/> while it is alive.</summary>
     public DamageCause DeathCause => _lifecycle.DeathCause;
 
+    /// <summary>
+    /// The colour of the tank this one's death is credited to (<see cref="StepEvent.Killer"/> of its
+    /// <see cref="StepEventKind.TankDied"/>): the enemy whose shell destroyed it (its own, or its turret's or
+    /// gatling's), or, when heat, cold or a creature did, the last enemy whose shell hurt it in the
+    /// <see cref="Tweaks.Arcade.KillCreditSeconds"/> before. -1 while it is alive and when the death is nobody's.
+    /// </summary>
+    public int KillerColor => _lifecycle.Killer;
+
     /// <summary>Counts down from <see cref="HitFlashDuration"/> after a hit by enemy fire.</summary>
     public int HitFlashTicks => _lifecycle.HitFlashTicks;
 
@@ -260,9 +278,10 @@ public class Tank
     public MachineType? CarriedMachineType => _build.CarriedType;
 
     public Tank(int color, TankBase tankBase, int rngSeed = 0, SimulationSettings? settings = null,
-        TankShieldSystem? shield = null)
+        TankShieldSystem? shield = null, PowerupDrops? powerups = null)
     {
         _shield = shield;
+        _powerups = powerups;
         _thermals = new TankThermals(this, settings ?? SimulationSettings.FromTweaks());
         Color = color;
         Base = tankBase;
@@ -316,9 +335,10 @@ public class Tank
         AdvanceRelayUnload(in ctx);
         AdvanceTurretAim(input);
         Turret.Update(input.ShootPrimary);
-        _digger.Move(in ctx, input.MoveSpeed, Turret.Direction, input.ShootPrimary, reserve.MoveFactor);
+        var powerups = _powerups?.EffectsOf(this) ?? PowerupEffects.None;
+        _digger.Move(in ctx, input.MoveSpeed, Turret.Direction, input.ShootPrimary, reserve.MoveFactor, powerups.Drill);
         _lifecycle.UpdateSpawnProtection(ctx.CheckBaseCollision(Position) == Base, input.ShootPrimary);
-        AdvanceShooting(input, in ctx, reserve.FireDelayFactor);
+        AdvanceShooting(input, in ctx, reserve.FireDelayFactor, powerups.ShellDamageFactor);
         _build.Advance(in ctx, input, reserve.CanBuild);
         AdvanceUpgrades(input);
         ctx.MachineUpgrades?.Advance(this, in input);
@@ -329,8 +349,9 @@ public class Tank
     /// Takes armor off the tank and records why, so the cause can be shown to the player. Returns false when nothing
     /// was taken (no damage, already dead, or enemy fire against the respawn shield).
     /// </summary>
-    public bool TakeDamage(int amount, DamageCause cause, VectorF hitVelocity = default) =>
-        _lifecycle.TakeDamage(amount, cause, hitVelocity);
+    /// <param name="attacker">The colour of the tank whose shell this is (its own or its machine's), or -1.</param>
+    public bool TakeDamage(int amount, DamageCause cause, VectorF hitVelocity = default, int attacker = -1) =>
+        _lifecycle.TakeDamage(amount, cause, hitVelocity, attacker);
 
     /// <summary>What the last <see cref="TakeDamage"/> took from the shield and from the hull; nothing when it took nothing.</summary>
     public DamageTaken LastDamageTaken => _lifecycle.LastDamageTaken;
@@ -549,10 +570,10 @@ public class Tank
         }
     }
 
-    private void AdvanceShooting(ControllerOutput input, in SimulationContext ctx, int delayFactor)
+    private void AdvanceShooting(ControllerOutput input, in SimulationContext ctx, int delayFactor, int damageFactor)
     {
         if (!input.ShootPrimary) return;
-        var bullet = Turret.TryShoot(Position, ctx.Projectiles, delayFactor);
+        var bullet = Turret.TryShoot(Position, ctx.Projectiles, ctx.Terrain, delayFactor, damageFactor * Tweaks.Weapon.BulletDamage);
         if (bullet != null)
         {
             _thermals.RecordShot();

@@ -391,7 +391,9 @@ island supplies charge. Cooling tanks and delivering ore still require base cove
 A base must not fall to a tank that drives up and shoots it. It is a keep (`BaseLayout`, numbers in `Tweaks.Keep`):
 
 - **Walls nothing gets through.** The same 35-cell square as before. Its walls stop tanks and shells and take no
-  damage, with or without power.
+  damage, with or without power. A barrel does not reach through them either: a shot whose barrel lies in or across a
+  wall, or a gate shut to the shooter, starts at the shooter and meets it (`ProjectileList.MuzzleOf`), so a tank or a
+  turret pressed against a keep does what one further back does.
 - **A gate in each side, 11 cells wide.** A tank is 7 wide, so the owner drives in from any direction without lining
   up. To its owner a gate is open ground, for the tank and for its shells.
 - **The core** is a disc 5 cells across at the centre (21 cells) and the only part of a base that takes damage. Its armor is
@@ -906,6 +908,76 @@ base against the border under the same conditions:
 - *Still open:* the centre-distance rule allows a base on a long border nearer the core than one on a short border
   by up to a fifth; a base on a long side keeps hot-rock pockets out of the middle of a small map's narrow axis.
 
+### 6.8 Arcade mode *(Prototype)*
+
+The standard match is long: nothing ends it but a fallen base or the core, a death costs up to 15 seconds, and a side
+that loses its base is out. Arcade mode is the short one, for up to four players, played on the same map with the
+same heat, network and machines (`MatchMode.Arcade`, `MatchRules.Arcade`; numbers in `Tweaks.Arcade`):
+
+- **A fixed length, won on kills.** The match lasts 8 minutes. A tank scores a kill when its shell, or its turret's
+  or gatling's, destroys another tank. It also scores when heat, frost or an emberite destroys a tank that its shell
+  hurt in the 5 seconds before: the last enemy to hit it has the kill, so driving a tank into the heat or the swarm
+  counts. A death with no enemy's shell in those 5 seconds, a recall and anything a tank's own shell did score for
+  nobody: the death is counted, and no one scores. (In 100 four-bot matches 21% of deaths scored for nobody, and
+  nearly half of those tanks had been hit by an enemy within 5 seconds; with the credit 10% do.)
+- **The sole leader wins.** When the clock runs out the tank with the most kills has won. While the top score is
+  shared the match goes on in sudden death, and ends the moment one tank leads alone.
+- **Bases hold.** A core takes no damage, so no base falls and nobody is eliminated. A shell bursts on an enemy core
+  as on a wall. Gates, shields and machines are as in the standard match, and can still be shot.
+- **A quick respawn.** A destroyed tank is back in its base after 3 seconds, whatever its base has stored.
+- The core race is off, and emberites are on.
+- **No slot is favoured.** Every tank's input, a bot's like a player's, is decided before the step from the world as
+  the last step left it. (Bots were asked as the tanks moved, slot by slot, so a bot in a later slot saw where the
+  earlier ones had just gone: of 100 four-bot matches the slots won 17, 17, 27 and 39. Decided before the step, 29,
+  23, 27 and 21 of the same hundred, and 119, 90, 97 and 94 of 400, with mean scores of 8.4, 8.1, 8.1 and 8.1.)
+- *Still open:* whether 5 seconds is the right time for a kill credit; what
+  bots do with the time they no longer spend on sieges; whether deaths should cost score.
+
+**Powerup drops** (`MatchRules.Powerups`, on in arcade mode; numbers in `Tweaks.Powerups`). Pickups land on a fixed
+schedule, and everyone knows well ahead where, when and what:
+
+- **The schedule is public.** The first drop lands 45 seconds in, and one every 40 seconds after it. The moment a
+  drop lands the next one's place, kind and time are decided, so the next drop is always known a full period ahead
+  (the first from the start of the match). Every side knows it whatever it sees: a drop and its forecast are never
+  behind the fog. The schedule follows from the match's seed alone, so every machine and every replay agrees.
+- **A drop lies for 40 seconds**, until the next one lands, so at most one is on the ground at a time: one nobody
+  takes is gone as the next lands. The first living tank to touch it (a disc 7 cells across) takes it; of two touching
+  it in the same step the nearer does, and the lower slot on a tie. (Bots took 73% of the drops they took within 20
+  seconds of landing and 8% after 40; lying 60 seconds, two drops were out 4.6% of the time.)
+- **Four kinds**, dealt from a shuffled bag: each once every four drops, never the same twice running.
+  - *Overhaul*, at once: the hull whole, the shield full, the tank cooled to the ground's rest temperature and its
+    off-network clock started over.
+  - *Overcharge*, 20 seconds: the tank's shells deal double damage.
+  - *Bulwark*, 20 seconds: the tank takes half of all damage (shells, heat, frost, emberites), shield and hull alike.
+    A recall still destroys it.
+  - *Drill*, 25 seconds: the tank digs soil as fast as it drives open ground (twice its plain digging). Rock is as
+    it was.
+  Taking a kind that is still running starts its time over. A tank's death ends what it had.
+- **Where a drop lands is fair.** Always on soil or open ground a tank can reach, away from every base (at least 30
+  cells, and 30% of the spacing of the two nearest bases), from the hot core, the hot and frost pockets and the nests,
+  off ground warmer than 40 degrees or colder than -20, and never where the drop before it lies. Two kinds of site
+  take turns. An *everyone's* drop is as nearly the same distance from every base as the ground allows; with four
+  bases that is beside the core. A *contested* drop lies between two neighbours, about as far from both, and each
+  base in its turn is one of the two (and the nearer by a little). The turns go in rounds, every base once, in an
+  order shuffled from the match's seed for each round, and no base has two turns running: which base is first, and
+  which is a turn ahead when the match ends partway through a round, does not follow from the slot. (In slot order
+  slot 0's base was the nearest to 39% of the contested drops of an 8-minute match and each other to about 20%;
+  shuffled, 27%, 26%, 23% and 24%.) Measured on 320x200 with four bases over 8 seeds, on ground nobody has fought
+  over: the farthest base of an everyone's drop is 32 cells farther than the nearest at the median (51 at worst, the
+  core being in the way of the point that is equally far from all), and the second base of a contested drop 3 cells
+  farther than the nearest (14 at worst). In play the fighting warms the ground round the core, which is where the
+  everyone's sites are: with sites kept off ground warmer than 20 degrees that median grew through a match from 27
+  cells for the first such drop to 62 for the sixth, and with 40 degrees it stays between 35 and 41 after the first
+  (100 four-bot matches).
+- **Bots contest them.** A roaming bot goes for a drop that lies within 150 cells, or lands there within 15 seconds,
+  and waits on the spot for one about to land; it fights what it meets on the way, and leaves alone a site it cannot
+  get to. In 100 whole matches of four bots on 320x200 they took 929 of 1126 drops (82%), half of them within 7
+  seconds of landing, and 16% ran out.
+- *Still open:* whether a forecast 40 seconds ahead is enough to plan a route by on the largest maps (the period
+  could scale with the map); with more than four bases no point is near all of them, so an everyone's drop favours
+  the bases nearest the middle; whether Overcharge should also reach the tank's turrets; whether a bot should weigh a
+  drop against its heat and hull before it goes.
+
 ## 7. World structure: sectors
 
 ### 7.1 Separate maps in one persistent world *(Proposed; the freeze rule in 7.3 builds on it)*
@@ -1128,6 +1200,11 @@ upgrades, throughput, turrets, removing the pylon and the tank's reserve are in)
 | Carried pyrite heats the tank linearly, steeply from 20 units and dangerously at 40, with no step or spike, and the hold upgrade insulates the load more than it enlarges the hold; the hold unloads only by touching the own core or a powered relay, and the core has no baffles round it (§6.3, §4.9) | Prototype |
 | Each unit a tank banks (core or relay) brings 250 energy into its reactor, booked as injected, after the tank's dock cooling; harvested and burned ore bring none (§6.3) | Prototype |
 | A bot sieges only a base it can break, and waits beside a gate (out of its line of fire) only while its enemy is docked in a base it cannot break; emberites hunt bot and player tanks by the same rules, and leave any tank docked in its own base (§4.9, §6.2) | Prototype |
+| Arcade mode is a timed match won on kills: 8 minutes, the sole leader wins, a tied top score plays on in sudden death; a kill is a tank destroyed by a shell (a tank's or its machines'), or by heat, frost or a creature within 5 s of an enemy's shell hurting it (§6.8) | Prototype |
+| In arcade mode bases hold: a core takes no damage, so no side is eliminated (§6.8) | Prototype |
+| In arcade mode a destroyed tank respawns after a flat 3 seconds, whatever its base has stored (§6.8) | Prototype |
+| Arcade mode has powerup drops on a public, seeded schedule: the next drop's place, kind and time are known to every side a full period (40 s) ahead, fog or no fog; four kinds from a shuffled bag (Overhaul, Overcharge, Bulwark, Drill); a drop lies until the next lands, so one is out at a time; sites alternate between as near every base alike as the ground allows and between two neighbours, each base in its turn, the turns in rounds shuffled from the seed; bots go for drops near them (§6.8) | Prototype |
+| Every tank's input, a bot's like a player's, is decided before the step, so no slot knows more than another (§6.8) | Prototype |
 
 ## 14. Open questions
 
