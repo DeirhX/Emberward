@@ -483,7 +483,7 @@ public partial class World
 
     /// <summary>
     /// Marks the side of spawn <paramref name="spawnIndex"/> as played by the computer, or by a player again: the bot
-    /// does not prospect, so while it plays, its base gets <see cref="Tweaks.Ore.BotOrePerSecond"/> of ore instead (a
+    /// prospects only in the opening, so while it plays, its base also gets <see cref="Tweaks.Ore.BotOrePerSecond"/> of ore (a
     /// stand-in, DESIGN.md §6.4). Part of the simulation: in a network match every client changes it at the same tick.
     /// </summary>
     public void SetBotControlled(int spawnIndex, bool botControlled)

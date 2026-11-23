@@ -127,7 +127,6 @@ public partial class Game : IDisposable
             terrainTestMode, terrainSizeOverride, genMode, Seed, players, CoreTapWins: relay != null, Mode: matchMode));
         _world = built.World;
         _terrainSize = built.TerrainSize;
-        _entityLayer.CaptureStep(_world, _localSlot);
         // The terrain test has no tanks, and so no fog.
         if (fogOfWar && LocalTank is { } localTank)
         {
@@ -135,6 +134,8 @@ public partial class Game : IDisposable
             _fogLayer = new FogLayer(_terrainSize);
             _radar = _world.TrackRadar(localTank);
         }
+        // After the vision, so the enemy name plates start from what the player sees.
+        _entityLayer.CaptureStep(_world, _localSlot, _vision);
         _terrainView = _vision != null ? TerrainView.Fogged(_world.Terrain, _vision) : TerrainView.Live(_world.Terrain);
 
         _worldPixels = new uint[_terrainSize.Area];
@@ -152,8 +153,6 @@ public partial class Game : IDisposable
         // The terrain test has no match: no player input to script or record, and no enemy tank.
         bool aiTanks = !terrainTestMode && StartMatchInput(enableAiTanks && relay == null);
         var bots = CreateBots(built, aiTanks);
-        // Against one bot the other tank needs no name; among several each says which it is.
-        _localBotTags = aiTanks && relay == null && _world.TankList.Count > 2;
         _simulationStepper = new GameSimulationStepper(
             world: _world,
             localSlot: _localSlot,
@@ -306,7 +305,7 @@ public partial class Game : IDisposable
     {
         _simFrameCounter++;
         _steppedSinceRender = true;
-        _entityLayer.CaptureStep(_world, _localSlot);
+        _entityLayer.CaptureStep(_world, _localSlot, _vision);
 
         // With fog the renderer follows what the player knows of the terrain, not the terrain: a change out of
         // sight is drawn when the player next sees the cell.

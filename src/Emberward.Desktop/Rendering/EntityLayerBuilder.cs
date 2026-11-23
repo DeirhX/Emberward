@@ -25,7 +25,7 @@ public struct EntityVertex
 /// Turns simulation snapshots into the entity layer's quads: radar blips, nest danger rings, the powerup site and drops,
 /// network coverage, links, the placement preview, the core heat glows, machines, the light of tank fires, tanks, the
 /// deposit crystals, projectiles, emberites, tank fires, shields, powerup halos, charge labels, nest, deposit and
-/// powerup labels, in that order (later ones draw on top). <see cref="EntityMotion"/> says where
+/// powerup labels and enemy tank name plates, in that order (later ones draw on top). <see cref="EntityMotion"/> says where
 /// tanks and machines start and how they move through a simulation step (the vertex shader does the rest); each family's emitter in <c>Rendering/Entities</c>
 /// writes its quads. The layer reads simulation state solely for drawing.
 /// </summary>
@@ -52,6 +52,7 @@ public sealed class EntityLayerBuilder
     private readonly PowerLabelQuads _powerLabels = new();
     private readonly DepositQuads _deposits = new();
     private readonly PowerupQuads _powerups = new();
+    private readonly TankPlateQuads _tankPlates = new();
     private TankRenderState[] _tankScratch = [];
     private MachineRenderState[] _machineScratch = [];
 
@@ -64,11 +65,17 @@ public sealed class EntityLayerBuilder
     /// <summary>The powerup site, drops and halos drawn.</summary>
     public PowerupQuads Powerups => _powerups;
 
+    /// <summary>The name plates over enemy tanks; a network match gives them the players' names (<see cref="TankPlateQuads.SetPlayerName"/>).</summary>
+    public TankPlateQuads TankPlates => _tankPlates;
+
     public EntityVertex[] Vertices => _quads.Vertices;
     public int VertexCount => _quads.VertexCount;
 
-    /// <summary>Records the world after a simulation step; each moving thing starts from where it was last drawn.</summary>
-    public void CaptureStep(World world, int localSlot)
+    /// <summary>
+    /// Records the world after a simulation step; each moving thing starts from where it was last drawn.
+    /// <paramref name="vision"/> is the player's (null without fog of war), which the enemy name plates follow.
+    /// </summary>
+    public void CaptureStep(World world, int localSlot, VisionMap? vision)
     {
         if (_tankScratch.Length < world.TankList.Count)
             _tankScratch = new TankRenderState[world.TankList.Count];
@@ -93,6 +100,7 @@ public sealed class EntityLayerBuilder
         OreLedger.CaptureStep(world, localSlot);
         _deposits.CaptureStep(world, localSlot, OreLedger);
         _powerups.CaptureStep(world);
+        _tankPlates.CaptureStep(world, localSlot, vision);
     }
 
     /// <summary>
@@ -128,11 +136,12 @@ public sealed class EntityLayerBuilder
     /// <paramref name="visualSeconds"/> is the game's visual clock, which drives every animation (pulses, blinking).
     /// With fog of war, <paramref name="vision"/> is the player's: tanks, machines, shots and links out of its sight
     /// are left out, and <paramref name="radar"/>'s blips are drawn on the ground it cannot see.
-    /// <paramref name="powerLabelCellSize"/> is the displayed size of a cell in UI units, or zero to hide charge labels.
+    /// <paramref name="powerLabelCellSize"/> is the displayed size of a cell in UI units, or zero to hide charge labels;
+    /// <paramref name="labelCellSize"/> is the same size for the enemy name plates, or zero to hide them.
     /// </summary>
     public void Build(
         in RenderView view, float alpha, float turnSeconds, bool snapHeadings, float visualSeconds,
-        VisionMap? vision = null, Radar? radar = null, float powerLabelCellSize = 0f)
+        VisionMap? vision = null, Radar? radar = null, float powerLabelCellSize = 0f, float labelCellSize = 0f)
     {
         _quads.Begin(view, visualSeconds % AnimationPhaseWrapSeconds, alpha);
         bool protectedBlinkOn = (long)(visualSeconds * 1000f) / ProtectedBlinkMilliseconds % 2 == 0;
@@ -171,5 +180,6 @@ public sealed class EntityLayerBuilder
         _nestDangers.EmitLabels(_quads);
         _deposits.EmitLabels(_quads);
         _powerups.EmitLabels(_quads);
+        _tankPlates.Emit(_quads, _motion, labelCellSize);
     }
 }

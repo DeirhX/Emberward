@@ -50,10 +50,13 @@ public partial class Game
             CameraMotion: _renderViewState.CamMotion,
             StepAlpha: stepProgress);
         float visualTime = VisualTime;
+        if (_relay is { } relay)
+            NamePlayers(relay); // Before the build: the plates are drawn with this frame's names.
         _entityLayer.Build(
             renderView, stepProgress, turnSeconds: WorldStandsStill ? 0f : dt, snapHeadings: !_interpolateFrames,
             visualSeconds: visualTime, vision: _vision, radar: _radar,
-            powerLabelCellSize: _commandController.ShowPowerLabels && !InNetLobby ? scale / ImGuiPlatform.DeviceScale : 0f);
+            powerLabelCellSize: _commandController.ShowPowerLabels && !InNetLobby ? scale / ImGuiPlatform.DeviceScale : 0f,
+            labelCellSize: InNetLobby ? 0f : scale / ImGuiPlatform.DeviceScale);
         ScreenEffectLevels screenEffects = _screenEffects.Update(_terrainTestMode ? null : player, WorldStandsStill ? 0f : dt);
         bool steppedSinceRender = _steppedSinceRender;
         _steppedSinceRender = false;
@@ -154,7 +157,7 @@ public partial class Game
                 _localController.MachineUpgradeMode = _hud.MachineUpgrades.IsOpen;
                 _renderBackend.SetHeatOrb(_hud.HeatOrb);
                 DrawSessionOverlay(dt);
-                DrawNetOverlays(drawnTankPositions);
+                DrawNetOverlays();
             }
 
         }

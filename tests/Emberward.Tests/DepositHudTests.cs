@@ -90,15 +90,20 @@ public class DepositHudTests
     }
 
     [Fact]
-    public void TheMaterialsLine_StaysInThePlate()
+    public void TheMaterialsLines_EachStayInItsPlate()
     {
-        var line = LedgerLayout.Text(LedgerLayout.MaterialsLineY);
-        Assert.True(line.Top >= LedgerLayout.MaterialsPlateTop, $"the line starts at {line.Top}, above the plate");
-        Assert.True(line.Bottom <= LedgerLayout.MaterialsPlateBottom, $"the line ends at {line.Bottom}, below the plate");
+        var hold = LedgerLayout.Text(LedgerLayout.HoldLineY);
+        Assert.True(hold.Top >= LedgerLayout.MaterialsUpperTop, $"HOLD starts at {hold.Top}, above its plate");
+        Assert.True(hold.Bottom <= LedgerLayout.MaterialsUpperBottom, $"HOLD ends at {hold.Bottom}, below its plate");
+        var store = LedgerLayout.Text(LedgerLayout.BaseLineY);
+        Assert.True(store.Top >= LedgerLayout.MaterialsLowerTop, $"BASE starts at {store.Top}, above its plate");
+        Assert.True(store.Bottom <= LedgerLayout.MaterialsLowerBottom, $"BASE ends at {store.Bottom}, below its plate");
         Assert.True(LedgerLayout.RateSize <= LedgerLayout.NumberSize);
-        Assert.True(LedgerLayout.MaterialsLeft < LedgerLayout.MaterialsSplit
-            && LedgerLayout.MaterialsSplit < LedgerLayout.MaterialsRateRight
-            && LedgerLayout.MaterialsRateRight < LedgerLayout.MaterialsRight);
+        Assert.True(LedgerLayout.MaterialsLeft < LedgerLayout.MaterialsNumberRight
+            && LedgerLayout.MaterialsNumberRight < LedgerLayout.MaterialsRight);
+        // The deposit's +N, at the top of its rise, stays clear of the HOLD line.
+        var risen = LedgerLayout.Text(LedgerLayout.BaseLineY - 2f - LedgerLayout.DeltaRise);
+        Assert.True(risen.Top >= hold.Bottom, $"the +N rises to {risen.Top}, into HOLD ({hold.Bottom})");
     }
 
     [Fact]
@@ -209,25 +214,24 @@ public class DepositHudTests
     }
 
     /// <summary>
-    /// HOLD 70 | 99,999 +999/m BASE fits across the plate: the labels, numbers and rate do not run into each other, at
-    /// a generous width for the HUD font (each character at most <c>Advance</c> of the text size; Chakra Petch's
+    /// HOLD 70 and BASE 99,999 +999/m fit across their plates: the labels, numbers and rate do not run into each other,
+    /// at a generous width for the HUD font (each character at most <c>Advance</c> of the text size; Chakra Petch's
     /// capitals and digits measure about 0.45).
     /// </summary>
     [Fact]
-    public void TheMaterialsLine_FitsAcrossThePlate()
+    public void TheMaterialsLines_FitAcrossThePlates()
     {
         const float Advance = 0.5f;
+        const float Gap = 3f;
         static float Width(string text, float size) => text.Length * size * Advance;
-        float split = LedgerLayout.MaterialsSplit, gap = LedgerLayout.SplitGap;
-        float holdLabelEnd = LedgerLayout.MaterialsLeft + Width("HOLD", LedgerLayout.LabelSize);
-        float holdStart = split - gap - Width("70", LedgerLayout.NumberSize);
-        float storeEnd = split + gap + Width("99,999", LedgerLayout.NumberSize);
-        float rateStart = LedgerLayout.MaterialsRateRight - Width("+999/m", LedgerLayout.RateSize);
-        float baseLabelStart = LedgerLayout.MaterialsRight - Width("BASE", LedgerLayout.LabelSize);
+        float numbers = LedgerLayout.MaterialsNumberRight;
+        float labelEnd = LedgerLayout.MaterialsLeft + Width("HOLD", LedgerLayout.LabelSize);
+        float storeStart = numbers - Width("99,999", LedgerLayout.NumberSize);
+        float rateStart = LedgerLayout.MaterialsRight - Width("+999/m", LedgerLayout.RateSize);
 
-        Assert.True(holdLabelEnd < holdStart, $"HOLD ends at {holdLabelEnd}, past the hold's number at {holdStart}");
-        Assert.True(storeEnd < rateStart, $"the store ends at {storeEnd}, past the rate's start at {rateStart}");
-        Assert.True(LedgerLayout.MaterialsRateRight < baseLabelStart, "the rate ends before BASE");
+        Assert.True(labelEnd + Gap < storeStart, $"the label ends at {labelEnd}, past the store's number at {storeStart}");
+        Assert.True(numbers + Gap < rateStart, $"the store ends at {numbers}, past the rate's start at {rateStart}");
+        Assert.True(LedgerLayout.MaterialsRight <= 213f, "the rate ends inside the plate");
     }
 
     [Fact]

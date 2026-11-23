@@ -5,7 +5,8 @@ using Emberward.Core.Types;
 /// <summary>
 /// Short lines of text drawn in the world as entity quads: one <see cref="EntityShape.KindPowerLabel"/> quad per glyph of
 /// a 5x7 bitmap alphabet, packed into the quad's parameters (<c>PowerLabel.hlsli</c> unpacks it). The charge labels and
-/// the nest danger labels, the pyrite deposit labels (DepositQuads) and the powerup marks (PowerupQuads) use it.
+/// the nest danger labels, the pyrite deposit labels (DepositQuads), the powerup marks (PowerupQuads) and the enemy tank
+/// name plates (TankPlateQuads) use it.
 /// </summary>
 internal static class GlyphText
 {
@@ -17,9 +18,9 @@ internal static class GlyphText
 
     /// <summary>
     /// Adds <paramref name="text"/> centred on (<paramref name="x"/>, <paramref name="y"/> + <paramref name="top"/>),
-    /// its top at <paramref name="top"/> cells, each dot <paramref name="dot"/> cells.
+    /// its top at <paramref name="top"/> cells, each dot <paramref name="dot"/> cells. <paramref name="motion"/> moves it
+    /// with what it labels (cells per step).
     /// </summary>
-    /// <param name="motion">How the line moves through a simulation step (cells per step), for one that rides a tank.</param>
     public static void AddLine(EntityQuads quads, float x, float y, float top, string text, float dot, Color color, float alpha,
         PositionF motion = default)
     {
@@ -65,6 +66,12 @@ internal static class GlyphText
         'g' => 0b00000_01111_10001_10001_01111_00001_01110UL,
         'e' => 0b00000_00000_01110_10001_11111_10000_01111UL,
         'n' => 0b00000_00000_11110_10001_10001_10001_10001UL,
+        '(' => 0b00010_00100_01000_01000_01000_00100_00010UL,
+        ')' => 0b01000_00100_00010_00010_00010_00100_01000UL,
+        '_' => 0b00000_00000_00000_00000_00000_00000_11111UL,
+        '\'' => 0b00100_00100_01000_00000_00000_00000_00000UL,
+        '!' => 0b00100_00100_00100_00100_00100_00000_00100UL,
+        ',' => 0b00000_00000_00000_00000_01100_00100_01000UL,
         'A' => 0b01110_10001_10001_11111_10001_10001_10001UL,
         'B' => 0b11110_10001_10001_11110_10001_10001_11110UL,
         'C' => 0b01110_10001_10000_10000_10000_10001_01110UL,
@@ -87,7 +94,7 @@ internal static class GlyphText
         'T' => 0b11111_00100_00100_00100_00100_00100_00100UL,
         'U' => 0b10001_10001_10001_10001_10001_10001_01110UL,
         'V' => 0b10001_10001_10001_10001_10001_01010_00100UL,
-        'W' => 0b10001_10001_10001_10101_10101_11011_10001UL,
+        'W' => 0b10001_10001_10001_10101_10101_10101_01010UL,
         'X' => 0b10001_10001_01010_00100_01010_10001_10001UL,
         'Y' => 0b10001_10001_01010_00100_00100_00100_00100UL,
         'Z' => 0b11111_00001_00010_00100_01000_10000_11111UL,

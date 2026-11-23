@@ -106,6 +106,19 @@ Core decides what is seen; the renderer only shows it.
 - **Nest danger rings.** `NestDangerQuads` asks Core for the player's discovered nests (`World.CopyNestDangers`) each
   step and draws a thin pink ring over each (`KindDangerRing`, `DangerRing` in `Shaders/Entity/Overlays.hlsli`) under the
   machines, and its title above it with the glyph quads the charge labels use (`GlyphText`), after them.
+- **Enemy name plates.** `TankPlateQuads` keeps one small record per tank, updated once a step in
+  `EntityLayerBuilder.CaptureStep` (which takes the player's vision for it) from Core's answers: `Tank.IsRivalOf`
+  (a side is a base; a match has no teams, so every other tank is a rival), `IsDead` and the tank sprites' fog rule
+  (`Sight`). A rival in sight gets a plate above it, its name in the tank's colour on a dark backing with a rule
+  under it (`GlyphText` and plain `KindPowerLabel` quads), moving with the tank as drawn. Out of sight the plate stays
+  at the cell where the tank was last seen and fades from `DesktopScreenTweaks.TankPlateGhostOpacity` to nothing
+  over `TankPlateFadeSeconds` (counted in steps, so a pause holds it); seen again anywhere, the record jumps to the
+  tank at once, and a dead tank's record is cleared. Names are `BOT n` for a side the computer plays
+  (`SlotNames.LocalBot`, as the board and the toasts say) and `PLAYER n` otherwise; in a network match `Game.NamePlayers` (and `BrowserNetMatch` in the browser) hands in the drivers' names
+  from the relay (`TankPlateQuads.SetPlayerName`), shown in capitals and cut at 16 characters. They fade out zoomed
+  out like the charge labels (`PowerLabels.ZoomFade`; `Build`'s `labelCellSize`, which G does not turn off). They
+  replace the ImGui name tags network matches drew before, and a timed match that is over shows none (the final
+  standings have the view). Cost follows the number of tanks; nothing scans the map.
 - **Pyrite deposits.** `DepositQuads` reads each step's `OreUnloaded` and `RestartOreBurned` (Position is the
   receiver, Target says core or relay) and pours up to 12 crystals from the tank's hold into it (`KindOreCrystal`), a
   crystal a step, each flying 0.45 s on a short arc; events from one tank a few steps apart join one pour. Each base
@@ -235,13 +248,16 @@ display's own resolution instead of being stretched by the OS.
   carries no text: `HudStrip` draws titles and numbers with the UI font, placed from each panel's plates as
   measured on the art (`HudStrip.Plate`), and centres text on the height of the '0' glyph, not on the font's line
   box.
-- **SHIELD/HULL plate.** The title is one status word (`HullStatuses`: SHIELDED, SHIELD DOWN, HULL BREACH,
-  MELTING, SLAG); the readout is one line, `SHIELD 400 | 1000 HULL`, the numbers meeting in the middle with a
-  hairline bar under each half, filled from the plate's outer edge (with no shield in the match, HULL alone, its
-  number centred and its bar across the plate; `LedgerLayout`). The hull's number and bar, and the
-  hot centre the crystal shows through an empty shield, follow the hull heat ramp `HudPalette.HullHeat` (and
-  `HullEmber` for glows), the one the tank's hotspot shares. The browser's strip gets the same word and colours
-  through `HullPlate` in its frame.
+- **SHIELD/HULL and MATERIALS plates.** Each panel has two plates, one above the other, and each carries one line,
+  its label at the left and its number ending in a column the panel's two numbers share (`LedgerLayout`, whose
+  tests check each line stays in its plate). SHIELD is on the upper plate and HULL on the lower, each with a
+  hairline bar under it filled from the left (with no shield in the match, HULL alone on the lower plate). The
+  shield is cyan, slate once empty. The hull's number and bar, and the hot centre the crystal shows through an
+  empty shield, follow the hull heat ramp `HudPalette.HullHeat` (and `HullEmber` for glows), the one the tank's
+  hotspot shares; the HULL label's colour says what the hull is doing (`HullStatuses`: warm neutral, breach orange
+  while it burns, flashing embers under 5%, slag grey once dead). MATERIALS has HOLD on the upper plate and BASE
+  on the lower, with the store's rate at the right end and a deposit's `+N` rising out of the store's number. The
+  browser's strip gets the same colours through `HullPlate` in its frame.
 - **Charge labels** (`PowerLabelQuads`, only while the match runs `MatchRules.EnergyNetwork`, as every standard
   match does). Each standing machine in sight within `DesktopScreenTweaks.PowerLabelGoneCells` of the player's tank
   gets a label with charge over capacity, flow in and out a second (and `>` what a node passed on) and a fill bar,
@@ -266,7 +282,7 @@ display's own resolution instead of being stretched by the OS.
   between the panels, with a beak and a tag (`DropLine.PointerText`: `D  in 0:32  120 m`, `B  52s left  45 m`); a
   forecast's badge has a broken outer ring, two badges sit side by side (`ArcadeLines.Beside`) and two tags never
   overlap (`ArcadeLines.ClearOf`). The badge is round and marked, so it is neither the tutorial's amber arrow nor the
-  red one to a base under fire. Once the match is over the drop lines, the badges and the name tags over the tanks
+  red one to a base under fire. Once the match is over the drop lines, the badges and the name plates over the tanks
   are gone, and the final standings have the view. The player's running powerups are tags above the HUD
   strip (`D DRILL 14s` over a bar that drains), blinking in their last five seconds. When the score decides the
   match, `MatchOverlay` shows VICTORY or DEFEAT, why (`Scoreboards.VictoryLine`, `DefeatLine`), the player's own

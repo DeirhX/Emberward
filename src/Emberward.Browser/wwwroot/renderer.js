@@ -71,8 +71,9 @@ export class GameRenderer {
             Math.ceil(width / 620),
             Math.ceil(height / 380),
         );
-        const powerLabelCellSize = this.showPower ? (scale * this.width) / width : 0;
-        return { width, height, scale, powerLabelCellSize };
+        const labelCellSize = (scale * this.width) / width;
+        const powerLabelCellSize = this.showPower ? labelCellSize : 0;
+        return { width, height, scale, powerLabelCellSize, labelCellSize };
     }
 
     // CSS pixels per terrain cell in the frame on screen.

@@ -36,9 +36,9 @@ public sealed class VisionMap
     private readonly int _height;
     private readonly byte[] _level;
     private readonly bool[] _explored;
-    // Whether each cell blocked sight when the sources were last brought up to date: a change of pixel that leaves
-    // this as it was (regrowing dirt that settles, a scorch mark on open ground) changes nothing anyone sees.
-    private readonly bool[] _blocksSight;
+    // How each cell stood to sight when the sources were last brought up to date (SightClassOf): a change of pixel
+    // that leaves this as it was (regrowing dirt that settles, a scorch mark on open ground) changes nothing anyone sees.
+    private readonly byte[] _sightClass;
     private readonly KnownTerrain _known;
     private readonly List<Position> _knownChanges = new();
 
@@ -72,10 +72,10 @@ public sealed class VisionMap
         _level = new byte[area];
         _explored = new bool[area];
         _known = new KnownTerrain(terrain);
-        _blocksSight = new bool[area];
+        _sightClass = new byte[area];
         ReadOnlySpan<TerrainPixel> pixels = terrain.Data;
         for (int i = 0; i < area; i++)
-            _blocksSight[i] = Pixel.BlocksLink(pixels[i]);
+            _sightClass[i] = SightClassOf(pixels[i]);
         _tilesX = (_width + TileSize - 1) / TileSize;
         _eyesByTile = new List<VisionEye>?[_tilesX * ((_height + TileSize - 1) / TileSize)];
         _sightStamp = new long[_eyesByTile.Length];
@@ -264,17 +264,24 @@ public sealed class VisionMap
         }
     }
 
-    /// <summary>A changed cell matters to the sources around it only if it now blocks sight and did not, or the reverse.</summary>
+    /// <summary>
+    /// What a cell is to sight: open ground (0), a keep's courtyard (1: open, but it lights only the keep's wall beside
+    /// it, <see cref="VisionCast"/>), a keep's wall (2) or other ground that blocks sight (3).
+    /// </summary>
+    private static byte SightClassOf(TerrainPixel pixel) =>
+        Pixel.IsBase(pixel) ? (byte)2 : Pixel.BlocksSight(pixel) ? (byte)3 : Pixel.IsKeepInterior(pixel) ? (byte)1 : (byte)0;
+
+    /// <summary>A changed cell matters to the sources around it only if it changed what it is to sight (<see cref="SightClassOf"/>).</summary>
     private void NoteTerrainChange(Position cell, ReadOnlySpan<TerrainPixel> pixels)
     {
         int x = cell.X, y = cell.Y;
         if ((uint)x >= (uint)_width || (uint)y >= (uint)_height)
             return;
         int offset = x + y * _width;
-        bool blocks = Pixel.BlocksLink(pixels[offset]);
-        if (_blocksSight[offset] == blocks)
+        byte sightClass = SightClassOf(pixels[offset]);
+        if (_sightClass[offset] == sightClass)
             return;
-        _blocksSight[offset] = blocks;
+        _sightClass[offset] = sightClass;
         List<VisionEye>? near = _eyesByTile[x / TileSize + y / TileSize * _tilesX];
         if (near == null)
             return;

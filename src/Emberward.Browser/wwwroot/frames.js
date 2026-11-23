@@ -156,6 +156,7 @@ export async function startRuntime(dotnet, { config = {}, report = () => {}, byt
                 data.time || 0,
                 Boolean(data.thermalView),
                 data.powerLabelCellSize || 0,
+                data.labelCellSize || 0,
                 Boolean(data.due),
                 data.now || 0,
             );

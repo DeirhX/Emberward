@@ -80,7 +80,7 @@ Entities/
                              machine from the base store (DESIGN.md §4.9); World.MachineUpgradeOfferFor / MachineUpgradeOf answer
   Tanks/TankShieldSystem.cs   (only when MatchRules.TankShield is on) The tank's shield in front of its hull (DESIGN.md
                              §4.7): damage takes it first (Absorb), it refills after a delay (Advance); the state is kept
-                             per tank colour here, not on Tank. World.TankShieldOf answers. FireLevelOf gives the fire on a damaged hull, which TankThermals.Advance books as injected heat in the tank and the air around it. TankDamageEvents records a hit as
+                             per tank colour here, not on Tank. World.TankShieldOf answers. FireLevelOf gives the fire on a damaged hull; TankThermals.Advance turns it into heat (TankHeatModel.FireHeatShare, the level squared) booked as injected in the tank, before its exchange with the ground, and in the air around it. TankDamageEvents records a hit as
                              TankShieldHit / TankShieldBroken / TankHit step events.
   Tanks/TankReserveSystem.cs, TankReserve.cs   (only when MatchRules.TankReserve is on) The tank's reserve (DESIGN.md
                              §4.9): the recall key burns carried pyrite to lower the off-network floor, the stages of
@@ -130,6 +130,7 @@ Bots/                        The computer player: produces a ControllerOutput li
   BotSiege.cs, BotLoiter.cs  Laying siege to a base it can break; waiting outside one it cannot
   BotTankAI.Drops.cs         Going for a powerup drop near it, and giving up one it cannot reach
   BotStuckWatch.cs           Going nowhere near one spot, and the detour taken instead
+  BotProspector.cs           Where a prospecting bot digs (BotTankAI.Prospecting: when it prospects, digging)
 Snapshots/                   A match's state for a player who joins it in progress (docs/late-join-design.md §9)
   WorldSnapshot.cs           Save, Load, Compress, Decompress: canonical bytes of the world and the bots beside it
                              Digest: a hash of the raw bytes, which two players with one world agree on
@@ -392,13 +393,16 @@ A side sees through `VisionSource`s (numbers in `Tweaks.Vision`):
 
 - its tank, along open lines of sight to `TankRadius`, and everything within `TankNearRadius`, through solid ground
   too, so digging is not blind;
-- its base, along open lines of sight over its coverage circle (the radius of `NetworkCoverage`);
+- its base, along open lines of sight from its core over its coverage circle (the radius of `NetworkCoverage`),
+  with no near radius: it sees out only through its gates;
 - its link nodes (relays, generators), over their whole coverage circles, through solid ground too, linked or not;
 - every other planted machine of its base, `MachineNearRadius` around itself.
 
 A source casts a Bresenham ray to each cell on the edge of its square, cut to a circle. A ray stops at the first
-cell that blocks a link (`Pixel.BlocksLink`, the rule links and coverage use). The walls around the open cells in
-sight are then lit `WallSkin` cells deep, less with every cell of depth. Each cell gets a level, 255 in plain sight
+cell that blocks sight (`Pixel.BlocksSight`: what blocks a link, `Pixel.BlocksLink`, and a keep's walls, which links
+pass but sight does not). The walls around the open cells in sight are then lit `WallSkin` cells deep, less with
+every cell of depth; a keep's courtyard lights only the keep's one-cell wall, not the ground beyond it. What a
+cell is to sight (open, courtyard, keep wall, other blocking ground) is what a change has to alter to recast a source. Each cell gets a level, 255 in plain sight
 and fading over the last `EdgeFade` cells of the source's reach (a short reach: its outer half), so sight has no hard
 edge anywhere.
 
@@ -579,6 +583,18 @@ The bot drives its tank through the same `ControllerOutput` as a player, and ask
   no nearer for `BotSeekGiveUpSeconds` (time fighting in sight does not count) it gives up for good. What it
   remembers is saved and mixed into its sync hash only once it has gone for a drop, so a bot in a match without
   drops plays and hashes as it always did.
+
+- **Prospecting.** In a match with ore (`World.OreDeposits` not empty) and no clock (`MatchRules.TimeLimitSeconds` 0:
+  a timed match is won on kills, so there it hunts from the start), while it goes for no powerup drop, for its first
+  `Tweaks.Bot.ProspectSeconds` the roaming bot mines instead of hunting (`BotTankAI.Prospecting`), unless its enemy, out of its base, is within
+  `EngageRangeCells`, in sight within `EngageSightCells`, at the bot's own base, or has hit it (then for
+  `EngageHoldSeconds`). `BotProspector` picks the plain ore cell nearest the tank in the nearest pocket or speck within
+  `ProspectRadiusCells` of its base (`TerrainGrid.TryFindPlainOre`, which skips tiles without ore); the bot roams there
+  by the usual scoring and, within `MineReachCells`, drives straight at the cell, which the tank's own dig takes into
+  the hold. A tick reads one cell while the target is still ore; the deposit list is searched only when a deposit runs
+  dry, and at most every `ProspectSearchSeconds` when none was found. A hot hold sends it home to bank as before; with
+  ore aboard and none left in its area it goes home too, and with none it roams to random places in its area. Digging
+  in place is not watched by `BotStuckWatch`; its own stall count torches rock in the way and then gives the deposit up.
 
 It still has no route planner (moves are scored one step at a time), sees the whole map and always knows where the
 enemy is.

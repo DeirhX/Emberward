@@ -69,14 +69,15 @@ public sealed record PlayerStatus(
     bool OffNetworkUrgent, HullPlate Plate, MaterialsView Materials);
 
 /// <summary>What the desktop's SHIELD/HULL plate shows (<c>HudStrip</c>, <c>LiquidGauges</c>); colours as #rrggbb.</summary>
-/// <param name="Word">The status word (<c>HullStatuses</c>), in <paramref name="WordColor"/>, alternating four times a
-/// second with <paramref name="WordFlashColor"/> when the two differ.</param>
+/// <param name="HullLabelColor">The HULL label's colour (<c>HullStatuses</c>: what the hull is doing), alternating four
+/// times a second with <paramref name="HullLabelFlashColor"/> when the two differ.</param>
+/// <param name="HullLabelAlarms">The label is lit with a glow in its colour (the hull is not intact).</param>
 /// <param name="Shield">The shield's points (0 once dead).</param>
 /// <param name="HullColor">The hull number's and bar's colour (<c>HudPalette.HullHeat</c>; dim once dead).</param>
 /// <param name="GlowStops">The crystal's hot centre: its colours on the heat ramp at even steps from the middle (first)
 /// to the outline (last), as the desktop's bands take them, at strength <paramref name="Glow"/> (0 to 1; 0 once dead),
 /// fading to a fifth of it at the outline.</param>
-public sealed record HullPlate(string Word, string WordColor, string WordFlashColor, int Shield, string HullColor,
+public sealed record HullPlate(string HullLabelColor, string HullLabelFlashColor, bool HullLabelAlarms, int Shield, string HullColor,
     string[] GlowStops, float Glow);
 
 /// <param name="KeyLabel">The key that builds it, as the desktop writes it (<c>MachinePresentation.KeyLabel</c>).</param>

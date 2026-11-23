@@ -5,9 +5,9 @@ using Emberward.Core.Entities.Tanks;
 
 /// <summary>
 /// What the MATERIALS plate shows (docs/pyrite-deposit-feedback-design.md §5.1), the same on desktop
-/// (<see cref="HudStrip"/>) and in the browser (<c>strip.js</c>, <c>hud.js</c>): one line, HOLD (what the hold
-/// carries; the pile shows how full it is) and BASE (the base store, which every relay shares, with how fast it
-/// grows) with their numbers meeting in the middle, the hold's pile, and the line beneath the hold window. A deposit
+/// (<see cref="HudStrip"/>) and in the browser (<c>strip.js</c>, <c>hud.js</c>): a line on each of its two plates,
+/// HOLD (what the hold carries; the pile shows how full it is) on the upper and BASE (the base store, which every relay
+/// shares, with how fast it grows) on the lower, the hold's pile, and the line beneath the hold window. A deposit
 /// is stretched over its pour: the hold drains, the store counts up, the store's number flashes gold once and a
 /// <c>+N</c> rises out of it.
 /// </summary>

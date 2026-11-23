@@ -23,8 +23,8 @@ public class TankBase
     public OreStore Store { get; } = new(Tweaks.Ore.BaseStartingStore, Tweaks.Ore.BaseStoreCapacity);
 
     /// <summary>
-    /// True when the computer plays this base's side (<see cref="World.SetBotControlled"/>): the bot does not prospect,
-    /// so the store gets <see cref="Tweaks.Ore.BotOrePerSecond"/> instead.
+    /// True when the computer plays this base's side (<see cref="World.SetBotControlled"/>): the bot prospects only in
+    /// the opening, so the store also gets <see cref="Tweaks.Ore.BotOrePerSecond"/>.
     /// </summary>
     public bool IsBotControlled { get; private set; }
 

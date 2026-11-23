@@ -155,34 +155,28 @@ public partial class Game
     /// <summary>In the room's lobby: connected, and the match has not started (and nothing has gone wrong).</summary>
     private bool InNetLobby => _relay is { Started: false, Failure: null };
 
-    /// <summary>A local match with several bots: each has its name over it, as the players of a network match do.</summary>
-    private bool _localBotTags;
-
-    /// <summary>What a local match calls the bot in <paramref name="slot"/> when it has more than one.</summary>
-    public static string LocalBotName(int slot) => SlotNames.LocalBot(slot);
-
     /// <summary>
-    /// What the board and the toasts call the tank in <paramref name="slot"/>: the driver's name in a network match,
-    /// <c>YOU</c> and <c>BOT n</c> in a local one.
+    /// What the board, the toasts and the enemy name plates call the tank in <paramref name="slot"/>: the driver's name
+    /// in a network match, <c>YOU</c> and <c>BOT n</c> in a local one, and <c>BOT n</c> for a seat a bot drives.
     /// </summary>
     private string SlotName(int slot) =>
-        _relay is { } relay && _netSession is { } session ? relay.DriverName(slot, session.HumanMask)
-        : slot == _localSlot ? SlotNames.You
+        _relay is { } relay && _netSession is { } session && (session.HumanMask & (1 << slot)) != 0
+            ? relay.DriverName(slot, session.HumanMask)
+        : slot == _localSlot && _relay == null ? SlotNames.You
         : SlotNames.LocalBot(slot);
 
     /// <summary>
-    /// The network overlays of a frame: the lobby before the start, a warning plate when something is wrong, and a
-    /// name over every other tank in sight. A local match has only the names, and only among several bots.
+    /// The network overlays of a frame: the lobby before the start and a warning plate when something is wrong. The
+    /// names over the other tanks are the entity layer's (<see cref="NamePlayers"/>, given before each build). A local
+    /// match of several bots names the bot that won.
     /// </summary>
-    private void DrawNetOverlays(ReadOnlySpan<PositionF> drawnTankPositions)
+    private void DrawNetOverlays()
     {
         if (_relay is not { } relay)
         {
-            if (_localBotTags)
-            {
-                _hud.WinnerName = _world.MatchWinner?.Tank is { } won && won.Color != _localSlot ? LocalBotName(won.Color) : null;
-                DrawNameTags(drawnTankPositions);
-            }
+            // Against one bot the loss needs no name; among several it says which won.
+            _hud.WinnerName = _world.TankList.Count > 2 && _world.MatchWinner?.Tank is { } won && won.Color != _localSlot
+                ? SlotName(won.Color) : null;
             return;
         }
 
@@ -196,7 +190,6 @@ public partial class Game
         _hud.CanRestartMatch = _world.IsMatchOver;
         var winner = _world.MatchWinner?.Tank;
         _hud.WinnerName = winner != null && _netPlaying ? relay.DriverName(winner.Color, _netSession!.HumanMask) : null;
-        DrawNameTags(drawnTankPositions);
 
         var play = _hud.PlayRect;
         // Below the clock plate of a timed match, when the HUD has one at the top of the view.
@@ -285,22 +278,16 @@ public partial class Game
         return $"Waiting for {hostName} to start the match.";
     }
 
-    /// <summary>The name of every other living tank the player can see, over the tank, in its colour.</summary>
-    private void DrawNameTags(ReadOnlySpan<PositionF> drawnTankPositions)
+    /// <summary>
+    /// Gives the enemy name plates (<see cref="Rendering.Entities.TankPlateQuads"/>) the name of every player in the
+    /// match; a seat a bot drives keeps its default name.
+    /// </summary>
+    private void NamePlayers(RelayConnection relay)
     {
-        // A timed match that is over shows its final standings where the tags would be.
-        if (_world.IsMatchOver && _world.MatchClock.Active)
+        if (!_netPlaying || _netSession is not { } session)
             return;
-        var tanks = _world.TankList.Tanks;
-        var dl = ImGui.GetForegroundDrawList();
-        for (int slot = 0; slot < tanks.Count && slot < drawnTankPositions.Length && (_netPlaying || _localBotTags); slot++)
-        {
-            // Names follow the same rule as the tanks themselves: nothing is shown of a tank out of sight.
-            if (slot == _localSlot || tanks[slot].IsDead || !Rendering.Entities.Sight.Sees(_vision, tanks[slot].Position))
-                continue;
-            Vector2 at = _hud.CellToScreen(drawnTankPositions[slot].X + 0.5f, drawnTankPositions[slot].Y - 5f);
-            if (_hud.IsInView(at))
-                HudTheme.DrawTag(dl, at, _relay?.DriverName(slot, _netSession!.HumanMask) ?? LocalBotName(slot), SlotColor(slot), 14f);
-        }
+        for (int slot = 0; slot < _world.TankList.Count; slot++)
+            _entityLayer.TankPlates.SetPlayerName(slot,
+                (session.HumanMask & (1 << slot)) != 0 ? relay.DriverName(slot, session.HumanMask) : null);
     }
 }

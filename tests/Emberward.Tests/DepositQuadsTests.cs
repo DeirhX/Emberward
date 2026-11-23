@@ -287,7 +287,7 @@ public class DepositQuadsTests
         for (int i = 0; i < 4; i++)
         {
             s.World.Advance(_ => default);
-            layer.CaptureStep(s.World, 0);
+            layer.CaptureStep(s.World, 0, vision: null);
             Assert.True(s.Tank.IsUnloadingOre || i > 0);
             layer.Build(new RenderView(size, size, default, 1), 0.5f, 0f, snapHeadings: true, visualSeconds: i * 0.1f);
             for (int v = 0; v < layer.VertexCount; v += 6)

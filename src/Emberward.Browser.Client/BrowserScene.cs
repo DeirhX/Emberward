@@ -41,7 +41,7 @@ public sealed class BrowserScene
     {
         _session = session;
         Terrain = new BrowserTerrain(session.World.Terrain, session.Vision);
-        _entities.CaptureStep(session.World, session.LocalSlot);
+        _entities.CaptureStep(session.World, session.LocalSlot, session.Vision);
     }
 
     public BrowserTerrain Terrain { get; }
@@ -49,6 +49,9 @@ public sealed class BrowserScene
     /// <summary>The player's ore as the HUD tells it, counted from the steps this scene captured.</summary>
     public Emberward.Desktop.Gui.OreLedgerView OreLedger => _entities.OreLedger;
     public RenderView View { get; private set; }
+
+    /// <summary>The name plates over enemy tanks; a network match gives them the players' names.</summary>
+    public Emberward.Desktop.Rendering.Entities.TankPlateQuads TankPlates => _entities.TankPlates;
 
     /// <summary>The last frame, laid out as the remarks describe. Valid until the next <see cref="Render"/>.</summary>
     public ArraySegment<byte> Packet => new(_packet, 0, _packetLength);
@@ -59,14 +62,16 @@ public sealed class BrowserScene
     /// <param name="silent">A tick from the past, replayed to catch up: a hit in it does not shake the view.</param>
     public void CaptureStep(bool silent)
     {
-        _entities.CaptureStep(_session.World, _session.LocalSlot);
+        _entities.CaptureStep(_session.World, _session.LocalSlot, _session.Vision);
         if (!silent)
             _screenEffects.AfterStep(_session.World.StepEvents, _session.Player);
         Terrain.ObserveStep(_visualTime);
     }
 
+    /// <param name="powerLabelCellSize">The displayed CSS size of a cell, or zero to hide the charge labels (G).</param>
+    /// <param name="labelCellSize">The displayed CSS size of a cell for the enemy name plates, or zero to hide them.</param>
     public void Render(int width, int height, int scale, float alpha, float delta, float time, float powerLabelCellSize = 0f,
-        bool hold = false)
+        bool hold = false, float labelCellSize = 0f)
     {
         _visualTime = time;
         width = Math.Clamp(width, 1, 3840);
@@ -86,7 +91,7 @@ public sealed class BrowserScene
         View = new RenderView(new Size(width, height), _session.World.Terrain.Size, camera, scale, cameraMotion, alpha);
         Terrain.Prepare(View.VisibleCells(), time);
         _entities.Build(View, alpha, Math.Clamp(delta, 0f, 0.1f), snapHeadings: false, time,
-            _session.Vision, _session.Radar, powerLabelCellSize);
+            _session.Vision, _session.Radar, powerLabelCellSize, labelCellSize);
         int glowCount = _glowBuilder.BuildGpuTankHeatGlowData(_session.World.TankList.Tanks, positions, View, _glows, _session.Vision,
             _entities.TankFireLevels);
         var upload = new GamePixelsUpload(View,

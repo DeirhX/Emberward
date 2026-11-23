@@ -223,9 +223,9 @@ to carry it, followed by a tick that releases it. A step is drawn from when the 
 because ticks arrive by the relay's clock. A hidden tab stops drawing and stepping; when it comes back it catches up
 as a rejoining player does.
 
-Not yet in the browser: name tags over other tanks (in a network match, and over the bots of a solo match of more
-than two, which the desktop tags "BOT 2" and so on), the desync report file the desktop writes, and choosing a map
-size or seed for a new room from the page.
+Not yet in the browser: the desync report file the desktop writes, and choosing a map size or seed for a new room
+from the page. The name plates over enemy tanks come from the shared entity layer (`BOT n` over a bot, as on the
+desktop), with the drivers' names from the relay (`BrowserNetMatch`).
 
 The header says **SAVED FOR OFFLINE** after the entire app, including the .NET runtime, has been cached, and
 **OFFLINE · SOLO ONLY** without a connection; otherwise it says nothing.
@@ -485,8 +485,8 @@ window and graphics dependencies out of the shared rendering assembly.
   the desktop's art strip in the bottom corners on two canvases, TEMP, SHIELD and MATERIALS on the left and BUILD
   STRUCTURES and COMMAND on the right, at the desktop's art coordinates and scale. It ports `HudStrip`,
   `HeatGauge`, `LiquidGauges` and `BuildPanel`: the heat orb with its dial, needle and trend arrow, the shield
-  crystal, the cargo hold filling with pieces of Pyrite, the SHIELD/HULL and MATERIALS plates' one-line readouts
-  (`SHIELD 400 | 1000 HULL`, `HOLD 23 | 1,234 +18/m BASE`, from `LedgerLayout` and the shared `MaterialsView`; the
+  crystal, the cargo hold filling with pieces of Pyrite, the SHIELD/HULL and MATERIALS plates' readouts, a line on each plate
+  (`SHIELD 400` over `HULL 1000`, `HOLD 23` over `BASE 1,234 +18/m`, from `LedgerLayout` and the shared `MaterialsView`; the
   phone plate shows BASE beside the hold), the OFF NETWORK tag, the build slots and the COMMAND button (a click
   on a slot builds, on COMMAND opens the upgrades). What the slots say comes from the shared `BuildSlotView`, which
   the desktop's `BuildPanel` draws too, and the orb's frozen and boiling states from `HeatScale`. The desktop
@@ -535,4 +535,4 @@ What is intended next for the browser client, roughly in order:
 - Try the threaded runtime in Firefox. WebKit keeps to one thread, because its threaded runtime sometimes stops
   answering (Two runtimes, above).
 - Saving and resuming a match across closing the app.
-- Name tags over other tanks in a network match, and a desync report the player can download.
+- A desync report the player can download.

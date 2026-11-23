@@ -109,9 +109,9 @@ public static class BrowserFrameBuilder
     /// <summary>The SHIELD/HULL plate as the desktop's <c>HudStrip</c> and <c>LiquidGauges</c> show it.</summary>
     private static HullPlate Plate(Tank player, in TankShieldView shield)
     {
-        var word = HullStatuses.Of(player, shield);
+        var label = HullStatuses.Of(player);
         float hull = player.HullFraction;
-        return new HullPlate(word.Text, HudPalette.Hex(word.Color), HudPalette.Hex(word.FlashColor),
+        return new HullPlate(HudPalette.Hex(label.Color), HudPalette.Hex(label.FlashColor), label.Alarms,
             player.IsDead ? 0 : Math.Max(0, shield.Shield),
             HudPalette.Hex(player.IsDead ? HudPalette.TextDim : HudPalette.HullHeat(hull)),
             GlowStops(Math.Min(hull, HudPalette.HullHeatStart)),
