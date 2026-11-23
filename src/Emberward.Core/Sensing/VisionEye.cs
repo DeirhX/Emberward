@@ -200,7 +200,7 @@ internal static class VisionCast
                 return;
 
             // The source's own cell never blocks: a machine stands in the ground it was planted in.
-            if (!blocked && distSq != 0 && Pixel.BlocksLink(pixels[x + y * frame.Width]))
+            if (!blocked && distSq != 0 && Pixel.BlocksSight(pixels[x + y * frame.Width]))
                 blocked = true;
             if (blocked && distSq > fade.NearSq)
                 return;
@@ -221,7 +221,9 @@ internal static class VisionCast
     /// Lights the solid cells within <see cref="Tweaks.Vision.WallSkin"/> of each lit open cell in the "from" bounds,
     /// at that cell's level on the wall's face and less with every cell of depth, writing only inside the "to" bounds.
     /// Only open cells that touch a wall do any work, and a wall never lights another, so one pass over the square is
-    /// enough. All bounds are map cells, inclusive, inside the map and the frame's square.
+    /// enough. A keep's walls are one cell thin, so the courtyard lights only the wall itself and not the ground beyond
+    /// it, which would be seeing through the wall. All bounds are map cells, inclusive, inside the map and the frame's
+    /// square.
     /// </summary>
     private static void Walls(
         byte[] levels, in Frame frame, ReadOnlySpan<TerrainPixel> pixels,
@@ -234,8 +236,10 @@ internal static class VisionCast
             for (int x = fromMinX; x <= fromMaxX; x++)
             {
                 int level = levels[localRow + x];
-                if (level == 0 || Pixel.BlocksLink(pixels[x + y * frame.Width]) || !TouchesWall(x, y, frame, pixels))
+                TerrainPixel from = pixels[x + y * frame.Width];
+                if (level == 0 || Pixel.BlocksSight(from) || !TouchesWall(x, y, frame, pixels))
                     continue;
+                bool insideKeep = Pixel.IsKeepInterior(from);
 
                 int minX = Math.Max(toMinX, x - skin), maxX = Math.Min(toMaxX, x + skin);
                 int minY = Math.Max(toMinY, y - skin), maxY = Math.Min(toMaxY, y + skin);
@@ -245,7 +249,8 @@ internal static class VisionCast
                     int wallRow = (ny - frame.OriginY) * frame.Side - frame.OriginX;
                     for (int nx = minX; nx <= maxX; nx++)
                     {
-                        if (!Pixel.BlocksLink(pixels[row + nx]))
+                        TerrainPixel wall = pixels[row + nx];
+                        if (!Pixel.BlocksSight(wall) || (insideKeep && !Pixel.IsBase(wall)))
                             continue;
                         // Full at the wall's face, fading with depth so the wall has no hard inner edge.
                         int depth = Math.Max(Math.Abs(nx - x), Math.Abs(ny - y));
@@ -264,7 +269,7 @@ internal static class VisionCast
         int minY = Math.Max(0, y - 1), maxY = Math.Min(frame.Height - 1, y + 1);
         for (int ny = minY; ny <= maxY; ny++)
             for (int nx = minX; nx <= maxX; nx++)
-                if (Pixel.BlocksLink(pixels[nx + ny * frame.Width]))
+                if (Pixel.BlocksSight(pixels[nx + ny * frame.Width]))
                     return true;
         return false;
     }

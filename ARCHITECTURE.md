@@ -197,8 +197,8 @@ updates it after each step on the match's time (`BrowserSession.HudSeconds`) and
   an edge arrow with the distance off screen). `GameHud.Goal` draws the sector goal lines, the upgrade list while
   docked (base track on keys 1-4, tank track on 5-6) and the sector-complete banner. The build panel asks
   `Tank.QuoteBuild` for each machine's ore cost and payer. The MATERIALS panel shows Pyrite piling up inside
-  the hold and one line, `HOLD 23 | 1,234 +18/m BASE`, the numbers meeting in the middle: what the hold carries (the
-  amount alone; the pile shows how full it is) and the base store, which every relay shares, with its growth a minute;
+  the hold and a line on each of its two plates, `HOLD 23` above and `BASE 1,234 +18/m` below: what the hold carries
+  (the amount alone; the pile shows how full it is) and the base store, which every relay shares, with its growth a minute;
   and UNLOADING (`Tank.IsUnloadingOre`). `MaterialsView` (shared with the browser) says what it shows: a deposit is
   stretched over its pour, the hold draining as the store counts up, the store's number flashing once and a `+N`
   rising out of it. `LedgerLayout` places the MATERIALS and SHIELD/HULL lines, and tests check they fit their plates.

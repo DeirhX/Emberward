@@ -281,7 +281,7 @@ public class VisionMapTests
         var sources = new List<VisionSource>
         {
             Tank(new Position(50, 50)),
-            new(new Position(30, 30), Tweaks.Coverage.BaseRadius, Tweaks.Vision.MachineNearRadius),
+            new(new Position(30, 30), Tweaks.Coverage.BaseRadius, 0),
         };
         Position Anywhere() => new(random.Next(-5, terrain.Width + 5), random.Next(-5, terrain.Height + 5));
         for (int i = 0; i < 12; i++)
@@ -293,11 +293,14 @@ public class VisionMapTests
             changed.Clear();
             int blobs = random.Next(0, 4);
             for (int i = 0; i < blobs; i++)
-                Blob(terrain, random, random.Next(4) switch
+                Blob(terrain, random, random.Next(6) switch
                 {
                     0 => TerrainPixel.Dirt,
                     1 => TerrainPixel.Decal,
                     2 => TerrainPixel.Rock,
+                    // A keep's wall blocks sight, and its floor lights only the wall beside it.
+                    3 => TerrainPixel.BaseMin,
+                    4 => TerrainPixel.BaseFloor,
                     _ => TerrainPixel.Blank,
                 }, changed);
 
@@ -414,6 +417,75 @@ public class VisionMapTests
             }
         }
         Assert.True(quietTicks > 0, "the scenario should have ticks on which no pixel changes");
+    }
+
+    /// <summary>Open ground with a keep laid out at its centre, as <see cref="BaseLayout"/> shapes every base.</summary>
+    private static TerrainGrid KeepIn(TerrainPixel around, Position centre)
+    {
+        var terrain = Grid(121, 121, around);
+        for (int dy = -BaseLayout.Half; dy <= BaseLayout.Half; dy++)
+            for (int dx = -BaseLayout.Half; dx <= BaseLayout.Half; dx++)
+                terrain.SetPixelRaw(centre + new Offset(dx, dy), BaseLayout.PartAt(dx, dy) switch
+                {
+                    BasePart.Wall => TerrainPixel.BaseMin,
+                    BasePart.Gate => TerrainPixel.BaseBarrier,
+                    BasePart.Core => TerrainPixel.BaseCore,
+                    _ => TerrainPixel.BaseFloor,
+                });
+        return terrain;
+    }
+
+    [Fact]
+    public void AKeepsWalls_BlockSight_AndItsGatesDoNot()
+    {
+        var centre = new Position(60, 60);
+        var terrain = KeepIn(TerrainPixel.Blank, centre);
+        var map = See(terrain, new VisionSource(centre, Tweaks.Coverage.BaseRadius, 0));
+        const int half = BaseLayout.Half;
+
+        Assert.True(map.IsVisible(centre + new Offset(BaseLayout.Lane, BaseLayout.Lane)), "the courtyard");
+        Assert.True(map.IsVisible(centre + new Offset(half, 10)), "the inside of the wall");
+        Assert.True(map.IsVisible(centre + new Offset(half + 10, 0)), "open ground out through the gate");
+        Assert.False(map.IsVisible(centre + new Offset(half + 4, 12)), "open ground behind the wall");
+        Assert.False(map.IsVisible(centre + new Offset(half + 1, half + 1)), "open ground behind a corner");
+    }
+
+    [Fact]
+    public void FromInsideAKeep_TheWallIsSeen_ButNotTheGroundBeyondIt()
+    {
+        var centre = new Position(60, 60);
+        var terrain = KeepIn(TerrainPixel.Dirt, centre);
+        var map = See(terrain, new VisionSource(centre, Tweaks.Coverage.BaseRadius, 0));
+        const int half = BaseLayout.Half;
+
+        // Beyond the skin of the gate, whose open cells light the dirt round it like any opening.
+        int alongWall = BaseLayout.GateHalf + Tweaks.Vision.WallSkin + 1;
+        Assert.True(map.IsVisible(centre + new Offset(half, alongWall)), "the wall");
+        for (int depth = 1; depth <= Tweaks.Vision.WallSkin; depth++)
+            Assert.False(map.IsVisible(centre + new Offset(half + depth, alongWall)), $"dirt {depth} cells beyond the wall");
+        Assert.True(map.IsVisible(centre + new Offset(half + 1, 0)), "the dirt in front of a gate");
+    }
+
+    [Fact]
+    public void AWorld_TheBaseDoesNotSeeThroughItsWalls()
+    {
+        var s = RelayHeatTests.CreateScenario();
+        var terrain = s.World.Terrain;
+        int half = BaseLayout.Half;
+        // A cave beside the keep, behind its side wall and well inside the base's sight radius; the tank waits at
+        // the far end of the tunnel out of the front gate, out of its reach.
+        int sideY = s.DirY * 12;
+        for (int dy = -2; dy <= 2; dy++)
+            for (int dx = half + 3; dx <= half + 10; dx++)
+                terrain.SetPixel(s.Base.Position + new Offset(dx, sideY + dy), TerrainPixel.Blank);
+        s.Tank.Position = s.Base.Position + new Offset(0, s.DirY * (half + 50));
+
+        VisionMap map = s.World.TrackVision(s.Tank);
+        Assert.True(map.IsVisible(s.Base.Position + new Offset(BaseLayout.Lane, sideY)), "the courtyard");
+        Assert.True(map.IsVisible(s.Base.Position + new Offset(half, sideY)), "its own wall");
+        Assert.True(map.IsVisible(s.Base.Position + new Offset(0, s.DirY * (half + 5))), "the tunnel out of the gate");
+        Assert.False(map.IsVisible(s.Base.Position + new Offset(half + 6, sideY)), "the cave behind the wall");
+        Assert.False(map.IsVisible(s.Base.Position + new Offset(half + 1, sideY)), "the ground just behind the wall");
     }
 
     [Fact]

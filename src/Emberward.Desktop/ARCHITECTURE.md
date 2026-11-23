@@ -223,13 +223,16 @@ display's own resolution instead of being stretched by the OS.
   carries no text: `HudStrip` draws titles and numbers with the UI font, placed from each panel's plates as
   measured on the art (`HudStrip.Plate`), and centres text on the height of the '0' glyph, not on the font's line
   box.
-- **SHIELD/HULL plate.** The title is one status word (`HullStatuses`: SHIELDED, SHIELD DOWN, HULL BREACH,
-  MELTING, SLAG); the readout is one line, `SHIELD 400 | 1000 HULL`, the numbers meeting in the middle with a
-  hairline bar under each half, filled from the plate's outer edge (with no shield in the match, HULL alone, its
-  number centred and its bar across the plate; `LedgerLayout`). The hull's number and bar, and the
-  hot centre the crystal shows through an empty shield, follow the hull heat ramp `HudPalette.HullHeat` (and
-  `HullEmber` for glows), the one the tank's hotspot shares. The browser's strip gets the same word and colours
-  through `HullPlate` in its frame.
+- **SHIELD/HULL and MATERIALS plates.** Each panel has two plates, one above the other, and each carries one line,
+  its label at the left and its number ending in a column the panel's two numbers share (`LedgerLayout`, whose
+  tests check each line stays in its plate). SHIELD is on the upper plate and HULL on the lower, each with a
+  hairline bar under it filled from the left (with no shield in the match, HULL alone on the lower plate). The
+  shield is cyan, slate once empty. The hull's number and bar, and the hot centre the crystal shows through an
+  empty shield, follow the hull heat ramp `HudPalette.HullHeat` (and `HullEmber` for glows), the one the tank's
+  hotspot shares; the HULL label's colour says what the hull is doing (`HullStatuses`: warm neutral, breach orange
+  while it burns, flashing embers under 5%, slag grey once dead). MATERIALS has HOLD on the upper plate and BASE
+  on the lower, with the store's rate at the right end and a deposit's `+N` rising out of the store's number. The
+  browser's strip gets the same colours through `HullPlate` in its frame.
 - **Charge labels** (`PowerLabelQuads`, only while the match runs `MatchRules.EnergyNetwork`, as every standard
   match does). Each standing machine in sight within `DesktopScreenTweaks.PowerLabelGoneCells` of the player's tank
   gets a label with charge over capacity, flow in and out a second (and `>` what a node passed on) and a fill bar,

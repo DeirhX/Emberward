@@ -195,10 +195,17 @@ The tank lives in a band around 0. Both ends hurt, and the world has places at b
   while the tank is on its relay network (or in its base) and the base is not dark; the hull never regenerates, and a
   base repairs it only while the tank is docked. Overheating and frostbite go straight to the hull, as do losing the
   base and a recall. Without the rule the tank has the hull alone.
-  **A damaged hull burns**: below 75% hull the tank is on fire, and the fire grows to full size at an empty hull. At full
-  size it adds 6 degrees a second to the tank (what a full-strength link takes away) and puts twice as much energy again into the air around it, so a
-  burning tank warms its surroundings more than itself (the energy is booked as injected in the ledger). The fire
-  does no damage of its own; it hurts through the heat (overheating, being seen by emberites). Only the base puts it
+  **A damaged hull burns**: below 75% hull the tank is on fire, and the fire grows to full size at an empty hull. Its
+  heat grows much faster than the fire, with the square of its size: at full size it adds 48 degrees a second to the
+  tank (eight times what a full-strength link takes away) and puts as much energy again into the air around it (booked
+  as injected in the ledger). A 70% hull adds 0.2 degrees a second, which a link never notices; 50% about what a link
+  takes away; 30% 17 and 10% 36, which cook a tank in a tunnel in about 20 seconds even on a full link. The tank sheds
+  the fire's heat through its ordinary exchange with the ground and air it touches, so cold ground keeps a burning tank
+  cooler and hot ground (or air the fire has already warmed) does not; a minor wound is shrugged off, a major one has to
+  be repaired. The fire does no damage of its own; it hurts through the heat (overheating, being seen by emberites).
+  However hot it has made the tank, a burning hull loses at most 50 hull points a second to overheating (spread evenly
+  over the ticks, 2 or 3 a tick), so heat alone takes a hull that has just caught fire (75%) no sooner than in 15 seconds, and one at 30% in 6;
+  shots are not capped, and a hull not alight overheats at the plain rate. Only the base puts it
   out, by repairing the hull (a dark base repairs nothing, so a fire there stays, held down by the base's cooling).
   The fire is drawn on the tank: the exposed core glowing at the hull's centre, its rough edge melting into a smudge
   of soot with no rim (1.5 cells across at
@@ -218,10 +225,9 @@ The tank lives in a band around 0. Both ends hurt, and the world has places at b
   same third of a second, and the particles already in the air live out their lives. It crackles, fading in as it catches, higher as
   it grows and sizzling higher still once the core sags; the HUD's hull number eases from its neutral colour onto the
   heat ramp between 75% and 60%, and the HUD's
-  crystal shows the shield, the line under it both numbers (`SHIELD 400 | 1000 HULL`, each half with its bar), and the
-  plate names the worst state: SLAG, MELTING (under
-  5%), HULL BREACH while it burns, except that an empty shield on a hull only just alight (fire level up to 0.2)
-  still reads SHIELD DOWN, then SHIELD DOWN and SHIELDED.
+  crystal shows the shield, and the two plates under it a number each, SHIELD above and HULL below, each with its
+  bar. The SHIELD line turns slate once the shield is empty, and the HULL label takes the hull's worst state as its
+  colour: breach orange while it burns, flashing embers under 5%, slag grey once the tank is dead.
   **A tank's shield is seen only while it blocks hits.** A hit brings up a translucent plastic dome of swirling blue
   with raised, shimmering hexagon ridges, a glossy highlight and a brighter rim, thin enough to see the tank through.
   It fades in over one simulation step (the frame of the hit itself shows nothing yet), stays while hits keep coming,
@@ -586,7 +592,8 @@ A sector only completes when it runs without the player, so nothing may depend o
   not close the way home. Bodies that already overlap (a respawn onto an intruder) can part, and cannot pass through
   one another on the way.
 - **The bot plays by the same rules.** It sees the whole of its hull, so it does not wedge in tunnels a little
-  narrower than itself. It leaves its base through a gate, goes home when it is hurt, hot or after a kill, by the
+  narrower than itself. In the opening of a match with ore it mines round its base instead of hunting (§6.4).
+  It leaves its base through a gate, goes home when it is hurt, hot or after a kill, by the
   way it came, and fires only aimed shots in an enemy's sight, and out of it only to dig itself through. A way home that stays shut (a gate
   sealed by hot rock) is given up after a while, and the bot goes back to roaming.
 
@@ -784,8 +791,8 @@ and drives up to its core to put it down, as a player must. Hot with
 When the tank dies its hold spills back into the ground as plain ore in the nearest open or dirt cells around the wreck,
 never under another tank or a machine (ore blocks links, so it would cut a relay); what does not fit within a few cells
 is lost. Torching rock no longer yields anything. The MATERIALS panel shows a pile of Pyrite growing inside the
-hold and two rows under it: HOLD, the ore aboard against capacity, and BASE, the base store (which every relay
-shares) with how fast it has grown over the last 30 seconds (banked and harvested). Banking is shown where it
+hold and a row on each of the two plates under it: HOLD, the ore aboard (the pile shows how full the hold is), and
+BASE, the base store (which every relay shares) with how fast it has grown over the last 30 seconds (banked and harvested). Banking is shown where it
 happens: crystals pour from the hold into the core or relay, the core glows with its reactor's heat and pulses as
 they land, a `+N` rises for the player's own side (a rival's pour shows in sight, without numbers), and the nearest
 powered relay carries a BASE STORE label. On the HUD the hold drains and the store counts up over the pour (0.9 s),
@@ -821,8 +828,17 @@ base store starts with 30. The tank's hold is small (40), so getting ore home is
   frozen. Its ore reaches the base only through the network, so it works only while it
   stands in the own linked coverage. With no ore it can reach, or with the store full (the panel says "waiting: the
   base ore store is full"), it idles and spends nothing.
-- **The bot** does not prospect yet. As a stand-in, a base whose side the computer plays gets 0.5 ore a second.
-  The bot builds and buys nothing today, so this only keeps its store from being empty once it does.
+- **The bot prospects** (`BotProspector`, `Tweaks.Bot` in `Tweaks.BotProspect.cs`). In a match with ore, for the
+  first 240 seconds its outings are for mining, not for its enemy: it heads for the nearest pocket or speck within
+  100 cells of its own base that still has plain ore (lumps are left alone: their core cooks the tank), digs into it
+  the plain way as a player does (torching only rock that has held it up for 2 seconds, while its heat allows; a
+  deposit it gets nowhere with for 6 seconds, or behind a wall or scorching ground, is passed over for a minute), and
+  goes home to bank the load at its core when the hold runs hot (20) or its area has no ore left. With nothing to
+  dig it roams its area. It fights instead, for at least 8 seconds after, while its enemy is out of its base and
+  within 45 cells, in sight within 75 (its sight passes through dirt), at the bot's own base, or has hit it; it does
+  not wait outside the enemy's base or lay siege while prospecting. After the opening, and in a match without ore,
+  it hunts as before. The stand-in stays for now: a base whose side the computer plays also gets 0.5 ore a second,
+  since the bot builds and buys nothing and mines only in the opening.
 
 ### 6.5 The rival tank *(Proposed)*
 
@@ -836,7 +852,9 @@ The player sees only what their side sees, so that learning the shape of the wor
 - **Three kinds of ground.** *In sight*: shown live. *Remembered*: seen before, shown as it was last seen, drained
   toward a cool blue-grey and dimmed, with no entities and no live heat. *Unknown*: never seen, black.
 - **What sees.** The tank sees along open tunnel (about 45 cells) and a little through solid ground around itself.
-  The base sees along open ground over its coverage circle (plus the Sensors upgrade, §4.8). A relay or generator sees its
+  The base sees along open ground over its coverage circle (plus the Sensors upgrade, §4.8), from its core: its
+  walls block sight like solid ground, so it sees its courtyard, the inside of its walls and out through its gates,
+  never through a wall (a keep's walls block everyone's sight; its gates do not). A relay or generator sees its
   whole coverage circle and 10 cells beyond it, plus the Sensors upgrade, through the ground, whether or not it is
   linked; every other machine sees a few cells around itself. The network is
   therefore the player's eyes as well as its cooling line (§4.6): a place stays lit, with its live heat, only while
@@ -1079,6 +1097,7 @@ upgrades, throughput, turrets, removing the pylon and the tank's reserve are in)
 | First emberite: heat-hunting emberites nest in pyrite pockets and lumps; they burrow slower than the tank and run faster in tunnels; they bite heat into tanks, and a cleared nest frees its ore (§6.2) | Decided |
 | A nest sends its emberites in pulses after a stir that warns of each, sized by the hunted tank's heat; a creature leaves only with a full charge, and one its deposit cannot feed starves, so a cold nest clears itself (§6.2) | Decided |
 | Moving things are drawn by extrapolation in the entity vertex shader, so motion is smooth above the step rate with no added lag | Decided |
+| A burning hull's heat grows with the square of the fire, from nothing a link notices at a minor wound to eight times a link at an empty hull, and the tank sheds it through its exchange with the ground and air, so a major wound cooks the tank unless it is repaired or the ground is cold (§4.7) | Decided |
 | Bases are the main heat sinks; heat returns by tank or by relay | Decided |
 | Add environmental hazards, emberites from nests, and dangerous terrain that must be mined out or disassembled | Decided |
 | Supporting structures make that easier | Decided |
@@ -1127,6 +1146,7 @@ upgrades, throughput, turrets, removing the pylon and the tank's reserve are in)
 | Stored heat is the match's supply; what keeps it up over a long match is open (§4.10) | Proposed |
 | Carried pyrite heats the tank linearly, steeply from 20 units and dangerously at 40, with no step or spike, and the hold upgrade insulates the load more than it enlarges the hold; the hold unloads only by touching the own core or a powered relay, and the core has no baffles round it (§6.3, §4.9) | Prototype |
 | Each unit a tank banks (core or relay) brings 250 energy into its reactor, booked as injected, after the tank's dock cooling; harvested and burned ore bring none (§6.3) | Prototype |
+| In the opening of a match with ore the bot mines round its base and banks the ore, and fights only an enemy that comes near, is in sight close by, is at its base or hits it (§6.4) | Prototype |
 | A bot sieges only a base it can break, and waits beside a gate (out of its line of fire) only while its enemy is docked in a base it cannot break; emberites hunt bot and player tanks by the same rules, and leave any tank docked in its own base (§4.9, §6.2) | Prototype |
 
 ## 14. Open questions

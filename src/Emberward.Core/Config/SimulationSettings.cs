@@ -61,8 +61,12 @@ public readonly record struct SimulationSettings
     public int TankCargoHeatStartOre { get; init; }
     public float TankHeatCapacity { get; init; }
     public float TankFireHeatPerTickMax { get; init; }
+    public int TankFireHeatPower { get; init; }
     public double TankFireAirEnergyPerTickMax { get; init; }
     public int TankFireAirRadius { get; init; }
+    /// <summary>Most hull a burning tank loses to overheating in a second (<see cref="TicksPerSecond"/> ticks).</summary>
+    public int TankFireMaxHullLossPerSecond { get; init; }
+    public int TicksPerSecond { get; init; }
     public float TankFrostbiteTemperature { get; init; }
     public float TankFrostbiteDamagePerDegree { get; init; }
     public float TankTerrainConductance { get; init; }
@@ -123,8 +127,11 @@ public readonly record struct SimulationSettings
         TankCargoInsulationPerLevel = Tweaks.Cargo.InsulationPerLevel,
         TankHeatCapacity = Tweaks.Tank.TankHeatCapacity,
         TankFireHeatPerTickMax = Tweaks.TankShield.FireTankHeatPerTickMax,
+        TankFireHeatPower = Tweaks.TankShield.FireHeatPower,
         TankFireAirEnergyPerTickMax = Tweaks.TankShield.FireAirEnergyPerTickMax,
         TankFireAirRadius = Tweaks.TankShield.FireAirRadius,
+        TankFireMaxHullLossPerSecond = Tweaks.TankShield.FireMaxHullLossPerSecond,
+        TicksPerSecond = Tweaks.Perf.TargetFps,
         TankFrostbiteTemperature = Tweaks.Tank.FrostbiteTemperature,
         TankFrostbiteDamagePerDegree = Tweaks.Tank.FrostbiteDamagePerDegree,
         TankTerrainConductance = Tweaks.Tank.TankTerrainConductance,

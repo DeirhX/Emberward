@@ -23,7 +23,7 @@ public partial class BotTankAI
     {
         bool besieging = canSiege && enemy?.Base is { } enemyBase && BotSiege.InSiegeRange(tank.Position, enemyBase);
         bool watched = _mode == TwitchMode.Return ||
-            (_mode == TwitchMode.Twitch && !_gunner.EnemyInSight && !loiter && !besieging);
+            (_mode == TwitchMode.Twitch && (!_gunner.EnemyInSight || _prospecting) && !loiter && !besieging && !_mining);
         if (!watched || IsInsideOwnBase(tank))
         {
             _stuckWatch.Reset();
@@ -75,7 +75,7 @@ public partial class BotTankAI
     /// </summary>
     private Position? ChooseLoiterPost(Tank tank, Tank? enemy, World world, bool breakable)
     {
-        bool wanted = _mode == TwitchMode.Twitch && enemy is { IsDockedAtOwnBase: true, Base: { IsDestroyed: false } } &&
+        bool wanted = _mode == TwitchMode.Twitch && !_prospecting && enemy is { IsDockedAtOwnBase: true, Base: { IsDestroyed: false } } &&
             !breakable && !_gunner.EnemyInSight && _loiterBreakFrames == 0;
         Position? post = wanted ? BotLoiter.Post(tank.Position, enemy!.Base!, world.Terrain) : null;
         if (post is not Position at || BotLoiter.IsAtPost(tank.Position, at))
@@ -186,12 +186,15 @@ public partial class BotTankAI
     /// <summary>Ticks left in which the bot does not wait at a post (see <see cref="LoiterBreakFrames"/>).</summary>
     private int _loiterBreakFrames;
 
-    /// <summary>Notes a hit (health lower than last tick, or enemy fire the shield took: the hit flash just lit), which keeps the bot from waiting at a post for a while.</summary>
+    /// <summary>Notes a hit (health lower than last tick, or enemy fire the shield took: the hit flash just lit), which keeps the bot from waiting at a post for a while and from prospecting (<see cref="UpdateProspecting"/>).</summary>
     private void TrackHits(Tank tank)
     {
         int health = (int)tank.Reactor.Health;
         if (health < _lastHealth || tank.HitFlashTicks >= Tank.HitFlashDuration - 1)
+        {
             _loiterBreakFrames = Math.Max(_loiterBreakFrames, LoiterBreakFrames); // never cuts a longer give-up short
+            _engageFrames = Math.Max(_engageFrames, EngageHoldFrames);
+        }
         else if (_loiterBreakFrames > 0)
             _loiterBreakFrames--;
         _lastHealth = health;

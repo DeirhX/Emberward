@@ -27,7 +27,7 @@ internal sealed class SideSensing(TerrainGrid terrain, MachineList machines, Tan
     /// <summary>
     /// Starts tracking what <paramref name="tank"/>'s side sees and returns the map, which every
     /// <see cref="Advance"/> then keeps up to date. The side sees through its tank, its base and its machines:
-    /// the tank and the base along open tunnel, link nodes (relays, generators) over their whole coverage circles, every
+    /// the tank and the base along open tunnel (the base out through its gates), link nodes (relays, generators) over their whole coverage circles, every
     /// machine a little around itself.
     /// </summary>
     public VisionMap TrackVision(Tank tank)
@@ -143,8 +143,10 @@ internal sealed class SideSensing(TerrainGrid terrain, MachineList machines, Tan
         }
         if (tank.Base is { IsDestroyed: false } owner)
         {
+            // The base sees only along open lines from its core: out through its gates, never through its walls or
+            // the ground (Pixel.BlocksSight), so it has no near radius.
+            _visionSources.Add(new VisionSource(owner.Position, owner.Upgrades.BaseSightRadius / divisor, 0));
             const int near = Tweaks.Vision.MachineNearRadius;
-            _visionSources.Add(new VisionSource(owner.Position, owner.Upgrades.BaseSightRadius / divisor, near));
             foreach (var machine in machines.Machines)
             {
                 if (!machine.StandsFor(owner))

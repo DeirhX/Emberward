@@ -167,6 +167,16 @@ public static class Pixel
         !IsOpenGround(p) && !IsAnyBaseCell(p);
 
     /// <summary>
+    /// True when the pixel stops sight (fog of war, <c>Sensing/VisionEye</c>): what blocks a link, and a base's walls
+    /// too, whichever side's, so a base sees out only through its gates and nobody sees into a keep through its wall.
+    /// The gates, the courtyard floor and the core do not block it.
+    /// </summary>
+    public static bool BlocksSight(TerrainPixel p) => BlocksLink(p) || IsBase(p);
+
+    /// <summary>The open ground inside a keep's walls: its courtyard floor and its core.</summary>
+    public static bool IsKeepInterior(TerrainPixel p) => p is TerrainPixel.BaseFloor or TerrainPixel.BaseCore;
+
+    /// <summary>
     /// True when the pixel stops a creature's sight and senses: plain, hot and frost rock, and concrete. Dirt, open
     /// ground, ore and base cells do not, so creatures sense through soil but not through stone (unlike
     /// <see cref="BlocksLink"/>, which dirt blocks too). <see cref="IsRock"/> alone is plain rock only, hence the list.

@@ -109,6 +109,7 @@ public partial class BotTankAI
         _rng = new BotRandom(seed);
         _navigator = new BotNavigator(_rng);
         _gunner = new BotGunner(_rng);
+        _prospector = new BotProspector(_rng);
     }
 
     /// <summary>The mode the bot is in; for tests and diagnostics.</summary>
@@ -189,15 +190,18 @@ public partial class BotTankAI
             _trail.Record(tank.Position);
 
         var basePos = tank.Base?.Position ?? tank.Position;
-        // Roaming, headway is toward the enemy. Heading home it is just moving on: the trail may wind.
-        _navigator.UpdateStuckState(tank.Position,
-            _mode == TwitchMode.Twitch && enemy is { IsDead: false } ? enemy.Position : null);
+        TrackHits(tank);
+        bool prospecting = UpdateProspecting(tank, enemy, world);
+        // Roaming, headway is toward the enemy (prospecting, toward the ore or the place it roams to). Heading home it
+        // is just moving on: the trail may wind.
+        _navigator.UpdateStuckState(tank.Position, _mode != TwitchMode.Twitch ? null
+            : prospecting ? _prospector.Goal
+            : enemy is { IsDead: false } ? enemy.Position : null);
         // Its enemy docked in a base it cannot break, the bot waits outside (BotLoiter); one it can break it lays siege to
         // once the opening grace is over, and before that roams as usual. It stops waiting while it sees the enemy (who
         // then has a shot at it too) or soon after it is hit, and fights.
         bool breakable = HoldBreakDecision(tank, enemy?.Base, world);
-        bool canSiege = _gunner.BaseSiegeAllowed && breakable;
-        TrackHits(tank);
+        bool canSiege = _gunner.BaseSiegeAllowed && breakable && !prospecting;
         Position? post = ChooseLoiterPost(tank, enemy, world, breakable);
         _waiting = post != null;
         // A manoeuvre begun while roaming may torch; waiting never fires near the gate, so it ends there.
@@ -209,7 +213,7 @@ public partial class BotTankAI
         {
             // A breakout is for roaming out of sight; once the enemy is seen the bot fights, which a manoeuvre's
             // plain move would not.
-            if (_maneuverIsBreakout && _mode == TwitchMode.Twitch && _gunner.EnemyInSight)
+            if (_maneuverIsBreakout && _mode == TwitchMode.Twitch && _gunner.EnemyInSight && !_prospecting)
                 _maneuverFrames = 0;
             else
                 return ContinueManeuver(tank, world);
@@ -340,6 +344,16 @@ public partial class BotTankAI
         if (post is Position at)
             return DoLoiter(tank, enemy!.Base!, at, world);
 
+        // In the opening of a match with ore it mines instead of going for the enemy (BotTankAI.Prospecting).
+        Position? prospectGoal = null;
+        if (_prospecting)
+        {
+            var (output, goal) = Prospect(tank, world);
+            if (output is ControllerOutput mined)
+                return mined;
+            prospectGoal = goal;
+        }
+
         // Out of the enemy's sight and near a base it can break, the bot works on the base (BotSiege): it shoots what a
         // shot wears down, a shut gate or the core, and otherwise heads for the place the next shot is fired from.
         Position? siegePoint = null;
@@ -354,13 +368,14 @@ public partial class BotTankAI
         }
 
         bool hasTarget = enemy != null && !enemy.IsDead;
-        bool hasLos = _gunner.EnemyInSight;
+        // Prospecting, a far enemy in sight is left alone: the bot goes on with its digging.
+        bool hasLos = _gunner.EnemyInSight && !_prospecting;
         if (hasLos)
         {
             _navigator.ResetProgress(); // Circling an enemy in sight is fighting, not going nowhere.
             _stuckWatch.EndDetour();
         }
-        var targetPos = siegePoint ?? _stuckWatch.Detour ?? (hasTarget ? enemy!.Position : (Position?)null);
+        var targetPos = siegePoint ?? _stuckWatch.Detour ?? prospectGoal ?? (hasTarget ? enemy!.Position : (Position?)null);
 
         // A move that has run into rock or a wall is not held to the end of its plan.
         if (world.ProbeTankStep(tank, _move) is StepObstacle.Hard or StepObstacle.Solid)
@@ -660,6 +675,7 @@ public partial class BotTankAI
         hash = Fnv1a.Mix(hash, _loiterBreakFrames);
         hash = Fnv1a.Mix(hash, _waiting);
         hash = MixWaitingState(hash);
+        hash = MixProspectState(hash);
         return Fnv1a.Mix(hash, _rechargeStallFrames);
     }
 }
