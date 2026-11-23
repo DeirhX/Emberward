@@ -27,9 +27,6 @@ public partial class Game
 
     private bool IsNetMatch => _relay != null;
 
-    // The scoreboard's driver lookup, made once rather than a closure each frame.
-    private Func<int, string>? _driverNames;
-
     /// <summary>
     /// A network match cannot stop for one player: the others' ticks keep coming. The pause menu still opens, over
     /// a running game.
@@ -153,23 +150,34 @@ public partial class Game
         Console.WriteLine($"[Net] Match {(relay.Rejoined ? "rejoined" : "started")}: {string.Join(", ", names)}.");
     }
 
-    private static uint SlotColor(int slot)
-    {
-        Color c = TankSprites.GetPixelColor(1, slot);
-        return HudTheme.Rgba(c.R, c.G, c.B);
-    }
+    private static uint SlotColor(int slot) => HudPalette.TankColor(slot);
 
     /// <summary>In the room's lobby: connected, and the match has not started (and nothing has gone wrong).</summary>
     private bool InNetLobby => _relay is { Started: false, Failure: null };
 
     /// <summary>
+    /// What the board, the toasts and the enemy name plates call the tank in <paramref name="slot"/>: the driver's name
+    /// in a network match, <c>YOU</c> and <c>BOT n</c> in a local one, and <c>BOT n</c> for a seat a bot drives.
+    /// </summary>
+    private string SlotName(int slot) =>
+        _relay is { } relay && _netSession is { } session ? SlotNames.Seat(slot, session.HumanMask, relay.DriverName(slot, session.HumanMask))
+        : slot == _localSlot && _relay == null ? SlotNames.You
+        : SlotNames.LocalBot(slot);
+
+    /// <summary>
     /// The network overlays of a frame: the lobby before the start and a warning plate when something is wrong. The
-    /// names over the other tanks are the entity layer's (<see cref="NamePlayers"/>, given before each build).
+    /// names over the other tanks are the entity layer's (<see cref="NamePlayers"/>, given before each build). A local
+    /// match of several bots names the bot that won.
     /// </summary>
     private void DrawNetOverlays()
     {
         if (_relay is not { } relay)
+        {
+            // Against one bot the loss needs no name; among several it says which won.
+            _hud.WinnerName = _world.TankList.Count > 2 && _world.MatchWinner?.Tank is { } won && won.Color != _localSlot
+                ? SlotName(won.Color) : null;
             return;
+        }
 
         SaveLastMatch(relay);
         if (InNetLobby)
@@ -180,11 +188,11 @@ public partial class Game
 
         _hud.CanRestartMatch = _world.IsMatchOver;
         var winner = _world.MatchWinner?.Tank;
-        _hud.WinnerName = winner != null && _netPlaying ? relay.DriverName(winner.Color, _netSession!.HumanMask) : null;
-        _hud.DriverName = _netPlaying ? _driverNames ??= slot => relay.DriverName(slot, _netSession!.HumanMask) : null;
+        _hud.WinnerName = winner != null && _netPlaying ? SlotName(winner.Color) : null;
 
         var play = _hud.PlayRect;
-        var anchor = new Vector2(play.x + play.w * 0.5f, play.y + 18f);
+        // Below the clock plate of a timed match, when the HUD has one at the top of the view.
+        var anchor = new Vector2(play.x + play.w * 0.5f, MathF.Max(play.y, _hud.TopCentreBottom) + 18f);
         string? notice = NetNotice(relay, _netSession?.Buffered ?? 0, out bool bad);
         if (notice == null)
         {
@@ -231,6 +239,7 @@ public partial class Game
         if (HudTheme.BeginWindow("##NetLobby", anchor, new Vector2(0.5f, 0f), 520f))
         {
             HudTheme.TitleRow($"NETWORK MATCH    room {relay.Room}", 19f);
+            HudTheme.WrappedRow(LobbyText.SettingsLine(relay.Config), HudTheme.TextDim, 15f);
             var dl = ImGui.GetWindowDrawList();
             for (int slot = 0; slot < relay.Config.Slots; slot++)
             {

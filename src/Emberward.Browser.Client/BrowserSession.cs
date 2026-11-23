@@ -13,6 +13,7 @@ using Emberward.Desktop;
 using Emberward.Desktop.Audio;
 using Emberward.Desktop.Gui;
 using Emberward.Desktop.Gui.Guidance;
+using Emberward.Desktop.Net;
 using Emberward.Protocol;
 
 /// <summary>
@@ -21,12 +22,20 @@ using Emberward.Protocol;
 /// </summary>
 public sealed class BrowserSession
 {
-    /// <summary>The map of a normal match.</summary>
+    /// <summary>The map of a normal local match.</summary>
     public static Size DefaultMapSize => new(1500, 750);
 
     /// <summary>The largest map the page asks for (<c>?map=WxH</c>); WebGL 2 promises textures of 2048 and more.</summary>
     public static Size LargestMapSize => new(4096, 4096);
-    private const int BotSlot = 1;
+
+    /// <summary>
+    /// The map of a local match nobody chose a map for: the browser's large one for a standard match, and for an
+    /// arcade match the one a room of that mode and that many tanks gets (<see cref="MapPresets.DefaultSizeFor"/>),
+    /// which keeps a few tanks close enough to fight.
+    /// </summary>
+    public static Size LocalMapSize(MatchMode mode, int players) =>
+        mode == MatchMode.Standard ? DefaultMapSize : MapPresets.DefaultSizeFor(mode, players);
+
     private readonly BotTankAI?[] _bots = [];
     private readonly SoundDirector _soundDirector;
 
@@ -35,15 +44,19 @@ public sealed class BrowserSession
     /// How many threads the heat solver may use. One is the single-thread runtime, where it must not split its work;
     /// more need the threaded runtime (docs/browser.md). The world comes out the same either way.
     /// </param>
-    /// <param name="mapSize">The map; null for <see cref="DefaultMapSize"/>. Kept within 320x200 and <see cref="LargestMapSize"/>.</param>
+    /// <param name="mapSize">The map; null for <see cref="LocalMapSize"/>. Kept within 320x200 and <see cref="LargestMapSize"/>.</param>
     /// <param name="machines">
     /// For measuring: this many machines planted in networks grown from every base before play starts
     /// (<see cref="BrowserStress"/>). Zero in a normal match.
     /// </param>
-    public BrowserSession(int seed, int heatWorkers = 1, Size? mapSize = null, int machines = 0)
-        : this(seed, ClampMap(mapSize ?? DefaultMapSize), Tweaks.LevelGen.DefaultPlayers, LevelGenMode.Deterministic,
-            heatWorkers, localSlot: 0, localBot: true, machines)
+    /// <param name="players">The tanks of the match: the player's, and a bot in every other.</param>
+    /// <param name="mode">The kind of match. A local match in the browser is a race to the core, as a network one is.</param>
+    public BrowserSession(int seed, int heatWorkers = 1, Size? mapSize = null, int machines = 0,
+        int players = Tweaks.LevelGen.DefaultPlayers, MatchMode mode = MatchMode.Standard)
+        : this(seed, ClampMap(mapSize ?? LocalMapSize(mode, BrowserLaunch.Players(players))), BrowserLaunch.Players(players),
+            LevelGenMode.Deterministic, MatchRules.ForMode(mode, coreTapWins: true), heatWorkers, localSlot: 0, localBots: true, machines)
     {
+        Mode = mode;
     }
 
     /// <summary>
@@ -68,24 +81,26 @@ public sealed class BrowserSession
         return input;
     }
 
-    /// <param name="localBot">A local match: the bot drives <see cref="BotSlot"/>.</param>
-    private BrowserSession(int seed, Size mapSize, int players, LevelGenMode genMode, int heatWorkers, int localSlot,
-        bool localBot = false, int machines = 0)
+    /// <param name="localBots">A local match: a bot drives every tank but the player's.</param>
+    private BrowserSession(int seed, Size mapSize, int players, LevelGenMode genMode, MatchRules rules, int heatWorkers,
+        int localSlot, bool localBots = false, int machines = 0)
     {
         Seed = seed;
         MapSize = mapSize;
         var settings = SimulationSettings.FromTweaks() with { ThermalMaxWorkers = Math.Max(1, heatWorkers) };
         if (heatWorkers <= 1)
             settings = settings with { ThermalParallelTileThreshold = int.MaxValue };
-        // A network match is a race, as on the desktop: the first base to tap the core wins.
-        World = MatchSetup.Build(MapSize, seed, MatchRules.Standard with { CoreTapWins = true, Emberites = true }, players, genMode,
-            settings: settings);
+        World = MatchSetup.Build(MapSize, seed, rules, players, genMode, settings: settings);
         LocalSlot = localSlot;
-        if (localBot)
+        if (localBots)
         {
-            World.SetBotControlled(BotSlot, botControlled: true);
             _bots = new BotTankAI?[World.TankList.Count];
-            _bots[BotSlot] = new BotTankAI(MatchSetup.BotSeed(seed, BotSlot));
+            for (int slot = 0; slot < _bots.Length; slot++)
+                if (slot != localSlot)
+                {
+                    World.SetBotControlled(slot, botControlled: true);
+                    _bots[slot] = new BotTankAI(MatchSetup.BotSeed(seed, slot));
+                }
         }
         Vision = World.TrackVision(Player);
         Radar = World.TrackRadar(Player);
@@ -108,7 +123,10 @@ public sealed class BrowserSession
         if (localSlot < 0 || localSlot >= config.Slots)
             throw new ArgumentOutOfRangeException(nameof(localSlot));
         return new BrowserSession(config.Seed, new Size(config.MapWidth, config.MapHeight), config.Slots,
-            (LevelGenMode)config.GenMode, heatWorkers, localSlot);
+            (LevelGenMode)config.GenMode, NetMatch.RulesOf(config), heatWorkers, localSlot)
+        {
+            Mode = NetMatch.ModeOf(config),
+        };
     }
 
     private static Size ClampMap(Size size) =>
@@ -118,6 +136,9 @@ public sealed class BrowserSession
     public int Seed { get; }
 
     public Size MapSize { get; }
+
+    /// <summary>The kind of match: what was asked for locally, or the room's.</summary>
+    public MatchMode Mode { get; private init; }
 
     /// <summary>How many machines <see cref="BrowserStress"/> planted before play; zero in a normal match.</summary>
     public int Machines { get; }
@@ -136,23 +157,22 @@ public sealed class BrowserSession
     /// <summary>The tutorial, toasts, hint and warning, as the desktop HUD chooses them; updated after each step.</summary>
     public PlayerGuidance Guidance { get; } = new();
 
-    private ScoreboardStatus? _scoreboard;
-    private (int Deaths, int Seconds, int Player) _scoreboardKey = (-1, -1, -1);
+    /// <summary>A timed match's drop lines (<see cref="BrowserArcade"/>); it hears every step, as the desktop's does.</summary>
+    public DropBoard Drops { get; } = new();
+
+    /// <summary>A timed match's board, built again only when what it shows changed (<see cref="ScoreboardCache"/>).</summary>
+    public ScoreboardCache Board { get; } = new();
+
+    private Func<int, string>? _names;
 
     /// <summary>
-    /// The scoreboard for the frame. What it shows changes only with a death, the match clock's second or the player's
-    /// tank, so it is built when one of those does and the same one is handed out until then, not rebuilt every frame
-    /// while Tab is up.
+    /// What the board, the drop lines and the toasts call the tank in a slot: <c>YOU</c> and <c>BOT n</c> in a local
+    /// match (<see cref="SlotNames.Local"/>), the players' names once a network match sets them.
     /// </summary>
-    public ScoreboardStatus ScoreboardFor(World world, Tank player)
+    public Func<int, string> Names
     {
-        var key = (world.Deaths.Count, (int)world.MatchTime.TotalSeconds, player.Color);
-        if (_scoreboard is null || key != _scoreboardKey)
-        {
-            _scoreboard = BrowserFrameBuilder.Scoreboard(world, player);
-            _scoreboardKey = key;
-        }
-        return _scoreboard;
+        get => _names ??= SlotNames.Local(LocalSlot);
+        set => Guidance.Names = _names = value;
     }
 
     /// <summary>
@@ -183,13 +203,18 @@ public sealed class BrowserSession
         return hash;
     }
 
-    /// <summary>One step of the local match: the player's input, and the bot's.</summary>
-    public void Advance(ControllerOutput input)
+    /// <summary>One step of the local match: the player's input, and the bots'.</summary>
+    /// <returns>
+    /// Whether it stepped: a decided match stands still, and the page has nothing new to be told (its last frame
+    /// carries the final standings).
+    /// </returns>
+    public bool Advance(ControllerOutput input)
     {
         if (World.MatchOutcomeFor(Player) != MatchOutcome.InProgress)
-            return;
+            return false;
         SlotStepper.Advance(World, _bots, _ => input);
         AfterStep(silent: false);
+        return true;
     }
 
     /// <summary>What follows every step, local or from the relay: sound, guidance and what the next frame draws.</summary>
@@ -199,6 +224,7 @@ public sealed class BrowserSession
         if (!silent)
             _soundDirector.AfterStep(World, LocalSlot);
         Guidance.AfterStep(World, Player);
+        Drops.AfterStep(World);
         Guidance.Update(World, Player, HudSeconds, offerThermalView: !ThermalView);
         Scene.CaptureStep(silent);
     }

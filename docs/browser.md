@@ -173,14 +173,36 @@ from the warning on X (or the button over the HUD) burns a unit of pyrite from t
 The on-screen controls support touch devices; tap the game to aim and fire, or hold FIRE while driving.
 Escape opens the pause menu. Switching away from the page pauses the local match.
 
+A solo match is the player's tank against one bot in a standard match. The address asks for another:
+`?players=N` (2 to 8) puts a bot in every tank but the player's, and `?mode=arcade` plays the arcade mode (the
+desktop's `--players=N` and `--arcade`). The page passes both on as it found them and `BrowserLaunch` reads them:
+a count outside 2 to 8 is two tanks, a mode nobody knows the standard one. A standard solo match keeps the large
+map whatever the count; an arcade one gets the map a room of its size would (320x200 up to four tanks,
+`BrowserSession.LocalMapSize`), and `?map=WxH` chooses another for either.
+
+An arcade match shows what the desktop's HUD does, in its words: `BrowserArcade` turns `Scoreboards` and
+`DropBoard` into the frame's `arcade` field after each step (null in a match without a clock and in a network
+lobby), and `arcade.js` only places it. The frame's `objective` (`Scoreboards.Objective`, null without a clock) is
+there from the lobby on, so the card of an arcade room never shows the core race's objective. The clock plate stands at the top of the view with the drop lines under it (the next drop, where and
+when; one on the ground and how long it lies; who took the last), the board (place, colour, name, kills, deaths;
+the player's line and the sole leader marked) at the right above the other panels, the running powerups as tags
+over the bottom of the view, and a badge at the edge of the view for each drop out of sight. Below 1080 pixels of
+width the clock stands over the board. Once the score decides the match the board moves to the middle with the
+result over it, and the local match stops stepping, so the page is sent nothing more. Every kind's chip carries its
+mark (`PowerupPresentations`), never its colour alone. The arcade toasts and sounds are the desktop's (`ArcadeWatch`,
+`SoundDirector`), which the browser already shares. `BrowserArcadeTests` checks the fields, that the page has and
+styles each element `arcade.js` writes to, and a local four-tank match up to its first drop.
+
 ## Network play
 
 The welcome screen has two tabs, **Solo** and **Online**, and keeps the one last chosen. **Online** joins a room on
-the relay (docs/multiplayer-design.md): a name, a room and the number of tanks. The page remembers them
-(`localStorage`). The page sends no secret: the public relay is open to everyone, and a relay that asks for a secret
-refuses the browser. The first player into
-a room opens it with a new seed and that many tanks, on the desktop's map for the count (480x300 for more than two,
-`?map=WxH` for another); bots take the slots nobody joins. The lobby shows who is in each slot in their tank's
+the relay (docs/multiplayer-design.md): a name, a room, the match mode (**MODE**: Standard or Arcade) and the number
+of tanks. The page remembers them (`localStorage`); `?mode=arcade` in the address presets the mode. The page sends
+no secret: the public relay is open to everyone, and a relay that asks for a secret refuses the browser. The first
+player into a room opens it with a new seed, that mode and that many tanks, on the desktop's map for them (480x300
+for more than two, 320x200 for an arcade room of up to four, `?map=WxH` for another); bots take the slots nobody
+joins. Someone who joins a room that exists gets the room's mode and tanks, not the page's. The lobby names the
+room's match in a line ("Arcade match   4 tanks   map 320x200") and shows who is in each slot in their tank's
 colour; the host (the lowest slot) starts with **Start match** or Enter, and a full room starts by itself. P pauses
 the match for everyone and resumes it. Escape opens the menu over a running match, which does not stop for one
 player, **Leave match** leaves the room, and the host's **Close to new players** shuts the running match to newcomers (and **Open to new players** reopens it); the button shows the state, disabled, to everyone else. A player who left or lost the connection joins again under the same
@@ -203,8 +225,9 @@ because ticks arrive by the relay's clock. A hidden tab stops drawing and steppi
 as a rejoining player does.
 
 Not yet in the browser: the desync report file the desktop writes, and choosing a map size or seed for a new room
-from the page. The name plates over enemy tanks come from the shared entity layer, with the drivers' names from the
-relay (`BrowserNetMatch`).
+from the page. The name plates over enemy tanks come from the shared entity layer (`BOT n` over a bot, as on the
+desktop), with the drivers' names from the relay (`BrowserNetMatch`). The board, the toasts and the result line call
+a seat by its player's name and a bot's seat `BOT n`, as the desktop does (`SlotNames.Seat`).
 
 The header says **SAVED FOR OFFLINE** after the entire app, including the .NET runtime, has been cached, and
 **OFFLINE · SOLO ONLY** without a connection; otherwise it says nothing.
@@ -449,7 +472,7 @@ window and graphics dependencies out of the shared rendering assembly.
   world is drawn at; `perf.js` is the `?perf` readout.
 - `main.js` / `input.js`: HUD, seed selection, session lifecycle, input and the heat view (H, which the frame
   request carries to `BrowserSession.ThermalView`). Build costs, placement, coverage, match
-  outcome and upgrade descriptions come from Core. `scoreboard.js` shows the Tab scoreboard (rows from `TankDeathView`, built by `BrowserSession.ScoreboardFor` only when a death, the clock's second or the player's tank changes; Tab works while the match is on screen, also after it ended), `guidance.js` shows the desktop's tutorial card (F2 hides it),
+  outcome and upgrade descriptions come from Core. `guidance.js` shows the desktop's tutorial card (F2 hides it),
   toasts, hint line and warning banner as each frame after a step carries them (`guidance`), and the renderer points
   at the tutorial's target. `hud.js` shows the status panels, the upgrade list (base track above tank track, with
   level pips), the heat orb and bar in the desktop's heat colours (`HeatScale`) and the hit flash with a wedge

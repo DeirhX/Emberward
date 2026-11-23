@@ -61,6 +61,16 @@ public readonly record struct EmberiteRenderState(int Id, PositionF Position, Ve
 /// <param name="IsStirring">A pulse of creatures is about to leave it: its embers flare.</param>
 public readonly record struct NestRenderState(Position Centre, int Radius, int Occupied, bool IsAwake, bool IsCleared, bool IsStirring = false);
 
+/// <summary>A powerup drop on the ground, as it is drawn (<see cref="Entities.Powerups.PowerupDrops"/>).</summary>
+/// <param name="Cell">The middle of its disc.</param>
+/// <param name="TicksUntilExpiry">Ticks before it is gone if nobody takes it.</param>
+/// <param name="Radius">Cells from <paramref name="Cell"/> within which a tank's sprite takes it.</param>
+public readonly record struct PowerupRenderState(Position Cell, Entities.Powerups.PowerupKind Kind, int TicksUntilExpiry, float Radius)
+{
+    /// <summary>Seconds before it is gone if nobody takes it.</summary>
+    public float SecondsUntilExpiry => TicksUntilExpiry / (float)Config.Tweaks.Perf.TargetFps;
+}
+
 /// <summary>How dangerous a discovered nest is now (<see cref="NestDanger"/>).</summary>
 public enum NestDangerLevel : byte
 {

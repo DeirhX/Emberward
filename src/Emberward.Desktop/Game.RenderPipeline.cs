@@ -141,8 +141,6 @@ public partial class Game
                 _hud.Camera = (_renderViewState.CamPixelX, _renderViewState.CamPixelY, _renderViewState.CellPixels);
                 var gameTextureSize = _renderBackend.GameTextureSize;
                 _hud.WaitingForPlayers = InNetLobby;
-                // Tab moves between the network menu's fields and the pause screen is for reading, so the board waits for play.
-                _hud.ShowScoreboard = !_paused && !_showControls && !InNetLobby && KeyboardController.IsHeld(SDL3.SDL.Scancode.Tab);
                 DrawProfile.Measure(ref _drawProfile.ScreenHudDraw, () =>
                     _hud.Draw(
                         _renderBackend.GameTextureId,

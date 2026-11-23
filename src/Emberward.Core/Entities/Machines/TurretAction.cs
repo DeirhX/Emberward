@@ -84,9 +84,9 @@ public static class TurretAction
             return;
 
         if (gatling)
-            FireRound(turret, at, motion, stats, projectiles);
+            FireRound(turret, at, motion, stats, projectiles, terrain);
         else
-            Fire(turret, at, stats, projectiles);
+            Fire(turret, at, stats, projectiles, terrain);
         energy.Spend(turret, stats.ShotCharge, terrain);
         ctx.Events?.Record(new StepEvent(StepEventKind.TurretFired, turret.Position, turret.OwnerColor, turret.Type,
             Count: targetColor));
@@ -142,11 +142,12 @@ public static class TurretAction
         heat.SampleAverageHeat(at, Tweaks.Turret.HeatSenseRadius) * 255f;
 
     /// <summary>A bullet from the barrel toward the tank at <paramref name="target"/>; the turret turns to face it.</summary>
-    private static void Fire(Machine turret, PositionF target, TurretStats stats, ProjectileList projectiles)
+    private static void Fire(Machine turret, PositionF target, TurretStats stats, ProjectileList projectiles, ITerrainPixelReadOnly terrain)
     {
         Position muzzle = Aim(turret, target.X - turret.Position.X, target.Y - turret.Position.Y, out DirectionF direction);
+        muzzle = projectiles.MuzzleOf(terrain, turret.Position, muzzle, turret.OwnerColor);
         projectiles.Add(Projectile.CreateBullet(muzzle, direction.ToVector(Tweaks.Weapon.CannonBulletSpeed),
-            turret.OwnerColor, stats.Damage, turret.Type));
+            turret.OwnerColor, stats.Damage));
     }
 
     /// <summary>
@@ -154,7 +155,8 @@ public static class TurretAction
     /// tick, will be when the round gets there (<see cref="Lead"/>); the gatling turns to face that point. The round is
     /// spent a little past the gatling's range.
     /// </summary>
-    private static void FireRound(Machine gatling, PositionF target, VectorF motion, TurretStats stats, ProjectileList projectiles)
+    private static void FireRound(Machine gatling, PositionF target, VectorF motion, TurretStats stats, ProjectileList projectiles,
+        ITerrainPixelReadOnly terrain)
     {
         float speed = Tweaks.Gatling.RoundSpeed;
         // The round first moves on the next tick, when shots fly before creatures run, and it starts at the barrel's
@@ -166,9 +168,10 @@ public static class TurretAction
         float dx = target.X - motion.X * behind - gatling.Position.X, dy = target.Y - motion.Y * behind - gatling.Position.Y;
         float flight = Lead(dx, dy, motion, speed);
         Position muzzle = Aim(gatling, dx + motion.X * flight, dy + motion.Y * flight, out DirectionF direction);
+        muzzle = projectiles.MuzzleOf(terrain, gatling.Position, muzzle, gatling.OwnerColor);
         int life = (int)MathF.Ceiling((stats.Range + Tweaks.Gatling.RoundSpareCells) / speed);
         projectiles.Add(Projectile.CreateRound(muzzle, direction.ToVector(speed), gatling.OwnerColor, stats.Damage, life,
-            stats.SoilPierce, gatling.Type));
+            stats.SoilPierce));
     }
 
     /// <summary>

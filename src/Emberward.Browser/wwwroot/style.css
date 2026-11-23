@@ -25,6 +25,8 @@
     --muted: #9aa9aa;
     --amber: #ecb867;
     --cyan: #6edace;
+    /* Where the plates at the top of the view start; a timed match puts its clock and board there (arcade.js). */
+    --hud-top: 22px;
 }
 * {
     box-sizing: border-box;
@@ -889,70 +891,14 @@ footer i {
 #lobby p {
     margin: 6px 0;
 }
+#lobby-settings {
+    color: var(--hud-dim);
+}
 #lobby-hint {
     color: var(--hud-amber);
 }
 #lobby .menu-actions {
     margin-top: 14px;
-}
-#scoreboard {
-    position: absolute;
-    left: 50%;
-    top: 14%;
-    transform: translateX(-50%);
-    width: min(620px, calc(100vw - 30px));
-    padding: 16px 24px 18px;
-    font-family: var(--hud-font);
-    pointer-events: none;
-    z-index: 2;
-}
-#scoreboard[hidden] {
-    display: none;
-}
-#scoreboard .eyebrow {
-    display: flex;
-    justify-content: space-between;
-}
-#scoreboard-clock {
-    color: var(--hud-dim);
-}
-#scoreboard ol {
-    list-style: none;
-    margin: 10px 0 0;
-    padding: 0;
-}
-#scoreboard li {
-    display: grid;
-    grid-template-columns: 16px max-content 2.5em 2.5em 1fr;
-    align-items: baseline;
-    gap: 4px 10px;
-    padding: 4px 0;
-    font-size: 16px;
-    color: var(--hud-text);
-}
-#scoreboard li i {
-    width: 12px;
-    height: 12px;
-    align-self: center;
-}
-#scoreboard li.you .name {
-    color: var(--hud-amber);
-}
-#scoreboard li b {
-    text-align: right;
-    color: var(--hud-danger);
-}
-#scoreboard .times {
-    font-size: 14px;
-    white-space: pre-wrap;
-}
-#scoreboard li b.kills {
-    color: var(--hud-good);
-}
-#scoreboard li.none b:not(.kills),
-#scoreboard li b.kills.none,
-#scoreboard li.none .times {
-    color: var(--hud-dim);
 }
 #net-status {
     position: absolute;
@@ -1439,6 +1385,9 @@ dd {
     }
 }
 @media (max-width: 850px) {
+    :root {
+        --hud-top: 12px;
+    }
     header {
         padding: 0 16px;
         height: 62px;
@@ -1796,4 +1745,324 @@ body.playing.art-hud {
 }
 .key-row[aria-pressed="true"] {
     color: var(--hud-amber);
+}
+/*
+ * A timed match (arcade.js, DESIGN.md §6.8): the clock plate with the powerup drops under it at the top of the view,
+ * the board at the right where the base panel is, the running powerups over the bottom, and the final standings in
+ * the middle once the score has decided the match. arcade.js measures the clock and the board and sets
+ * --arcade-top (under the clock), --arcade-board (under the board) and --arcade-stack (the clock over the board in a
+ * narrow view); what stood where they now stand moves down by them. A powerup kind is never told by its colour
+ * alone: every chip carries its mark.
+ */
+body.arcade #warning,
+body.arcade #net-status {
+    top: calc(var(--hud-top) + var(--arcade-top, 0px));
+}
+body.arcade #upgrades {
+    top: calc(var(--hud-top) + var(--arcade-stack, 0px) + var(--arcade-board, 0px));
+}
+body.arcade.art-hud #upgrades {
+    top: auto;
+}
+body.arcade.art-hud #hud {
+    top: calc(var(--hud-top) + var(--arcade-stack, 0px) + var(--arcade-board, 0px));
+}
+#arcade-clock {
+    --clock: var(--hud-text);
+    position: absolute;
+    left: 50%;
+    top: var(--hud-top);
+    transform: translateX(-50%);
+    min-width: 230px;
+    max-width: min(420px, 40vw);
+    padding: 8px 18px 10px;
+    text-align: center;
+    pointer-events: none;
+}
+#clock-caption {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: var(--hud-dim);
+}
+#clock-time {
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1.1;
+    color: var(--clock);
+    font-variant-numeric: tabular-nums;
+}
+/* The last minute frames the plate in the clock's colour; the last seconds and sudden death beat. */
+#arcade-clock.urgent {
+    --accent: var(--clock);
+}
+#arcade-clock.urgent #clock-caption {
+    color: var(--clock);
+}
+#arcade-clock.phase-LastSeconds #clock-time,
+#arcade-clock.phase-SuddenDeath #clock-time {
+    animation: clock-beat 1s ease-out infinite;
+}
+@keyframes clock-beat {
+    0% {
+        transform: scale(1.12);
+    }
+    40% {
+        transform: scale(1);
+    }
+    70% {
+        opacity: 0.7;
+    }
+}
+#drop-lines {
+    list-style: none;
+    margin: 6px 0 0;
+    padding: 0;
+    text-align: left;
+}
+#drop-lines li {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 2px 0;
+    font-size: 12.5px;
+    white-space: nowrap;
+    color: var(--hud-text);
+}
+#drop-lines li.past {
+    color: var(--hud-dim);
+}
+#drop-lines li.urgent .when {
+    animation: warning-blink 0.67s steps(1) infinite;
+}
+.chip {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 17px;
+    height: 17px;
+    border-radius: 3px;
+    font-style: normal;
+    font-size: 12px;
+    font-weight: 700;
+    color: #0e0e10;
+    background: var(--kind);
+}
+#drop-lines .name {
+    font-weight: 600;
+    color: var(--kind);
+}
+#drop-lines .when {
+    font-variant-numeric: tabular-nums;
+}
+#drop-lines .detail {
+    margin-left: auto;
+    padding-left: 8px;
+    color: var(--hud-dim);
+}
+#scoreboard {
+    position: absolute;
+    right: 24px;
+    top: calc(var(--hud-top) + var(--arcade-stack, 0px));
+    width: 335px;
+    padding: 10px 16px 12px;
+    pointer-events: none;
+}
+.art-hud #scoreboard {
+    width: 300px;
+}
+.score-head,
+#score-rows li {
+    display: grid;
+    grid-template-columns: 18px 12px 12px 1fr 44px 50px;
+    align-items: center;
+    gap: 6px;
+}
+.score-head {
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    color: var(--hud-dim);
+}
+.score-head span:first-child {
+    grid-column: 5;
+    text-align: right;
+}
+.score-head span:last-child {
+    text-align: right;
+}
+#score-rows {
+    list-style: none;
+    margin: 3px 0 0;
+    padding: 0;
+}
+#score-rows li {
+    position: relative;
+    padding: 2px 4px;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+}
+#score-rows .rank {
+    color: var(--hud-dim);
+}
+#score-rows .lead {
+    font-size: 10px;
+    color: var(--hud-amber);
+}
+.swatch {
+    width: 12px;
+    height: 12px;
+    background: var(--tank);
+}
+#score-rows .name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#score-rows .kills,
+#score-rows .deaths {
+    text-align: right;
+}
+#score-rows .kills {
+    font-weight: 600;
+}
+#score-rows .deaths {
+    color: var(--hud-dim);
+}
+/* The player's own line: a band, and a bar at its left in the tank's colour. */
+#score-rows li.local {
+    background: #ffffff14;
+    box-shadow: inset 3px 0 var(--tank);
+}
+#score-rows li.leader .name {
+    color: var(--hud-amber);
+}
+#effects {
+    position: absolute;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    pointer-events: none;
+}
+.effect {
+    min-width: 130px;
+    padding: 5px 10px 7px;
+    font: 600 13px var(--hud-font);
+    color: var(--kind);
+    background: #0d0e10e6;
+    border: 1px solid color-mix(in srgb, var(--kind) 60%, transparent);
+    border-radius: 3px;
+    white-space: nowrap;
+}
+.effect i {
+    display: block;
+    height: 3px;
+    margin-top: 4px;
+    background: var(--kind);
+    transform-origin: left;
+    transform: scaleX(var(--left, 1));
+}
+.effect.blink {
+    animation: warning-blink 0.5s steps(1) infinite;
+}
+/* A match the score decided: the board in the middle, the result over it, the world dimmed behind. */
+#arcade-dim {
+    position: absolute;
+    inset: 0;
+    background: #05080acc;
+    pointer-events: none;
+    z-index: 3;
+}
+#scoreboard.final {
+    top: 50%;
+    right: auto;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(440px, calc(100% - 24px));
+    padding: 20px 26px 22px;
+    z-index: 4;
+}
+#scoreboard.final #score-rows li {
+    font-size: 17px;
+    padding: 4px 6px;
+}
+#final {
+    text-align: center;
+    margin-bottom: 10px;
+}
+#final-title {
+    display: block;
+    font-size: 34px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+}
+#final p {
+    margin: 4px 0;
+}
+#final-own {
+    color: var(--hud-dim);
+}
+#final-foot {
+    margin: 12px 0 0;
+    text-align: center;
+    color: var(--hud-dim);
+}
+/* A narrow view: the clock stands over the board at the right, as wide as it. */
+@media (max-width: 1080px) {
+    #arcade-clock {
+        left: auto;
+        right: 24px;
+        transform: none;
+        width: 335px;
+        max-width: none;
+    }
+    .art-hud #arcade-clock {
+        width: 300px;
+    }
+}
+@media (max-width: 850px) {
+    #arcade-clock,
+    #scoreboard {
+        right: 12px;
+        width: 270px;
+    }
+    #clock-time {
+        font-size: 24px;
+    }
+}
+@media (max-width: 560px) {
+    /* Beside the tutorial card (190px), not over it. */
+    #arcade-clock,
+    #scoreboard {
+        width: calc(100% - 222px);
+        min-width: 0;
+        padding: 6px 10px 8px;
+    }
+    #drop-lines .detail {
+        display: none;
+    }
+    .score-head,
+    #score-rows li {
+        grid-template-columns: 8px 10px 1fr 30px 30px;
+        gap: 3px;
+        font-size: 12px;
+    }
+    .score-head {
+        font-size: 8.5px;
+        letter-spacing: 0;
+    }
+    #score-rows .rank {
+        display: none;
+    }
+    .score-head span:first-child {
+        grid-column: 4;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    #arcade-clock.phase-LastSeconds #clock-time,
+    #arcade-clock.phase-SuddenDeath #clock-time,
+    #drop-lines li.urgent .when,
+    .effect.blink {
+        animation: none;
+    }
 }

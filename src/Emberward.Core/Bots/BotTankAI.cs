@@ -191,23 +191,25 @@ public partial class BotTankAI
 
         var basePos = tank.Base?.Position ?? tank.Position;
         TrackHits(tank);
+        ChooseDrop(tank, world);
         bool prospecting = UpdateProspecting(tank, enemy, world);
-        // Roaming, headway is toward the enemy (prospecting, toward the ore or the place it roams to). Heading home it
-        // is just moving on: the trail may wind.
+        // Roaming, headway is toward the enemy (prospecting, toward the ore or the place it roams to; going for a drop,
+        // toward its site). Heading home it is just moving on: the trail may wind.
         _navigator.UpdateStuckState(tank.Position, _mode != TwitchMode.Twitch ? null
             : prospecting ? _prospector.Goal
-            : enemy is { IsDead: false } ? enemy.Position : null);
+            : _dropSite ?? (enemy is { IsDead: false } ? enemy.Position : null));
         // Its enemy docked in a base it cannot break, the bot waits outside (BotLoiter); one it can break it lays siege to
         // once the opening grace is over, and before that roams as usual. It stops waiting while it sees the enemy (who
         // then has a shot at it too) or soon after it is hit, and fights.
         bool breakable = HoldBreakDecision(tank, enemy?.Base, world);
-        bool canSiege = _gunner.BaseSiegeAllowed && breakable && !prospecting;
-        Position? post = ChooseLoiterPost(tank, enemy, world, breakable);
+        // A drop within reach comes before a siege and before waiting at a post.
+        bool canSiege = _gunner.BaseSiegeAllowed && breakable && !prospecting && _dropSite == null;
+        Position? post = _dropSite == null ? ChooseLoiterPost(tank, enemy, world, breakable) : null;
         _waiting = post != null;
         // A manoeuvre begun while roaming may torch; waiting never fires near the gate, so it ends there.
         if (_waiting && _maneuverFrames > 0 && !_maneuverHoldsFire)
             _maneuverFrames = 0;
-        WatchForStuck(tank, enemy, world, canSiege, _waiting);
+        WatchForStuck(tank, enemy, world, canSiege, _waiting || WaitsAtDrop(tank));
 
         if (_maneuverFrames > 0)
         {
@@ -375,7 +377,9 @@ public partial class BotTankAI
             _navigator.ResetProgress(); // Circling an enemy in sight is fighting, not going nowhere.
             _stuckWatch.EndDetour();
         }
-        var targetPos = siegePoint ?? _stuckWatch.Detour ?? prospectGoal ?? (hasTarget ? enemy!.Position : (Position?)null);
+        if (!hasLos && WaitsAtDrop(tank))
+            return WaitAtDrop();
+        var targetPos = siegePoint ?? _stuckWatch.Detour ?? prospectGoal ?? _dropSite ?? (hasTarget ? enemy!.Position : (Position?)null);
 
         // A move that has run into rock or a wall is not held to the end of its plan.
         if (world.ProbeTankStep(tank, _move) is StepObstacle.Hard or StepObstacle.Solid)
@@ -675,6 +679,7 @@ public partial class BotTankAI
         hash = Fnv1a.Mix(hash, _loiterBreakFrames);
         hash = Fnv1a.Mix(hash, _waiting);
         hash = MixWaitingState(hash);
+        hash = MixDropState(hash);
         hash = MixProspectState(hash);
         return Fnv1a.Mix(hash, _rechargeStallFrames);
     }

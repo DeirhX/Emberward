@@ -18,16 +18,20 @@ if (args.Any(a => a is "--help" or "-h" or "-?" or "/?"))
           --seed=N            Play the map with seed N (shown in the pause menu). Default: a new map each match.
           --size=WxH          Terrain size in cells.
           --large             Terrain size 1500x750.
-          --no-ai             No enemy tank.
+          --players=N         Tanks in the match, 2 to 8 (default 2): yours, and a bot in every other. Without --size,
+                              more than two get the 480x300 map.
+          --arcade            An arcade match: timed, for score, with powerups; on the 320x200 map with up to
+                              4 tanks. Also --mode=arcade (or standard).
+          --no-ai             No bots: the other tanks stand still.
           --no-fog            No fog of war: the whole map is shown live.
           --fast              Parallel level generation (another map per seed; still reproducible).
 
         Network match (see docs/multiplayer-design.md)
           --net[=ROOM]        Join ROOM (default: lobby) on the shared relay. The first player in opens the room
-                              and their --seed, --size, --fast and --players apply to everyone.
+                              and their --seed, --size, --fast, --players and --arcade apply to everyone.
           --relay=URL         Use the relay at URL instead (ws:// or wss://, ending in /play).
           --room=NAME         The room to join, when --relay is given without --net.
-          --players=N         Tanks in the match, 2 to 8 (default 4). Bots take the slots nobody joins.
+          --players=N         Tanks in the room, 2 to 8 (default 4). Bots take the slots nobody joins.
           --name=NAME         Your name in the room. After dropping out, the same name gets you back in.
           --secret=TEXT       The relay's shared secret, if it has one (or set EMBERWARD_RELAY_SECRET).
 
@@ -83,6 +87,9 @@ var mode = launch.FastGen ? LevelGenMode.Optimized : LevelGenMode.Deterministic;
 Emberward.Desktop.PerfCaptureOptions? perfOptions = launch.Perf
     ? new Emberward.Desktop.PerfCaptureOptions(launch.PerfWarmupFrames, launch.PerfMeasureFrames, launch.PerfCsvPath)
     : null;
+// A local match: the player's tank and a bot in every other.
+int localPlayers = launch.LocalPlayers;
+var matchMode = launch.Mode;
 Emberward.Desktop.Net.RelayConnection? relay = null;
 // The relay refused: this process plays a local match, and a restart after it is local too.
 bool joinRefused = false;
@@ -93,8 +100,7 @@ if (launch.Net is { } netOptions && !launch.TerrainTest)
     // The first player into the room decides the match; everyone builds what the relay hands back.
     var proposed = Emberward.Desktop.Net.NetMatch.ProposeConfig(
         launch.Seed ?? Random.Shared.Next(1, int.MaxValue),
-        terrainSize ?? (launch.Players > 2 ? NetworkTweaks.LargeMatchMapSize : DesktopScreenTweaks.RenderSurfaceSize),
-        mode, launch.Players);
+        terrainSize ?? MapPresets.DefaultSizeFor(launch.Mode, launch.Players), mode, launch.Players, launch.Mode);
     try
     {
         // Started again by a player whose connection broke: their slot may still be held by the dead connection.
@@ -115,6 +121,8 @@ if (launch.Net is { } netOptions && !launch.TerrainTest)
         // just to be able to show a menu.
         terrainSize = null;
         GameLaunchOptions.Seed = null;
+        localPlayers = Emberward.Core.Config.Tweaks.LevelGen.DefaultPlayers;
+        matchMode = Emberward.Core.Match.MatchMode.Standard;
     }
     if (relay != null)
     {
@@ -127,7 +135,7 @@ using (relay)
 {
     var game = new Emberward.Desktop.Game(terrainSize, mode, perfOptions, launch.EnableAiTanks,
         terrainTestMode: launch.TerrainTest, fogOfWar: launch.FogOfWar, relay: relay, openNetMenu: openNetMenu,
-        launchSecret: launch.Secret, launchRelay: launch.Relay);
+        launchSecret: launch.Secret, launchRelay: launch.Relay, localPlayers: localPlayers, localMode: matchMode);
     game.Run();
     restartRequested = game.RestartRequested;
     rejoin = game.RejoinRequested;

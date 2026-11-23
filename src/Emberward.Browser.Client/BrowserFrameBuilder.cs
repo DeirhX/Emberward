@@ -6,7 +6,6 @@ using Emberward.Core.Config;
 using Emberward.Core.Entities.Bases;
 using Emberward.Core.Entities.Machines;
 using Emberward.Core.Entities.Tanks;
-using Emberward.Core.Rendering;
 using Emberward.Core.Types;
 using Emberward.Desktop.Gui;
 using Emberward.Desktop.Gui.Guidance;
@@ -47,7 +46,8 @@ public static class BrowserFrameBuilder
                 MachineBehaviors.Get(carried).RequiresLinkToPlant ? placement.Link.Status.ToString() : "Ready",
                 placement.Link.Target, placement.SenseHeat);
         }
-        GoalStatus? goal = world.CorePocket is Position core && world.CoreTapOf(home) is { } tap
+        // A timed match is won on the clock: its HUD has no core goal to show, as on the desktop (GoalLines).
+        GoalStatus? goal = !world.MatchClock.Active && world.CorePocket is Position core && world.CoreTapOf(home) is { } tap
             ? new GoalStatus(core, tap.TapPerTick * Tweaks.Perf.TargetFps, Tweaks.Goal.GoalChargePerSecond,
                 tap.HoldSeconds, Tweaks.Goal.GoalHoldSeconds, tap.HasTapped) : null;
         var (hitFromX, hitFromY) = HitFrom(player);
@@ -63,28 +63,15 @@ public static class BrowserFrameBuilder
             Math.Max(0, player.Reactor.Health), HeatScale.Frozen(player.Heat), HeatScale.Boil(player.Heat),
             player.IsOverheating || player.IsAboveSafeHeat, player.IsHullLow(latched: false),
             player.HitFlashTicks > Tank.HitFlashDuration - HitFreshTicks, player.IsOffNetworkUrgent, Plate(player, shield),
-            materials, player.IsDead ? TankDeathView.DeathLine(player) : null);
+            materials);
         return new BrowserFrame(session.Seed, world.AdvanceCount, Tweaks.Perf.TargetFps, status,
             session.Sounds.Frame(takePlays: includeEvents), builds, upgrades, preview, goal, Guidance(session.Guidance),
-            includeDial ? Dial() : null, session.ScoreboardFor(world, player), net?.Status(), BasePower(world, player), MachineUpgrade(session),
-            Reserve(world.ReserveOf(player)));
-    }
-
-    /// <summary>
-    /// The scoreboard's rows, as the desktop's Tab key shows them (<see cref="TankDeathView"/>). Built afresh, not
-    /// cached: <see cref="BrowserSession.ScoreboardFor"/> reuses one while nothing it shows has changed.
-    /// </summary>
-    public static ScoreboardStatus Scoreboard(World world, Tank player)
-    {
-        ArgumentNullException.ThrowIfNull(world);
-        ArgumentNullException.ThrowIfNull(player);
-        var rows = TankDeathView.Rows(world).Select(row =>
-        {
-            Color c = TankSprites.GetPixelColor(1, row.Tank);
-            return new ScoreboardRow(row.Tank, row.Name, HudPalette.Hex(HudPalette.Rgba(c.R, c.G, c.B)), row.Kills,
-                row.DeathCount, row.Deaths.Select(d => $"{d.Clock} {d.Cause}").ToArray());
-        }).ToArray();
-        return new ScoreboardStatus(TankDeathView.Clock(world.MatchTime), player.Color, rows);
+            includeDial ? Dial() : null, net?.Status(), BasePower(world, player), MachineUpgrade(session),
+            Reserve(world.ReserveOf(player)),
+            // In a network lobby the match has not begun: no clock, board or drops to show yet, as on the desktop.
+            net?.Room is { Started: false } ? null : BrowserArcade.Capture(world, player, session.Board, session.Drops, session.Names),
+            // The objective is the match's, lobby or not: an arcade room never says it is a core race.
+            world.MatchClock.Active ? Scoreboards.Objective : null);
     }
 
     /// <summary>The reserve's stage tag and burn prompt, as the desktop shows them (<see cref="ReserveTags"/>).</summary>

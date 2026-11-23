@@ -18,8 +18,7 @@ public class KeyboardController
         _keys = keys;
     }
 
-    /// <summary>Whether <paramref name="key"/> is down now (in the focused window).</summary>
-    public static bool IsHeld(Scancode key)
+    private static bool IsHeld(Scancode key)
     {
         ReadOnlySpan<bool> keys = GetKeyboardState(out int count);
         int index = (int)key;

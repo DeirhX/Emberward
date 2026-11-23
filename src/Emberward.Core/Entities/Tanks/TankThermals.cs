@@ -271,6 +271,19 @@ internal sealed class TankThermals
         _tank.Reactor.Current.Heat = new Heat(0);
     }
 
+    /// <summary>
+    /// A coolant pickup takes the tank's heat out of the system, down to the ground's rest temperature, and its
+    /// off-network floor with it, as a respawn does; a tank colder than that keeps its cold. What leaves is booked.
+    /// </summary>
+    public void CoolFromPickup(ThermalLedger ledger)
+    {
+        float cooled = Math.Min(_tank.Heat, 0f);
+        ledger.RecordSunkTank((_tank.Heat - cooled) * ThermalCapacity);
+        _tank.Heat = cooled;
+        OffNetworkFloor = 0f;
+        SyncReactorHeat();
+    }
+
     /// <summary>Copies the tank's heat into the reactor's whole-number mirror.</summary>
     private void SyncReactorHeat() => _tank.Reactor.Current.Heat = new Heat((int)MathF.Round(_tank.Heat));
 }

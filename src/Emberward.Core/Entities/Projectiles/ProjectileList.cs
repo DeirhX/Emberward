@@ -25,6 +25,7 @@ public class ProjectileList
     private FastRandom _rng;
     private readonly StepEventLog? _events;
     private readonly BasePowerSystem? _basePower;
+    private readonly bool _basesHold;
 
     /// <summary>
     /// Single source of truth for per-type projectile behavior.
@@ -47,11 +48,13 @@ public class ProjectileList
     }
 
     /// <param name="events">Where impacts, hits and explosions are recorded (<see cref="World.StepEvents"/>); null records nothing.</param>
-    public ProjectileList(int seed, StepEventLog? events = null, BasePowerSystem? basePower = null)
+    /// <param name="basesHold">No shell damages a base's core (<see cref="Match.MatchRules.BasesHold"/>).</param>
+    public ProjectileList(int seed, StepEventLog? events = null, BasePowerSystem? basePower = null, bool basesHold = false)
     {
         _rng = new FastRandom(seed);
         _events = events;
         _basePower = basePower;
+        _basesHold = basesHold;
     }
 
     public int Count => _projectiles.Count + _pending.Count;
@@ -109,8 +112,7 @@ public class ProjectileList
                 onTank: tank =>
                 {
                     if (tank.Color == p.OwnerColor) return false;
-                    Killer? by = p.OwnerColor >= 0 ? new Killer(p.OwnerColor, p.FiredBy) : null;
-                    if (tank.TakeDamage(p.Damage, DamageCause.EnemyFire, p.Speed, by))
+                    if (tank.TakeDamage(p.Damage, DamageCause.EnemyFire, p.Speed, attacker: p.OwnerColor))
                         TankDamageEvents.Record(self._events, tank, ipos, hullEvent: true);
                     if (bursts)
                         self.RecordImpact(ipos, p, ImpactTarget.Tank);
@@ -147,12 +149,12 @@ public class ProjectileList
                         p.PiercedCell = ipos;
                         return false;
                     }
-                    // Walls take no damage; only a shell that reaches the core wears a base down.
-                    if (Pixel.IsBaseCore(pix) && solver.EnemyBaseAt(ipos, p.OwnerColor) is { } target)
+                    // Walls take no damage; only a shell that reaches the core wears a base down. Where bases hold,
+                    // the core is one more wall.
+                    if (Pixel.IsBaseCore(pix) && !self._basesHold && solver.EnemyBaseAt(ipos, p.OwnerColor) is { } target)
                     {
                         int raw = p.Damage;
-                        target.TakeDamage(self._basePower?.CoreDamage(target, raw) ?? raw,
-                            p.OwnerColor >= 0 ? new Killer(p.OwnerColor, p.FiredBy) : null);
+                        target.TakeDamage(self._basePower?.CoreDamage(target, raw) ?? raw);
                         self._events?.Record(new StepEvent(target.IsDestroyed ? StepEventKind.BaseDestroyed : StepEventKind.BaseDamaged,
                             ipos, target.Color));
                         if (bursts)
@@ -229,6 +231,33 @@ public class ProjectileList
     {
         _events?.Record(new StepEvent(StepEventKind.Explosion, pos));
         AddRange(ExplosionFactory.CreateExplosion(pos, p, ref _rng, shrapnelHeatScale));
+    }
+
+    /// <summary>
+    /// Where a shot of side <paramref name="ownerColor"/> starts when it is fired from <paramref name="from"/> through a
+    /// barrel whose tip is at <paramref name="tip"/>: the tip, unless the barrel reaches into or through a keep's wall or
+    /// a gate shut to that side (DESIGN.md §4.9). A shot is tested from its first step on, so one that started at such
+    /// a tip would already be past what stops it. It starts at <paramref name="from"/> instead and meets the wall or the
+    /// gate shield on its way, as a shot fired from further back does.
+    /// </summary>
+    /// <remarks>
+    /// The cells of the barrel are walked a king's move at a time, as a shot flies, and a keep's walls and gates are an
+    /// unbroken ring one cell thick: neither can cross it without standing on one of its cells.
+    /// </remarks>
+    public Position MuzzleOf(ITerrainPixelReadOnly terrain, Position from, Position tip, int ownerColor)
+    {
+        int dx = tip.X - from.X, dy = tip.Y - from.Y;
+        int cells = Math.Max(Math.Abs(dx), Math.Abs(dy));
+        for (int i = 1; i <= cells; i++)
+        {
+            var cell = new Position(from.X + dx * i / cells, from.Y + dy * i / cells);
+            if (!terrain.IsInside(cell))
+                break;
+            var pix = terrain.GetPixelRaw(cell);
+            if (Pixel.IsBase(pix) || (Pixel.IsBaseGate(pix) && _basePower?.IsGateShutTo(ownerColor, cell) == true))
+                return from;
+        }
+        return tip;
     }
 
     private static void AdvanceShrapnel(Projectile p, CollisionSolver solver, ProjectileList self)

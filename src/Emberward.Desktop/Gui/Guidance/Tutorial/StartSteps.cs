@@ -12,8 +12,14 @@ internal sealed class LeaveBaseStep : TutorialStep
 
     public override string Title => "Leave the base";
 
-    protected override string Text =>
-        "Your goal is to tap the hot core at the centre of the map. First, get out: drive with W A S D through the gate in front of you. Your base has a gate in each wall.";
+    private const string WayOut =
+        "First, get out: drive with W A S D through the gate in front of you. Your base has a gate in each wall.";
+
+    protected override string Text => "Your goal is to tap the hot core at the centre of the map. " + WayOut;
+
+    /// <summary>A timed match is won on kills (DESIGN.md §6.8): the step names that goal, not the core.</summary>
+    public override string Body(World world) =>
+        world.MatchClock.Active ? "Your goal is the most kills when the clock runs out. " + WayOut : Text;
 
     public override void Observe(World world, Tank player)
     {

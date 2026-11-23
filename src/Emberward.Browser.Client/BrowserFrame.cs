@@ -5,30 +5,19 @@ using Emberward.Core.Types;
 using Emberward.Desktop.Gui;
 
 /// <param name="Dial">The heat dial's colours, with a match's first frame only; null after it.</param>
-/// <param name="Scoreboard">What the scoreboard shows while Tab is held.</param>
 /// <param name="Net">The network match (<see cref="BrowserNetMatch"/>); null in a local one.</param>
 /// <param name="BasePower">The base charge readout, present in an energy-network match.</param>
 /// <param name="MachineUpgrade">The machine next to the tank and its upgrade panel; null when none is in reach.</param>
 /// <param name="Reserve">The reserve's stage tag and burn prompt; null when there is nothing to say.</param>
+/// <param name="Arcade">A timed match's clock, board, drops and powerups; null in a match without a clock and in a network lobby.</param>
+/// <param name="Objective">What a timed match asks of the player (<see cref="Scoreboards.Objective"/>), shown where a core
+/// race shows its objective, from the lobby on; null in a match without a clock.</param>
 public sealed record BrowserFrame(
     int Seed, int Tick, int TickRate, PlayerStatus Player,
     SoundFrame Sounds, BuildOption[] Builds,
     UpgradeOption[] Upgrades, PlantPreview? Preview, GoalStatus? Goal, GuidanceStatus Guidance, HeatDial? Dial,
-    ScoreboardStatus Scoreboard, NetStatus? Net = null, BaseCharge? BasePower = null, MachineUpgradeStatus? MachineUpgrade = null,
-    ReserveStatus? Reserve = null);
-
-/// <summary>
-/// The scoreboard (<c>TankDeathView</c>, shared with the desktop): the match clock and every tank with the times it
-/// died. <c>You</c> is the player's tank. The page names a tank's driver from <see cref="NetStatus.Roster"/> in a
-/// network match.
-/// </summary>
-public sealed record ScoreboardStatus(string Clock, int You, ScoreboardRow[] Rows);
-
-/// <summary>
-/// A tank's row: its slot, colour name and colour (#rrggbb), the tanks it killed, how many times it died, and its latest
-/// deaths as "3:07 shot by Red", oldest first (the earlier ones are only counted).
-/// </summary>
-public sealed record ScoreboardRow(int Tank, string Name, string Color, int Kills, int DeathCount, string[] Deaths);
+    NetStatus? Net = null, BaseCharge? BasePower = null, MachineUpgradeStatus? MachineUpgrade = null,
+    ReserveStatus? Reserve = null, ArcadeStatus? Arcade = null, string? Objective = null);
 
 /// <summary>
 /// The tank's reserve (<c>ReserveTags</c>, shared with the desktop): the stage tag drawn beside OFF NETWORK with its
@@ -70,7 +59,6 @@ public sealed record HeatDial(string[] Bands, float Ambient, float Safe, float M
 /// <param name="FireLevel">How big the fire on the damaged hull is, 0 to 1 (0: not burning).</param>
 /// <param name="HitFresh">The first frames after a hit, when the shield crystal flashes white.</param>
 /// <param name="Plate">What the SHIELD/HULL plate shows.</param>
-/// <param name="DeathLine">While the tank is dead: what destroyed it, and who (<c>TankDeathView.DeathLine</c>).</param>
 /// <param name="Materials">What the MATERIALS plate shows: its HOLD and BASE line, the hold's pile, the ore line and a
 /// deposit's pour (<c>MaterialsView</c>).</param>
 public sealed record PlayerStatus(
@@ -80,7 +68,7 @@ public sealed record PlayerStatus(
     bool Docked, bool OffNetwork, float SafeSeconds, bool Dead, double RespawnSeconds, bool CanRecall,
     string Outcome, string? Carrying, bool BaseDestroyed,
     int Health, float Frozen, float Boil, bool Burning, bool HullLow, bool HitFresh,
-    bool OffNetworkUrgent, HullPlate Plate, MaterialsView Materials, string? DeathLine = null);
+    bool OffNetworkUrgent, HullPlate Plate, MaterialsView Materials);
 
 /// <summary>What the desktop's SHIELD/HULL plate shows (<c>HudStrip</c>, <c>LiquidGauges</c>); colours as #rrggbb.</summary>
 /// <param name="HullLabelColor">The HULL label's colour (<c>HullStatuses</c>: what the hull is doing), alternating four

@@ -3,6 +3,7 @@ namespace Emberward.Tests;
 using Emberward.Core;
 using Emberward.Core.Input;
 using Emberward.Core.LevelGen;
+using Emberward.Core.Match;
 using Emberward.Core.Types;
 using Emberward.Desktop.Net;
 using Emberward.Protocol;
@@ -70,6 +71,59 @@ public class MatchRecordingTests
         Assert.Equal(
             recording.Bundles.Select(b => (b.Tick, string.Join(',', b.Inputs))),
             loaded.Bundles.Select(b => (b.Tick, string.Join(',', b.Inputs))));
+    }
+
+    [Fact]
+    public void TheMode_IsSavedWithTheMatch_AndARecordingFromBeforeModesIsAStandardMatch()
+    {
+        MatchConfig arcade = Config with { Mode = 1 };
+        TickBundle[] bundles = [new(0, [1u, 2u], HumanMask)];
+        using var text = new StringWriter();
+        new MatchRecording(arcade, HumanMask, bundles).Save(text);
+        string saved = text.ToString().ReplaceLineEndings("\n");
+
+        Assert.Contains("\nmode=1\n", saved, StringComparison.Ordinal);
+        var loaded = MatchRecording.Load(new StringReader(saved));
+        Assert.Equal(arcade, loaded.Config);
+        Assert.Equal(MatchRules.ForMode(MatchMode.Arcade, coreTapWins: true), MatchRecording.BuildWorld(loaded.Config).Rules);
+
+        var old = MatchRecording.Load(new StringReader(saved.Replace("mode=1\n", "", StringComparison.Ordinal)));
+        Assert.Equal(Config, old.Config);
+        Assert.Equal(MatchMode.Standard, NetMatch.ModeOf(old.Config));
+    }
+
+    [Fact]
+    public void ARecordingOfAModeThisBuildDoesNotKnow_IsRejectedAsBadData_NamingTheMode()
+    {
+        using var text = new StringWriter();
+        new MatchRecording(Config with { Mode = 7 }, HumanMask, [new(0, [1u, 2u], HumanMask)]).Save(text);
+
+        var refused = Assert.Throws<InvalidDataException>(() => MatchRecording.Load(new StringReader(text.ToString())));
+        Assert.Contains("match mode 7", refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ARecordingWithBots_FromABuildWhoseBotsDecidedOtherwise_IsRefusedByReplay()
+    {
+        TickBundle[] bundles = [new(0, [1u, 2u], HumanMask)];
+        using var text = new StringWriter();
+        new MatchRecording(Config, HumanMask, bundles).Save(text);
+        string saved = text.ToString().ReplaceLineEndings("\n");
+        string line = $"bots={MatchRecording.CurrentBots}\n";
+        Assert.Contains("\n" + line, saved, StringComparison.Ordinal);
+        Assert.Equal(1, MatchRecording.Load(new StringReader(saved)).Replay().World.AdvanceCount);
+
+        // A recording from before bots had a number has no such line: its bots were asked during the step.
+        var old = MatchRecording.Load(new StringReader(saved.Replace(line, "", StringComparison.Ordinal)));
+        Assert.Equal(1, old.Bots);
+        Assert.True(old.HasBots);
+        var refused = Assert.Throws<InvalidDataException>(() => old.Replay());
+        Assert.Contains("bots of version 1", refused.Message, StringComparison.Ordinal);
+
+        // Players alone decide such a match, so it replays whatever bots the build has.
+        var players = old with { HumanMask = 0b11, Bundles = [new(0, [1u, 2u], HumanMask: 0b11)] };
+        Assert.False(players.HasBots);
+        Assert.Equal(1, players.Replay().World.AdvanceCount);
     }
 
     [Fact]

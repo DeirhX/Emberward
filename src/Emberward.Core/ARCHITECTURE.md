@@ -16,14 +16,20 @@ WorldStateHash.cs            One number for a world's state (determinism tests),
                              machines in a network match compare; each owner mixes its own private state)
 StatusLevel.cs               Ok / Warn / Bad for a HUD gauge (Tank.HullLevel, TankBase.ChargeLevel, ...)
 Match/
-  MatchRules.cs              Which optional systems a world runs (regrowth, pockets, ore, the core race); World.Rules
+  MatchRules.cs              Which optional systems a world runs (regrowth, pockets, ore, the core race, the clock);
+                             World.Rules, the presets (Standard, Arcade) and ForMode, which picks one by MatchMode
+  MatchMode.cs               MatchMode: Standard or Arcade, what a host asks MatchRules.ForMode for
   MatchOutcome.cs            MatchReferee: Victory / Defeat / InProgress for one tank (World.MatchOutcomeFor)
   MatchResult.cs             Latches the referee's first answer (World.MatchWinner, World.IsMatchOver)
-  TankDeathLog.cs            Every tank death, with its step and cause and who killed it (World.Deaths); output only, saved in the snapshot
+  MatchScore.cs              (only when MatchRules.TimeLimitSeconds is set) The timed match: each tank's kills and
+                             deaths, the clock, the sole leader's win when it runs out, sudden death while tied
+                             (World.Score.cs: World.ScoreOf, MatchClock, CopyStandings, ScoreLeader)
   SectorGoal.cs              The core tap: each base's CoreTap (tap, hold timer, tapped), the first base to tap the core
 Config/
   Tweaks.cs                  Every gameplay and simulation constant (const / static readonly only)
   Tweaks.Turrets.cs          The turret's constants (Tweaks is partial; Tweaks.cs is near the file-length cap)
+  Tweaks.Arcade.cs           Arcade mode's constants: the length of the match, the respawn wait
+  Tweaks.Powerups.cs         The powerup drops' constants: schedule, kinds, the site search, what a bot does about them
   SimulationSettings.cs      The thermal and tank-heat constants, copied from Tweaks; tests inject their own
   FastRandom.cs              Small seeded RNG used by the simulation
 Terrain/
@@ -48,7 +54,6 @@ Thermal/
   ThermalLedger.cs           Energy created or destroyed, by kind
   TankHeatEngine.cs          One tank's heat exchange with terrain and air
 Entities/
-  Killer.cs                  Who dealt a killing hit: a side's colour and the machine that fired, if any (Tank.DeathBy, TankDied events)
   Tanks/Tank.cs              Tank state and the per-tick order (below); delegates to the classes beside it
   Tanks/TankList.cs          Tank collection
   Tanks/SimulationContext.cs The slice of World a tank sees during Advance
@@ -59,7 +64,8 @@ Entities/
                              tank's RNG
   Tanks/TankBuildController.cs   Build keys: build, carry, plant; the payer rule (Quote)
   Tanks/BuildQuote.cs        BuildQuote, OrePayer, BuildRefusal: what a machine costs here and which stock pays
-  Tanks/TankLifecycle.cs     Damage, death (the hold spills as ore, OreDrop), respawn, spawn shield
+  Tanks/TankLifecycle.cs     Damage, death (the hold spills as ore, OreDrop), respawn (the wait is RespawnDelay's
+                             to say: flat under MatchRules.QuickRespawn), spawn shield, who killed it
   Tanks/TankSpriteShape.cs   The tank's one shape (its sprite's cells): terrain contact, bullet hits, planting
   Bases/TankBase.cs, TankBases.cs   Bases (reactor, radiator, engine, charge, ore store)
   Bases/BaseUpgrades.cs      BaseUpgrade (base track and tank track), levels, costs and what each level does
@@ -88,6 +94,12 @@ Entities/
   Emberites/EmberiteSwarm*.cs          The emberites (MatchRules.Emberites): nests wake, pulse, recharge and starve (Nests), creatures move, bite and
                              go home (Movement), shots find and kill them (Combat), hashes and snapshots of the swarm
   Emberites/EmberiteFlowField.cs       The coarse cost-to-goal field creatures follow, one per hunted tank and per awake nest
+  Powerups/PowerupKind.cs    PowerupKind, the kind table (PowerupKinds) and what hosts read: PowerupForecast (the next
+                             drop), TankPowerupView (a tank's running powerups), PowerupEffects (what a tank asks)
+  Powerups/PowerupDrops.cs   (only when MatchRules.Powerups is on) The powerup drops: the schedule and its shuffle bag,
+                             drops on the ground, who takes one, each tank's timed effects; hashes
+                             (World.Powerups.cs: World.PowerupForecast, PowerupDropCount, CopyPowerupRenderStates, PowerupsOf)
+  Powerups/PowerupDrops.Sites.cs   Where a drop lands: the bounded search for fair ground a tank can reach
 Network/                     The link network (not network matches: those are Desktop/Net and Emberward.Protocol)
   LinkPoint.cs, Link.cs, LinkMap.cs   Nodes, edges, refresh, power and flow
   NetworkCoverage.cs         Coverage nodes and the coverage a tank gets at a position
@@ -116,6 +128,7 @@ Bots/                        The computer player: produces a ControllerOutput li
                              hashed and saved (System.Random's cannot)
   BotTrail.cs                The way the bot came, retraced to get home
   BotSiege.cs, BotLoiter.cs  Laying siege to a base it can break; waiting outside one it cannot
+  BotTankAI.Drops.cs         Going for a powerup drop near it, and giving up one it cannot reach
   BotStuckWatch.cs           Going nowhere near one spot, and the detour taken instead
   BotProspector.cs           Where a prospecting bot digs (BotTankAI.Prospecting: when it prospects, digging)
 Snapshots/                   A match's state for a player who joins it in progress (docs/late-join-design.md §9)
@@ -135,7 +148,8 @@ LevelGen/
   OreDeposits.cs             Seeds pyrite: specks, pockets and lumps with a warm core (OreDeposit, OreDepositKind)
   TerrainTestPatternGenerator.cs   Synthetic terrain for the renderer's --terrain-test mode
 Rendering/
-  RenderSnapshots.cs         TankRenderState, ProjectileRenderState, MachineRenderState, LinkRenderState, EmberiteRenderState, NestRenderState
+  RenderSnapshots.cs         TankRenderState, ProjectileRenderState, MachineRenderState, LinkRenderState, EmberiteRenderState, NestRenderState,
+                             PowerupRenderState
   TankSprites.cs             Tank bitmaps and colour palettes
 Resources/Reactor.cs         Reactor, ReactorState, Heat, Health: a tank's or base's heat and shield
 Resources/OreStore.cs        OreStore: a tank's hold, a base's store (ore is the only currency)
@@ -148,7 +162,9 @@ Types/Fnv1a.cs               The 64-bit FNV-1a mixer the world, rules and econom
 ## World
 
 `new World(size, simulationSeed, rules)` creates the subsystems. `MatchRules` says which optional systems the world
-runs: regrowth, hot and frost rock pockets, ore, and whether tapping the core wins the match. It is the one switch for
+runs: regrowth, hot and frost rock pockets, ore, whether tapping the core wins the match, and the rules of arcade
+mode (DESIGN.md §6.8: `TimeLimitSeconds`, `BasesHold`, `QuickRespawn`, `Powerups`; `MatchRules.ForMode` gives a host the preset
+for a `MatchMode`). It is the one switch for
 them (a system that can be turned off gets a flag there), and it is mixed into the hash clients compare before a
 network match starts (`WorldStateHash.ComputeReady`). `World.Initialize(terrain, spawns, ...)` copies in a generated
 level, materializes it, builds the bases, places hot and frost rock pockets (if the rules ask; the hot ones also give
@@ -156,7 +172,7 @@ the core, `World.CorePocket`, and with it the `SectorGoal`), seeds pyrite ore (i
 `World.OreDeposits`) and adds one tank per spawn. Ore is placed last and grows each deposit cell by cell from its
 start, so generation never sweeps the grid; deposit counts scale with map area (`Tweaks.Ore`), and on a small map the
 distance rules shrink and a floor of pockets and lumps applies (`OreDeposits.DistanceScale`). Every RNG World owns
-(projectiles, link map, regrowth, each tank) is seeded from `simulationSeed`, and decorations and rock pockets from
+(projectiles, link map, regrowth, each tank, the powerup drops) is seeded from `simulationSeed`, and decorations and rock pockets from
 the decoration seed (or, without one, from the spawns and
 `simulationSeed`). Core never reads the clock or unseeded randomness; for a random match Desktop's `WorldFactory`
 picks the seed. `MatchSetup` (`Match/MatchSetup.cs`) builds the match from it, for the desktop, a network match and the
@@ -178,7 +194,9 @@ is a new entry, in the place its order needs; the profile picks up its label. Th
    going away. Open ground away from dirt or inside a blocker has none and costs nothing. The map is cut into
    regions of `RegrowthRegionSize` cells that each take their pass on a tick of their own, so a large map's
    regrowth is spread over the ticks between passes.
-4. **proj**: `ProjectileList.Advance`.
+4. **proj**: `ProjectileList.Advance`. A shell that reaches an enemy core takes the core's health there, the one
+   place a core is damaged; where `MatchRules.BasesHold` is on it bursts on the core as on a wall instead (no damage,
+   no `BaseDamaged`), so no base falls and nobody is eliminated, and `World.CanBreakBase` answers no.
 5. **tanks**: `LinkMap.AgeOreFlow`, then `TankList.Advance` with the world's `SimulationContext` (built once). Per tank (`Tank.Advance`):
    idle heat, base interaction (recharge, heat sink anywhere inside the walls; touching the core, `Tank.TouchesCore`,
    the hold banks into the store through `TankBase.BankFromHold`, after the dock heat pump, bringing
@@ -197,7 +215,8 @@ is a new entry, in the place its order needs; the profile picks up its label. Th
    then exchange with the grid). Machine upgrades take effect where the rest of the game reads them: a relay asks its
    pump rate (`MachineContext.Upgrades`), the energy network holds a resized capacitor and idle draw
    (`EnergyNetwork.Resize`) and a Conduit's throughput (`EnergyNetwork.SetThroughputScale`), and vision asks a
-   machine's sight bonus.
+   machine's sight bonus. Where the rules run powerup drops, **powerups** is stepped next (`PowerupDrops.Advance`,
+   "Powerup drops" below), and where they run emberites, **emberites** after it.
 6. **machines**: With the energy rule on, `EnergyNetwork.Refresh` first regroups the link nodes when
    `LinkMap.PowerVersion` changes. Each base's island takes the nodes whose power route ends at that base
    (`LinkPoint.IsPoweredBy`, the same rule harvester coverage uses in `NetworkCoverage`). The first generator in machine order roots
@@ -250,11 +269,21 @@ is a new entry, in the place its order needs; the profile picks up its label. Th
 8. **bases**: `TankBases.Advance` (reactor sink, radiator, engine counters), then the bot's stand-in ore income for
    bases marked with `World.SetBotControlled`.
 9. **goal**: `SectorGoal.Advance`, the core tap and its hold timer (only in a world with a core).
-10. **match**: `MatchResult.Latch`, the result, fixed once the referee has one.
-11. **links**: `LinkMap.Advance` brings the network up to date every `Tweaks.World.RefreshLinkMapInterval`
+10. **score** (only when `MatchRules.TimeLimitSeconds` is set): `MatchScore.Advance`, while the match is undecided.
+    It reads the step's own `TankDied` events (a death for the tank, a kill for the `Killer` it names), runs the
+    clock in ticks, and once the clock has run out names the winner as soon as one tank whose base stands leads
+    alone; until then the match is in sudden death. A tank destroyed after its own tick (heat or frost at its end, a
+    creature, a machine's shell) records its `TankDied` on its next tick (`Tank.IsDeathUntold` meanwhile), so past
+    the limit the score decides nothing while such a death is untold: that step is held, the clock standing at 0:00
+    and not in sudden death, and a kill credited on the deciding tick still counts. One pass over the step's events,
+    and past the limit one or two over the tanks. The tallies are kept in the system by tank colour, saved in the snapshot and mixed into
+    `WorldStateHash.Compute`.
+11. **match**: `MatchResult.Latch`, the result, fixed once the referee has one: the first base to tap the core, else
+    the last base standing, else the tank the score names (`MatchWinReason.TopScore`).
+12. **links**: `LinkMap.Advance` brings the network up to date every `Tweaks.World.RefreshLinkMapInterval`
    (200 ms), not every tick, and at once when a machine's point is switched off.
-12. **dock**: each tank notes whether it has left its base (`Tank.HasLeftBase`) and records docking (`Tank.ObserveDocking`).
-13. **vision**: each `VisionMap` handed out by `World.TrackVision` is brought up to date and each `Radar` handed
+13. **dock**: each tank notes whether it has left its base (`Tank.HasLeftBase`) and records docking (`Tank.ObserveDocking`).
+14. **vision**: each `VisionMap` handed out by `World.TrackVision` is brought up to date and each `Radar` handed
     out by `World.TrackRadar` runs its pulse on (see "Radar" below).
 
 `SimulationProfile` reports averages every 100 ticks when `ReportSink` is set: `[Profile]` (one time per system,
@@ -264,9 +293,14 @@ residual over the report window, which should stay near float noise. That line s
 is off by default and never runs per tick.
 
 Queries Desktop asks instead of computing itself: `World.MatchOutcomeFor` / `IsMatchOver`,
-`World.CoreTapOf` (a base's progress on the sector goal),
+`World.CoreTapOf` (a base's progress on the sector goal), `World.ScoreOf` (a tank's kills, deaths and place),
+`World.MatchClock` (ticks and seconds left, the limit, sudden death), `World.CopyStandings` (the board in rank order,
+into the caller's span) and `World.ScoreLeader` (all four inactive or empty in a match with no time limit),
 `Tank.IsDockedAtOwnBase`, `Tank.IsInOwnNetwork`, `Tank.IsUnloadingOre`, `Tank.IsCargoHot`, `Tank.TouchesCore`, `Tank.QuoteBuild` (cost, payer, stock and
 refusal for a machine), `Tank.LastBuildRefusal`, `World.GetNetworkStatus`, `World.PreviewPlacement`, `World.CoverageFor`,
+`World.PowerupForecast` (the next drop: site, kind, ticks until it lands), `World.CopyPowerupRenderStates` (the drops
+on the ground), `World.PowerupDropCount` and `World.PowerupsOf` (a tank's running powerups; all inactive or empty in a
+match without drops, and none of them behind the fog),
 `World.CollectCoverageNodes`, `World.TrackVision`, `World.TrackRadar`, `World.RadarOf`, and the `CopyRenderStates` snapshot of each entity list.
 
 ### Step events
@@ -276,11 +310,23 @@ Desktop learns about one-off happenings from `World.StepEvents`, never by compar
 the tank or side's colour, and a machine type, impact target, cell count or torch flag where they apply): shots
 fired, bullet impacts, explosions, spent shrapnel, tank hits, deaths and respawns, moving, digging, mining ore into the hold,
 docking and leaving the base, base service, ore unloaded by a tank or banked by a harvester, and machines built,
-planted, refused, damaged and wrecked. The list
+planted, refused, damaged and wrecked, and a powerup drop announced, landed, taken or gone and a powerup's effect
+ended (`PowerupAnnounced`, `PowerupLanded`, `PowerupCollected`, `PowerupExpired`, `PowerupEnded`: the kind in
+`Count`, the site in `Position`, and the tank in `Color` for the two that have one). The list
 holds the last step's events until the next step begins, so a caller that runs several steps per frame reads it
-after each one. It is output only: nothing in the simulation reads it, so recording cannot change a result
-(`SimulationFingerprintTests`), and the `StepEventLog` reuses its storage, so recording does not allocate in steady
-state. Tanks record through `SimulationContext.Events`, machines through `MachineContext.Events`, projectiles through the log `ProjectileList` is built with,
+after each one. It is output: nothing a step did before reads it, so recording cannot change a result
+(`SimulationFingerprintTests`). Two systems read the step's own events, after the system that recorded them and only
+where their rule is on: the swarm (who took ore from a nest's ground) and the match score (who died, and by whose
+shell). A `TankDied` carries its `Cause`, which is what emptied the hull, and its `Killer`, the colour of the tank the
+death is credited to: the enemy whose shell destroyed it (fired by that tank, its turret or its gatling: a machine's
+shell carries its owner's colour), or, when heat, frost or a creature destroyed it, the last enemy whose shell took
+armor off it within `Tweaks.Arcade.KillCreditSeconds` before. It is -1 with no such shell, for a recall, for a fallen
+base, and never the tank's own colour. `TankLifecycle.TakeDamage` decides it and nothing else does: the tank keeps who
+last hurt it and for how many more steps (`_claimant`, `_claimTicks`, set by an enemy shell that got past the respawn
+shield, counted down in `BeginTick`, cleared on respawn). It is kept in every mode, as `Killer` is; the snapshot saves
+it, the sync digest's latent part mixes it while a claim is live, and `WorldStateHash.Compute` does not read it, so a
+world without bots hashes as it did (`MatchScoreTests`).
+The `StepEventLog` reuses its storage, so recording does not allocate in steady state. Tanks record through `SimulationContext.Events`, machines through `MachineContext.Events`, projectiles through the log `ProjectileList` is built with,
 and `World` itself records plantings and docking. A new kind of happening that presentation needs is a new
 `StepEventKind`, recorded where it happens (`StepEventTests` covers each kind).
 
@@ -482,6 +528,11 @@ which gate of a base faces into the map, and its tank spawns inside that one.
 moves, `BotGunner` decides fire, and `BotProfileCycle` rotates the `BotBehaviorProfile` play styles. All three
 share one `Random`, so the order of their calls within a tick is part of the behaviour.
 
+A bot is asked for its input before the step, like a player: `SlotStepper.Advance` (the one stepper every host and
+replay uses) asks every slot, bot or player, from the world as the last step left it, and hands `World.Advance` the
+answers. `TankList.Advance` moves the tanks slot by slot, so a bot asked from inside the step would see where the
+tanks in the slots before it had just moved, and the later slots won more for it (`SlotStepperTests`).
+
 The bot drives its tank through the same `ControllerOutput` as a player, and asks Core what a player sees:
 
 - **What is in the way.** `World.ProbeTankStep` gives the answer the tank's own move gets (`None`, `Dirt`, `Hard`,
@@ -527,8 +578,18 @@ The bot drives its tank through the same `ControllerOutput` as a player, and ask
   5 s after a hit (`BotTankAI.TrackHits`; a hit never shortens a longer give-up). `BotTankAI.PickEnemy` fights an enemy at the bot's own base before a
   nearer one.
 
-- **Prospecting.** In a match with ore (`World.OreDeposits` not empty), for its first `Tweaks.Bot.ProspectSeconds`
-  the roaming bot mines instead of hunting (`BotTankAI.Prospecting`), unless its enemy, out of its base, is within
+- **Powerup drops.** Roaming, the bot goes for the nearest drop within `Tweaks.Powerups.BotSeekRange` that lies on the
+  ground or lands within `BotSeekLeadSeconds` (`BotTankAI.Drops.cs`, `ChooseDrop`; it asks `World.PowerupForecast`
+  and `World.CopyPowerupRenderStates`, what every player may know). It plans no path: the drop's site takes the
+  enemy's place as the point it roams toward and comes before a siege and a wait at a post, and an enemy in sight is
+  fought as always. Within `BotArriveCells` of a site whose drop has yet to land it stands and waits. A site it gets
+  no nearer for `BotSeekGiveUpSeconds` (time fighting in sight does not count) it gives up for good. What it
+  remembers is saved and mixed into its sync hash only once it has gone for a drop, so a bot in a match without
+  drops plays and hashes as it always did.
+
+- **Prospecting.** In a match with ore (`World.OreDeposits` not empty) and no clock (`MatchRules.TimeLimitSeconds` 0:
+  a timed match is won on kills, so there it hunts from the start), while it goes for no powerup drop, for its first
+  `Tweaks.Bot.ProspectSeconds` the roaming bot mines instead of hunting (`BotTankAI.Prospecting`), unless its enemy, out of its base, is within
   `EngageRangeCells`, in sight within `EngageSightCells`, at the bot's own base, or has hit it (then for
   `EngageHoldSeconds`). `BotProspector` picks the plain ore cell nearest the tank in the nearest pocket or speck within
   `ProspectRadiusCells` of its base (`TerrainGrid.TryFindPlainOre`, which skips tiles without ore); the bot roams there
@@ -589,7 +650,9 @@ Desktop:
    and a draw colour. Use `CollisionSolver.TestPoint` to hit tanks, machines or terrain (bullets skip their own side's tanks and machines), `ProjectileList`'s RNG for chance,
    and the heat API (`AddHeat`, `AddHeatRadius`) for heat, so the ledger stays balanced.
 3. Something has to spawn it: today `TankTurret` and `TurretAction` (bullets, and a gatling's rounds) and
-   `ExplosionFactory` (shrapnel) do.
+   `ExplosionFactory` (shrapnel) do. A shot is tested from its first step on, never where it starts: anything fired
+   from a barrel asks `ProjectileList.MuzzleOf` where to start, so that a barrel lying across a keep's wall or a shut
+   gate does not put the shot past it.
 4. Desktop: `Rendering/Entities/ProjectileQuads.cs` draws bullets and shrapnel as hot shots and throws for any
    other type; add a case for a new projectile. Record what presentation should hear about in `World.StepEvents` (bullets record `BulletImpact`, shrapnel `ShrapnelSpent`).
 
@@ -667,6 +730,62 @@ if either end has no cell for it; `EmberiteDropTests`). Shots find creatures thr
 of a nest that has creatures left (`MachineContext.IsOreGuarded`, `HarvesterState.Guarded`). The bot ignores creatures.
 Gatlings find creatures with `TryFindTarget`, a walk over the creatures out that casts a line only to those in range
 and nearer than the best so far; it is asked only while `OutCount` is above zero (`GatlingTests`).
+
+### Powerup drops
+
+`PowerupDrops` (`Entities/Powerups`, DESIGN.md §6.8) exists only when `MatchRules.Powerups` is on and is stepped as
+`"powerups"` right after `"tanks"`, so a tank that reached a drop this step takes it this step. `World.Initialize` calls
+`Begin` once the bases, pockets and nests are placed, which decides the first drop; from then on one upcoming drop is
+always decided and public (`World.PowerupForecast`: site, kind, ticks until it lands). The first lands
+`Tweaks.Powerups.FirstDropSeconds` in; the moment a drop lands the next is decided (`Schedule`) for
+`DropPeriodSeconds` later, so every drop is known a full period ahead. A landed drop lies for `GroundSeconds`, which
+is no longer than the period, so at most one lies at a time. Each step: running effects count down; the drop on the
+ground is tested against each tank (`SettleGround`; `TankSpriteShape.ReachesDisc`, a disc `PickupDiameter` across): of
+the living tanks touching it the one whose centre is nearest takes it, the lower slot on a tie, and one whose time is
+up is gone (`PowerupExpired`); then the forecast drop lands when its time has come, and a tank already standing there
+takes it in the same step. The old drop goes before the new one lands, so no step has two on the ground
+(`PowerupDropsTests`). That is all a step costs (the drop on the ground times tanks, and one look at each tank's
+timers); nothing scans the map.
+
+The drops have a random stream of their own (`FastRandom`, seeded from a hash of the simulation seed), so a world
+without them draws nothing more or less, and its hashes and `SimulationFingerprintTests` are as they were. Kinds come
+from a shuffle bag (`NextKind`): every `PowerupKind` once a round, shuffled afresh each round, never the same kind
+twice running.
+
+A site (`PowerupDrops.Sites.cs`, `ChooseSite`) is chosen once per drop from a bounded number of draws, the same for any
+map size and number of bases: `WideDraws` random cells over the bases' bounding box (widened by half the spacing of the
+two nearest bases), then `RefineDraws` near the best so far. A draw is graded by where it lies (`Grade`: no nearer a
+base than `MinBaseDistance` or `MinBaseDistancePercent` of that spacing, no nearer the site before it than
+`MinDropSpacing`) and costed by its unfairness in whole cells, and its ground is looked at only if it would be the best
+so far (`IsClearGround`: the drop's disc all soil or open ground, clear of the hot core, the pockets, uncleared nests
+and standing machines, the ground neither hot nor frozen). Two fairness goals alternate. An "everyone's" drop costs
+the farthest base's distance less the nearest's. A "contested" drop has one base, each in its turn (`TakeTurn`), as
+its nearest, and costs how much nearer that base is than the next. The turns go in rounds: every base that counts
+once, in an order shuffled afresh each round from the drops' own stream (`ShuffleTurns`), and a round never opens with
+the base that closed the one before; so which base is first, and which is one turn ahead when the match ends, follows
+from the seed and not from the slot. Destroyed bases do not count. A draw beside the
+site before the last costs half the drop spacing more, so sites move about. With no usable draw a fixed lattice round
+the middle of the bases is tried (`FallbackSite`); a drop is always scheduled. `PowerupSiteTests` bounds the
+unfairness over seeds and checks every site's ground.
+
+The system keeps each tank's running effects itself, by the tank's colour (`TankEffects`: ticks left of each timed
+kind), so `Tank` has no powerup fields; a tank holds the system (`Tank.Powerups`, as it holds the shield system) and
+asks it. `Tank.Advance` asks `EffectsOf` once: `Drill` lets `TankDigger.Move` step into what its plain dig cleared in
+the same tick (soil at open-ground speed; rock is as it was), and `ShellDamageFactor` multiplies the damage of the
+shell `TankTurret.TryShoot` fires (Overcharge). `TankLifecycle.TakeDamage` asks `ReduceDamage` (Bulwark) after the
+spawn-protection check and before the shield, so shield and hull both lose half as much; the division's remainder is
+carried to the next hit, so heat's point at a time is halved too. A recall and a fallen base still kill. An Overhaul
+acts at once in `Give`: the hull whole, the tank shield full (`TankShieldSystem.Clear`), and the tank's heat above the
+ground's rest temperature taken out of the system (`Tank.CoolFromPickup`, booked in `ThermalLedger` as sunk by the
+tank, so the balance holds) with its off-network floor back at zero. Taking a kind again restarts its time; a tank's death ends all its effects at
+once (`TankLifecycle.Die` calls `EndEffects`, each with its `PowerupEnded`, and the bulwark's carry is dropped), so a
+recall, which dies and respawns in the same step, ends them too. The schedule, the drops, the effects and the stream are saved in the snapshot (plain fields and
+lists), `MixState` mixes what shows into `WorldStateHash.Compute`, and `MixLatent` the stream, the bag and the turn
+into the sync digest's latent part.
+
+Hosts read `World.PowerupForecast`, `World.CopyPowerupRenderStates` (`PowerupRenderState`: cell, kind, ticks until it
+is gone, radius), `World.PowerupDropCount`, `World.PowerupsOf(tank)` (`TankPowerupView`) and the kind table
+`PowerupKinds`; none is behind the fog, because every side may know where and when a drop lands.
 
 ### Adding a collidable entity
 

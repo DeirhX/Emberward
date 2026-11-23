@@ -4,6 +4,7 @@ using Emberward.Core.Entities.Machines;
 using Emberward.Core.Input;
 using Emberward.Core.Rendering;
 using Emberward.Core.Types;
+using Emberward.Desktop;
 using Emberward.Core.Bots;
 
 namespace Emberward.Tests;
@@ -24,8 +25,8 @@ public class SimulationFingerprintTests
     private const ulong ExpectedPlayerDrivesAndShoots = 0x550C789946C0D419UL;
     private const ulong ExpectedRelayHarvesterNetwork = 0x4E3008A7C22C2325UL;
     private const ulong ExpectedEnemyMachinesShotToPieces = 0x9AD33135699B9C28UL;
-    private const ulong ExpectedBotVsBot = 0x837361CC26EF6A73UL;
-    private const ulong ExpectedShieldedBotVsBot = 0x7A83B3CE0806731BUL;
+    private const ulong ExpectedBotVsBot = 0x490C6E36EA726EF5UL;
+    private const ulong ExpectedShieldedBotVsBot = 0xE717F20768777923UL;
     private const ulong ExpectedTankBanksAtCore = 0x969707C1821E53C6UL;
 
     /// <summary>
@@ -41,11 +42,11 @@ public class SimulationFingerprintTests
 
         public static void Play(World world, BotTankAI?[] bots, int firstFrame, int frames, Func<int, int, ControllerOutput> input)
         {
-            var tanks = world.TankList.Tanks;
+            // As the game steps it (SlotStepper): each bot decides before the step, against the enemy it picks.
             for (int f = 0; f < frames; f++)
             {
                 int frame = firstFrame + f;
-                world.Advance(i => bots[i] is { } bot ? bot.GetInput(tanks[i], tanks[1 - i], world) : input(frame, i));
+                SlotStepper.Advance(world, bots, i => input(frame, i));
             }
         }
     }

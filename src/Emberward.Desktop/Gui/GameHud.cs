@@ -11,9 +11,10 @@ using Emberward.Core.Entities.Tanks;
 /// <summary>
 /// Draws the in-game HUD each frame: the game view, crosshair and hit feedback here, and the pieces in their own
 /// files (<see cref="HudStrip"/>, <see cref="NetworkPanel"/>, <see cref="WarningBanner"/>, <see cref="MatchOverlay"/>,
-/// <see cref="Scoreboard"/>, <see cref="PostPassOverlay"/>, <see cref="TerrainTestPanel"/>), plus the tutorial and notifications
-/// (<c>GameHud.Guidance.cs</c>), the upgrade panel and goal banner (<c>GameHud.Goal.cs</c>) and the machine upgrade
-/// highlight and panel (<c>GameHud.MachineUpgrade.cs</c>).
+/// <see cref="PostPassOverlay"/>, <see cref="TerrainTestPanel"/>), plus the tutorial and notifications
+/// (<c>GameHud.Guidance.cs</c>), the upgrade panel and goal banner (<c>GameHud.Goal.cs</c>), the machine upgrade
+/// highlight and panel (<c>GameHud.MachineUpgrade.cs</c>) and a timed match's clock, drop pointers and powerup tags
+/// (<c>GameHud.Arcade.cs</c>).
 /// </summary>
 public partial class GameHud
 {
@@ -51,12 +52,6 @@ public partial class GameHud
     /// <summary>What to call the tank that won, when it is not the player's; null for "another tank".</summary>
     public string? WinnerName { get; set; }
 
-    /// <summary>Tab is held: the <see cref="Scoreboard"/> of deaths is drawn over the view.</summary>
-    public bool ShowScoreboard { get; set; }
-
-    /// <summary>The driver of a tank by its slot, in a network match; null outside one.</summary>
-    public Func<int, string>? DriverName { get; set; }
-
     /// <summary>Where a point in the world (in cells) is on screen, in UI units.</summary>
     public Vector2 CellToScreen(float cellX, float cellY)
     {
@@ -90,19 +85,19 @@ public partial class GameHud
         DrawGameViewport(gameTextureId, texW, texH);
         if (WaitingForPlayers)
             return;
+        ReadArcade(player, world);
         DrawCrosshair();
         DrawHitFeedback(player);
         _strip.Draw(player, _time, world.Rules, world.TankShieldOf(player), oreLedger, ReserveTags.Of(world.ReserveOf(player)));
-        _network.Draw(ViewportRect, player, world, _guidance.Hint);
-        WarningBanner.Draw(ViewportRect, _guidance.Warning, _time);
+        _network.Draw(ViewportRect, player, world, _guidance.Hint, ArcadePanel);
+        WarningBanner.Draw(BelowClockPlate(ViewportRect), _guidance.Warning, _time);
         DrawGuidance();
+        DrawArcade(player, world);
         DrawBaseAttackPointer(player);
         DrawUpgradePanel(player);
         DrawMachineUpgrade(player, world);
         DrawSectorComplete(player, world);
-        MatchOverlay.Draw(PlayRect, player, world, CanRestartMatch, WinnerName);
-        if (ShowScoreboard)
-            Scoreboard.Draw(PlayRect, world, player, DriverName);
+        MatchOverlay.Draw(PlayRect, player, world, CanRestartMatch, WinnerName, _board, TopCentreBottom);
         if (showPostPassOverlay)
             PostPassOverlay.Draw(ViewportRect, heatDebugOverlayEnabled, postPassFlags);
     }

@@ -94,7 +94,8 @@ export class StatusView {
         const burn = f.reserve?.burn;
         setText($("recall-text"), burn ?? "Drop cargo and respawn");
         setHidden($("recall"), !(p.canRecall || burn) || p.outcome !== "InProgress");
-        setHidden($("death"), !p.dead && p.outcome === "InProgress");
+        // A match the score decided ends on its final standings (arcade.js), which say who won and how.
+        setHidden($("death"), (!p.dead && p.outcome === "InProgress") || Boolean(f.arcade?.over));
         setText(
             $("death"),
             p.outcome === "Victory"
@@ -103,7 +104,7 @@ export class StatusView {
                   ? p.baseDestroyed
                       ? "BASE DESTROYED\nOpen the menu to try a new world."
                       : "DIVE ENDED\nOpen the menu to try a new world."
-                  : `TANK LOST\n${p.deathLine ? p.deathLine + "\n" : ""}Respawning in ${Math.ceil(p.respawnSeconds)}s`,
+                  : `TANK LOST\nRespawning in ${Math.ceil(p.respawnSeconds)}s`,
         );
     }
 

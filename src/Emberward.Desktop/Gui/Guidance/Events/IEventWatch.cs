@@ -15,8 +15,8 @@ internal interface IEventWatch
     /// <summary>Forgets what it saw: a new match.</summary>
     void Reset();
 
-    /// <summary>Once for each simulated step, before its events reach <see cref="OnStepEvent"/>.</summary>
-    void OnStep() { }
+    /// <summary>Once for each simulated step, after it ran and before its events reach <see cref="OnStepEvent"/>.</summary>
+    void OnStep(World world) { }
 
     /// <summary>One event of the step just simulated (<see cref="World.StepEvents"/>).</summary>
     void OnStepEvent(World world, Tank player, in StepEvent e);
@@ -32,9 +32,10 @@ internal interface IEventWatch
 /// <param name="Network">The player's base's network, collected once for all watches.</param>
 /// <param name="IntroQuiet">The tutorial has not yet explained the network; toasts about it wait.</param>
 /// <param name="Primed">An earlier frame was seen since the last reset.</param>
+/// <param name="Names">What to call the tank in a slot (<see cref="SlotNames"/>), for toasts that name one.</param>
 internal readonly record struct GuidanceFrame(
     World World, Tank Player, TankBase Home, NetworkStatus Network, NotificationFeed Feed, float Now, bool IntroQuiet,
-    bool Primed);
+    bool Primed, Func<int, string> Names);
 
 /// <summary>A state seen in the last frame, to tell when it turns on.</summary>
 internal struct Latch

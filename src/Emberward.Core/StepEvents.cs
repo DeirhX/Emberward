@@ -27,8 +27,11 @@ public enum StepEventKind
     TankHit,
 
     /// <summary>
-    /// A tank was destroyed. <see cref="StepEvent.Position"/> is where it died, <see cref="StepEvent.Cause"/> why (a
-    /// recall is one too) and <see cref="StepEvent.By"/> who dealt the killing hit, if another side did.
+    /// A tank was destroyed. <see cref="StepEvent.Position"/> is where it died, <see cref="StepEvent.Color"/> the tank,
+    /// <see cref="StepEvent.Cause"/> what killed it and <see cref="StepEvent.Killer"/> the colour of the tank the
+    /// death is credited to (<see cref="Entities.Tanks.Tank.KillerColor"/>): the enemy whose shell did it (its own,
+    /// or its turret's or gatling's), or the last enemy whose shell hurt the tank shortly before heat, cold or a
+    /// creature finished it. -1 when it is nobody's: no enemy's shell in that time, a recall, the loss of its base.
     /// </summary>
     TankDied,
 
@@ -187,6 +190,31 @@ public enum StepEventKind
 
     /// <summary>A hit emptied a tank's shield (recorded instead of <see cref="TankShieldHit"/> for that hit). Same fields.</summary>
     TankShieldBroken,
+
+    /// <summary>
+    /// The next powerup drop was decided (<see cref="Entities.Powerups.PowerupDrops"/>), a full period before it lands.
+    /// <see cref="StepEvent.Position"/> is its site, <see cref="StepEvent.Count"/> its
+    /// <see cref="Entities.Powerups.PowerupKind"/> as a number. The first drop's is recorded in the first step.
+    /// </summary>
+    PowerupAnnounced,
+
+    /// <summary>A powerup drop landed. <see cref="StepEvent.Position"/> is its site, <see cref="StepEvent.Count"/> its kind.</summary>
+    PowerupLanded,
+
+    /// <summary>
+    /// A tank took a powerup drop. <see cref="StepEvent.Position"/> is the drop's site, <see cref="StepEvent.Color"/>
+    /// the tank, <see cref="StepEvent.Count"/> the kind.
+    /// </summary>
+    PowerupCollected,
+
+    /// <summary>A powerup drop nobody took is gone. <see cref="StepEvent.Position"/> is its site, <see cref="StepEvent.Count"/> its kind.</summary>
+    PowerupExpired,
+
+    /// <summary>
+    /// A tank's timed powerup ran out, or was lost when the tank died. <see cref="StepEvent.Position"/> is the tank,
+    /// <see cref="StepEvent.Color"/> its colour, <see cref="StepEvent.Count"/> the kind.
+    /// </summary>
+    PowerupEnded,
 }
 
 /// <summary>
@@ -197,7 +225,8 @@ public enum ImpactTarget { Terrain, Tank, Machine, Base }
 
 /// <summary>
 /// One thing that happened during a <see cref="World.Advance"/> step. Fields that do not apply to the
-/// <see cref="Kind"/> keep their defaults; <see cref="Color"/> is -1 when no tank or side is involved.
+/// <see cref="Kind"/> keep their defaults; <see cref="Color"/> is -1 when no tank or side is involved, and
+/// <see cref="Killer"/> is -1 for every kind but a <see cref="StepEventKind.TankDied"/> credited to another tank.
 /// </summary>
 public readonly record struct StepEvent(
     StepEventKind Kind,
@@ -208,12 +237,13 @@ public readonly record struct StepEvent(
     int Count = 0,
     bool Torch = false,
     Entities.DamageCause Cause = default,
-    Entities.Killer? By = null);
+    int Killer = -1);
 
 /// <summary>
-/// The events of the current step, cleared when the next one begins. It is output only: nothing in the simulation
-/// reads it back, so recording never changes a result. The backing list keeps its capacity, so recording does not
-/// allocate once it has grown to a busy step's size.
+/// The events of the current step, cleared when the next one begins. It is output: nothing carries over to the next
+/// step, and the two systems that read it do so later in the step that recorded (the swarm, for ore dug from a nest;
+/// the match score, for deaths), so recording never changes a result. The backing list keeps its capacity, so
+/// recording does not allocate once it has grown to a busy step's size.
 /// </summary>
 [NotSaved("output only: what happened in the last step, for sound and the HUD; cleared before each step")]
 public sealed class StepEventLog

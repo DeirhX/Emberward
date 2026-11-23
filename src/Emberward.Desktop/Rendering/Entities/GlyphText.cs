@@ -5,7 +5,8 @@ using Emberward.Core.Types;
 /// <summary>
 /// Short lines of text drawn in the world as entity quads: one <see cref="EntityShape.KindPowerLabel"/> quad per glyph of
 /// a 5x7 bitmap alphabet, packed into the quad's parameters (<c>PowerLabel.hlsli</c> unpacks it). The charge labels and
-/// the nest danger labels, the pyrite deposit labels (DepositQuads) and the enemy tank name plates (TankPlateQuads) use it.
+/// the nest danger labels, the pyrite deposit labels (DepositQuads), the powerup marks (PowerupQuads) and the enemy tank
+/// name plates (TankPlateQuads) use it.
 /// </summary>
 internal static class GlyphText
 {
@@ -37,6 +38,9 @@ internal static class GlyphText
             left += advance;
         }
     }
+
+    /// <summary>Whether <paramref name="character"/> has a bitmap of its own; one that has none is drawn as a question mark.</summary>
+    public static bool Has(char character) => character is ' ' or '?' || Glyph(character) != Glyph('?');
 
     /// <summary>The 5x7 bitmap of <paramref name="character"/>: each group of five bits is one row, top to bottom; 0 for a space.</summary>
     public static ulong Glyph(char character) => character switch

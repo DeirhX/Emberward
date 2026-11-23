@@ -1,6 +1,7 @@
 namespace Emberward.Desktop.Net;
 
 using System.Globalization;
+using Emberward.Core.Match;
 using Emberward.Core.Types;
 using Emberward.Protocol;
 
@@ -11,8 +12,10 @@ using Emberward.Protocol;
 /// <param name="Secret">The relay's shared secret, or empty for an open relay. Never put on a command line.</param>
 /// <param name="MapSize">The map this client proposes when it opens the room; null for the default of the player count.</param>
 /// <param name="Seed">The seed this client proposes when it opens the room; null for a new one each match.</param>
+/// <param name="Mode">The kind of match this client proposes when it opens the room.</param>
 public sealed record NetLaunchOptions(
-    Uri Relay, string Room, string Name, int Players, string Secret = "", Size? MapSize = null, int? Seed = null)
+    Uri Relay, string Room, string Name, int Players, string Secret = "", Size? MapSize = null, int? Seed = null,
+    MatchMode Mode = MatchMode.Standard)
 {
     /// <summary>The environment variable that carries the relay's secret to the game, and on to a restarted one.</summary>
     public const string SecretVariable = "EMBERWARD_RELAY_SECRET";
@@ -32,6 +35,8 @@ public sealed record NetLaunchOptions(
             yield return string.Create(CultureInfo.InvariantCulture, $"--size={size.X}x{size.Y}");
         if (Seed is { } seed)
             yield return string.Create(CultureInfo.InvariantCulture, $"--seed={seed}");
+        if (Mode != MatchMode.Standard)
+            yield return "--mode=" + MatchModes.Name(Mode);
     }
 }
 

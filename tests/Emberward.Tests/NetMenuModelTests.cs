@@ -1,5 +1,6 @@
 namespace Emberward.Tests;
 
+using Emberward.Core.Match;
 using Emberward.Core.Types;
 using Emberward.Desktop.Config;
 using Emberward.Desktop.Net;
@@ -117,6 +118,49 @@ public class NetMenuModelTests
     }
 
     [Fact]
+    public void TheMode_IsStandardUntilChosen_AndItsRowIsBetweenTheRoomNameAndTheTanks()
+    {
+        var menu = Menu();
+        Assert.Equal(MatchMode.Standard, menu.Mode);
+        Assert.DoesNotContain(NetMenuField.Mode, menu.Fields);
+
+        menu.OpenCreate();
+        var fields = menu.Fields.ToList();
+        Assert.Equal(fields.IndexOf(NetMenuField.CreateName) + 1, fields.IndexOf(NetMenuField.Mode));
+        Assert.Equal(fields.IndexOf(NetMenuField.Mode) + 1, fields.IndexOf(NetMenuField.Tanks));
+
+        menu.Click(NetMenuField.Mode);
+        Assert.False(menu.TextInputActive);
+        menu.HandleKey(NetMenuKey.Right);
+        Assert.Equal(MatchMode.Arcade, menu.Mode);
+        menu.HandleKey(NetMenuKey.Right);
+        Assert.Equal(MatchMode.Standard, menu.Mode);
+        menu.HandleKey(NetMenuKey.Left);
+        Assert.Equal(MatchMode.Arcade, menu.Mode);
+    }
+
+    [Fact]
+    public void AnArcadeRoomOfUpToFourTanks_GetsTheSmallMap_UnlessAnotherWasChosen()
+    {
+        var menu = Menu();
+        menu.OpenCreate();
+        Assert.Equal((4, MapPreset.Medium), (menu.Players, menu.Map));
+
+        menu.Adjust(NetMenuField.Mode, +1);
+        Assert.Equal(MapPreset.Small, menu.Map);
+        menu.Adjust(NetMenuField.Tanks, +1);
+        Assert.Equal(MapPreset.Medium, menu.Map);
+        menu.Adjust(NetMenuField.Tanks, -1);
+        Assert.Equal(new Size(320, 200), Launched(menu.Submit()).MapSize);
+
+        var chosen = Menu();
+        chosen.OpenCreate();
+        chosen.Adjust(NetMenuField.Map, +1);
+        chosen.Adjust(NetMenuField.Mode, +1);
+        Assert.Equal(MapPreset.Large, chosen.Map);
+    }
+
+    [Fact]
     public void Tanks_StayBetweenTwoAndEight()
     {
         var menu = Menu();
@@ -221,6 +265,18 @@ public class NetMenuModelTests
         Assert.Equal(new Size(1500, 750), launch.MapSize);
         Assert.Equal(12345, launch.Seed);
         Assert.Equal("Ann", launch.Name);
+        Assert.Equal(MatchMode.Standard, launch.Mode);
+    }
+
+    [Fact]
+    public void AFailedArcadeLaunch_ComesBackAsArcade()
+    {
+        var failed = new NetLaunchOptions(Relay, "friday", "Ann", 4, MapSize: new Size(320, 200), Mode: MatchMode.Arcade);
+
+        var menu = Menu(request: new NetMenuRequest(failed, "Could not reach the relay."));
+
+        Assert.Equal(MatchMode.Arcade, menu.Mode);
+        Assert.Equal(MatchMode.Arcade, Launched(menu.Submit()).Mode);
     }
 
     [Fact]
@@ -456,13 +512,17 @@ public class NetMenuModelTests
         Type(menu, NetMenuField.CreateName, "lunch");
         menu.Adjust(NetMenuField.Tanks, -1);
         menu.Adjust(NetMenuField.Map, +1);
+        menu.Adjust(NetMenuField.Mode, +1);
         menu.Adjust(NetMenuField.SeedMode, +1);
         Type(menu, NetMenuField.SeedValue, "77");
         var launch = Launched(menu.Submit());
+        Assert.Equal(MatchMode.Arcade, launch.Mode);
 
         menu.ApplyTo(settings, launch);
         var next = Menu(settings, user: "SomeoneElse");
 
+        Assert.Equal(MatchMode.Arcade, settings.CreateMode);
+        Assert.Equal(MatchMode.Arcade, next.Mode);
         Assert.Equal("Bob", next.NameField.Text);
         Assert.Equal("lunch", next.RoomField.Text);
         Assert.Equal(3, next.Players);
@@ -497,10 +557,12 @@ public class NetMenuModelTests
         var menu = Menu(user: "Ann Q.");
         menu.OpenCreate();
         Type(menu, NetMenuField.CreateName, "Ann's game");
+        menu.Adjust(NetMenuField.Mode, +1);
         var launch = Launched(menu.Submit());
 
         var parsed = LaunchArguments.Parse(launch.ToArguments());
 
+        Assert.Equal(MatchMode.Arcade, launch.Mode);
         Assert.Equal(launch, parsed.Net);
     }
 }

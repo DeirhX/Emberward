@@ -1,5 +1,6 @@
 namespace Emberward.Tests;
 
+using Emberward.Core.Match;
 using Emberward.Core.Types;
 using Emberward.Desktop.Config;
 using Emberward.Desktop.Net;
@@ -29,6 +30,8 @@ public class LaunchArgumentsTests
         Assert.True(launch.FogOfWar);
         Assert.Equal("lobby", launch.Room);
         Assert.Equal(NetworkTweaks.DefaultPlayers, launch.Players);
+        Assert.Equal(2, launch.LocalPlayers);
+        Assert.Equal(MatchMode.Standard, launch.Mode);
         Assert.Equal(Environment.UserName, launch.Name);
         Assert.Equal(string.Empty, launch.Secret);
     }
@@ -49,6 +52,63 @@ public class LaunchArgumentsTests
         Assert.Equal(7, Parse("--seed=7").Seed);
         Assert.True(Parse("--energy-audit").EnergyAudit);
         Assert.True(Parse("--terrain-test").TerrainTest);
+    }
+
+    [Fact]
+    public void Arcade_IsAskedForByItsFlagOrByName()
+    {
+        Assert.Equal(MatchMode.Arcade, Parse("--arcade").Mode);
+        Assert.Equal(MatchMode.Arcade, Parse("--mode=arcade").Mode);
+        Assert.Equal(MatchMode.Arcade, Parse("--mode=Arcade").Mode);
+        Assert.Equal(MatchMode.Standard, Parse("--mode=standard").Mode);
+        Assert.Equal(MatchMode.Standard, Parse("--arcade", "--mode=standard").Mode);
+
+        // A mode nobody knows leaves the one already asked for.
+        var unknown = Parse(["--arcade", "--mode=deathmatch"], out var warnings);
+        Assert.Equal(MatchMode.Arcade, unknown.Mode);
+        Assert.Contains("deathmatch", Assert.Single(warnings), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Players_AreTheTanksOfALocalMatchToo_AndEachKindOfMatchKeepsItsDefault()
+    {
+        // Without the option a local match has two tanks and a room four.
+        Assert.Equal((2, 4), (Parse().LocalPlayers, Parse().Players));
+        Assert.Equal((2, 4), (Parse("--net").LocalPlayers, Parse("--net").Players));
+
+        var four = Parse("--players=4", "--arcade");
+        Assert.Null(four.Net);
+        Assert.Equal((4, 4), (four.LocalPlayers, four.Players));
+        Assert.Equal(8, Parse("--players=8").LocalPlayers);
+        Assert.Equal(2, Parse("--players=9").LocalPlayers);
+    }
+
+    [Fact]
+    public void ANetworkLaunch_ProposesItsMode()
+    {
+        Assert.Equal(MatchMode.Standard, Parse("--net").Net!.Mode);
+        var arcade = Parse("--net=friday", "--arcade", "--players=3").Net!;
+        Assert.Equal((MatchMode.Arcade, 3), (arcade.Mode, arcade.Players));
+        Assert.Contains("--mode=arcade", arcade.ToArguments());
+        Assert.DoesNotContain(Parse("--net").Net!.ToArguments(), a => a.StartsWith("--mode", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ReplayArguments_NameWhatTheMapDependsOn_AndTheCommandLineReadsThemBack()
+    {
+        Assert.Equal("--seed=7", LaunchArguments.ReplayArguments(7, fastGen: false, players: 2, MatchMode.Standard));
+        Assert.Equal("--fast --seed=7", LaunchArguments.ReplayArguments(7, fastGen: true, players: 2, MatchMode.Standard));
+        Assert.Equal(
+            "--fast --seed=-7 --players=4 --arcade",
+            LaunchArguments.ReplayArguments(-7, fastGen: true, players: 4, MatchMode.Arcade));
+
+        foreach (var mode in MatchModes.All)
+        {
+            var replay = Parse(LaunchArguments.ReplayArguments(-7, fastGen: true, players: 4, mode).Split(' '), out var warnings);
+
+            Assert.Empty(warnings);
+            Assert.Equal((-7, true, 4, mode), (replay.Seed, replay.FastGen, replay.LocalPlayers, replay.Mode));
+        }
     }
 
     [Fact]
@@ -125,6 +185,8 @@ public class LaunchArgumentsTests
     [InlineData("--volume=loud", "volume")]
     [InlineData("--display=left", "display")]
     [InlineData("--windowed=10x10", "window size")]
+    [InlineData("--mode=", "mode")]
+    [InlineData("--mode=deathmatch", "mode")]
     [InlineData("--frobnicate", "option")]
     public void AnOptionThatMakesNoSense_IsLeftOutWithAWarning(string arg, string mentions)
     {
@@ -134,6 +196,8 @@ public class LaunchArgumentsTests
         Assert.StartsWith("[Args] ", warnings[0], StringComparison.Ordinal);
         Assert.Contains(mentions, warnings[0], StringComparison.Ordinal);
         Assert.Equal(NetworkTweaks.DefaultPlayers, launch.Players);
+        Assert.Equal(2, launch.LocalPlayers);
+        Assert.Equal(MatchMode.Standard, launch.Mode);
         Assert.Null(launch.Relay);
         Assert.Null(launch.Seed);
     }
@@ -145,6 +209,8 @@ public class LaunchArgumentsTests
             MapSize: new Size(320, 200)),
         new NetLaunchOptions(new Uri("wss://relay.example/play"), "Ann's game", "Zoë", 8,
             MapSize: new Size(1500, 750), Seed: 123456),
+        new NetLaunchOptions(new Uri("wss://relay.example/play"), "quick one", "Ann", 4,
+            MapSize: new Size(320, 200), Mode: MatchMode.Arcade),
     };
 
     [Theory]
@@ -192,7 +258,7 @@ public class LaunchArgumentsTests
     {
         var launch = Parse(
             "--windowed=1024x600", "--display=1", "--volume=35", "--mute", "--no-ai", "--no-fog",
-            "--seed=99", "--large", "--net=old-room", "--name=Old", "--fast", "--perf");
+            "--seed=99", "--large", "--net=old-room", "--name=Old", "--fast", "--perf", "--arcade", "--players=6");
 
         var local = Parse([.. launch.Relaunch(null)], out var warnings);
 
@@ -206,6 +272,8 @@ public class LaunchArgumentsTests
         Assert.Null(local.Net);
         Assert.Null(local.Seed);
         Assert.Null(local.TerrainSize);
+        Assert.Equal(MatchMode.Standard, local.Mode);
+        Assert.Equal(2, local.LocalPlayers);
         Assert.False(local.FastGen);
         Assert.False(local.Perf);
         var chosen = new NetLaunchOptions(new Uri("wss://r.example/play"), "new-room", "Ann", 3, MapSize: new Size(480, 300));

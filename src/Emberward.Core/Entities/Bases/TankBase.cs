@@ -70,22 +70,15 @@ public class TankBase
     /// Removes armor from the core, the only part of a base that takes damage, and disconnects a destroyed base from
     /// its links; true when armor was removed.
     /// </summary>
-    public bool TakeDamage(int damage, Killer? by = null)
+    public bool TakeDamage(int damage)
     {
         if (IsDestroyed || damage <= 0)
             return false;
         Reactor.Exhaust(new ReactorState(0, damage));
-        if (IsDestroyed)
-        {
-            DestroyedBy = by;
-            if (LinkPoint is { } point)
-                point.IsEnabled = false;
-        }
+        if (IsDestroyed && LinkPoint is { } point)
+            point.IsEnabled = false;
         return true;
     }
-
-    /// <summary>Who dealt the blow that destroyed the base, when another side did; output only (the tanks' death credit).</summary>
-    public Killer? DestroyedBy { get; private set; }
 
     /// <summary>True for any cell of the base, its outer wall and gates included (<see cref="IsInside"/> stops short of the wall).</summary>
     public bool OccupiesCell(Position tested) =>

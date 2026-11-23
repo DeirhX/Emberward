@@ -113,11 +113,12 @@ Core decides what is seen; the renderer only shows it.
   under it (`GlyphText` and plain `KindPowerLabel` quads), moving with the tank as drawn. Out of sight the plate stays
   at the cell where the tank was last seen and fades from `DesktopScreenTweaks.TankPlateGhostOpacity` to nothing
   over `TankPlateFadeSeconds` (counted in steps, so a pause holds it); seen again anywhere, the record jumps to the
-  tank at once, and a dead tank's record is cleared. Names are `BOT n` for a side the computer plays and `PLAYER n`
-  otherwise; in a network match `Game.NamePlayers` (and `BrowserNetMatch` in the browser) hands in the drivers' names
+  tank at once, and a dead tank's record is cleared. Names are `BOT n` for a side the computer plays
+  (`SlotNames.LocalBot`, as the board and the toasts say) and `PLAYER n` otherwise; in a network match `Game.NamePlayers` (and `BrowserNetMatch` in the browser) hands in the drivers' names
   from the relay (`TankPlateQuads.SetPlayerName`), shown in capitals and cut at 16 characters. They fade out zoomed
   out like the charge labels (`PowerLabels.ZoomFade`; `Build`'s `labelCellSize`, which G does not turn off). They
-  replace the ImGui name tags network matches drew before. Cost follows the number of tanks; nothing scans the map.
+  replace the ImGui name tags network matches drew before, and a timed match that is over shows none (the final
+  standings have the view). Cost follows the number of tanks; nothing scans the map.
 - **Pyrite deposits.** `DepositQuads` reads each step's `OreUnloaded` and `RestartOreBurned` (Position is the
   receiver, Target says core or relay) and pours up to 12 crystals from the tank's hold into it (`KindOreCrystal`), a
   crystal a step, each flying 0.45 s on a short arc; events from one tank a few steps apart join one pour. Each base
@@ -127,6 +128,18 @@ Core decides what is seen; the renderer only shows it.
   of the base, carries a `BASE STORE` label with the store and its rate (`World.NearestOreDropOff`, `OreLedgerView`,
   which counts the side's banked and harvested units over 30 s). At the core the ore beam is left out: the pour shows
   it. Output only, a function of the captured steps: a late joiner starts with nothing in flight.
+- **Powerup drops.** `PowerupQuads` (`MatchRules.Powerups`; `KindPowerup`, `Shaders/Entity/Powerup.hlsli`) draws
+  three things in the kind's colour (`PowerupPresentations`), each with the kind's letter so that colour is never the
+  only sign. The site of the next drop (`World.PowerupForecast`) is a reticle on the ground: a dashed ring turning
+  slowly, four ticks, the kind's name above and the time to the landing below (`0:32`), inside an outer ring that
+  closes onto it over the last ten seconds, when it also beats. A drop on the ground (`World.CopyPowerupRenderStates`) is a glowing
+  capsule with the letter, in a ring that runs down with the time it has left (`52s` below), beating in its last ten
+  seconds. Both are drawn whatever the player sees: every side knows them, so they are not behind the fog. A tank
+  with a powerup running (`World.PowerupsOf`) has a ring of dashes round it, lit for the share of the time that is
+  left, with the letter at its upper right; a second powerup is a second ring further out. That ring is the tank's,
+  so it shows only while the tank is in sight, and moves with it (it carries the tank's motion). The site and the
+  drops go under machines and tanks, the rings over the tanks and the labels last. Nothing is emitted while the rules
+  run no drops.
 - **Radar blips.** `Game` also asks for the player's `Radar` (`World.TrackRadar`). `RadarQuads` draws one small
   quad per contact (`KindRadarBlip`, `RadarBlip` in `Shaders/Entity/Overlays.hlsli`), first in the entity layer so
   everything else is on top: green for rock and walls, amber for metal, dim blue-green for a cave,
@@ -222,10 +235,6 @@ display's own resolution instead of being stretched by the OS.
 - **UI.** ImGui lays out in UI units: points divided by `ImGuiPlatform.UiScale`, which grows the UI on displays
   larger than 1920x1080 points. `ImGuiPlatform.DeviceScale` (UI scale times pixel density) is ImGui's framebuffer
   scale, so text and art land on device pixels. Mouse input arrives in points and is converted for the view.
-- **Tank deaths on the HUD.** `Gui/TankDeathView` (shared with the browser) holds the wording (colour names, who killed
-  whom, causes, the match clock) and the scoreboard's rows from `World.Deaths`: recalls are not deaths, and a row lists the
-  latest `MaxShownDeaths` and counts the rest. `Gui/Scoreboard` draws them while Tab is held in play (not paused, not in
-  a menu or lobby); `TankDeathWatch` toasts other tanks' deaths.
 - **HUD layout** (`Gui/HudLayout`). The bottom HUD art is one strip, 1024x223 art pixels, drawn in two parts so
   the middle of the view stays clear: TEMP, SHIELD and MATERIALS in the bottom-left corner, BUILD STRUCTURES in
   the bottom-right. Art coordinates still run across the whole strip; `HudLayout.At` moves the right part over.
@@ -258,6 +267,26 @@ display's own resolution instead of being stretched by the OS.
   fade and sends bitmap glyphs and bars to the shared entity shader. The labels sit under the HUD and follow the
   view during hit effects. G toggles them (`GameCommand.TogglePowerLabels`). The BASE panel adds a row from
   `World.BasePowerOf` with production against draw a second and the net.
+- **Timed match** (`GameHud.Arcade`, `ArcadeLines`; only while `World.MatchClock` is active). What it says comes
+  from the shared views (`Scoreboards`, `DropBoard`); this places it. A plate at the top centre, between the tutorial
+  card and the BASE panel, has the clock (a caption over large digits: `TIME`, amber `LAST MINUTE`, red and beating
+  in the last ten seconds and in `SUDDEN DEATH`, `FINAL` once over) and under it a line a drop: the kind's chip and
+  tag, `in 0:32` or `LANDED 52s`, and the distance from the player's tank; a line blinks in its last ten seconds, and
+  a drop just taken or gone stays a few seconds, dimmed (`TAKEN by BOT 3`). The warning banner, the network notice
+  and the match-over lines start below the plate (`GameHud.TopCentreBottom`). The BASE panel shows the goal
+  (`Scoreboards.Objective`) and the board where a core race has its goal lines: a row a tank in rank order (place,
+  colour swatch, name, kills, deaths), the player's row on a band of its colour, the sole leader marked with an amber
+  triangle. In a view too narrow for the plate (under about 1220 UI units) the clock and the drop lines go into the
+  BASE panel above the board. While a drop's site is off screen, or under the card, a toast, the plate or the BASE
+  panel (`ArcadeLines.IsUnder`), a round badge with the kind's chip sits at the edge of the view toward it, in the gap
+  between the panels, with a beak and a tag (`DropLine.PointerText`: `D  in 0:32  120 m`, `B  52s left  45 m`); a
+  forecast's badge has a broken outer ring, two badges sit side by side (`ArcadeLines.Beside`) and two tags never
+  overlap (`ArcadeLines.ClearOf`). The badge is round and marked, so it is neither the tutorial's amber arrow nor the
+  red one to a base under fire. Once the match is over the drop lines, the badges and the name plates over the tanks
+  are gone, and the final standings have the view. The player's running powerups are tags above the HUD
+  strip (`D DRILL 14s` over a bar that drains), blinking in their last five seconds. When the score decides the
+  match, `MatchOverlay` shows VICTORY or DEFEAT, why (`Scoreboards.VictoryLine`, `DefeatLine`), the player's own
+  result and the final standings. The core race's banner, toasts and tutorial step are not shown in a timed match.
 - **Around the HUD.** The base upgrade panel (`GameHud.Goal`) sits on the left of the view, just above the left
   part, clear of the tank and of the base's entrances above and below it. Aiming and clicks stop only over the parts (`HudLayout.Covers`, `RenderViewState.IsUnderHud`); the
   gap is play area. Overlays that cover the view (the death veil, the hit vignette, the key reminder) use
@@ -303,7 +332,7 @@ writes either.
 | `SoundSpace.cs` | Where a sound is heard from: gain from distance, pan from direction, muffle (and its low-pass cutoff) from the ground in between, and the pitch of a tank coming closer. Shared with the browser. |
 | `SoundDirector.cs` | Decides what to play, into an `ISoundSink`. Called after every simulation step. Shared with the browser (`Emberward.Rendering`), whose sink records the sounds into the frame. |
 | `GameAudio.cs` | The desktop's sound: the bank, the mixer (the director's sink), the device, volume, mute, pause and capture. |
-| `StepEventSounds*.cs` | The one table of event sounds, a partial per system (tanks, base, machines, ore, emberites): for each simulation event, the one-shot effect, its gain, whose events it is heard for (anyone's, a tracked tank's, the player's) and how it varies (plain, a capped burst, a cycling shot pitch, a rising pickup streak). `SoundDirector` plays what it says; tested without a device. A new event sound is one row. |
+| `StepEventSounds*.cs` | The one table of event sounds, a partial per system (tanks, base, machines, ore, emberites, the arcade match): for each simulation event, the one-shot effect, its gain, whose events it is heard for (anyone's, a tracked tank's, the player's, or every player wherever they are) and how it varies (plain, a capped burst, a cycling shot pitch, a rising pickup streak). `SoundDirector` plays what it says; tested without a device. A new event sound is one row. |
 | `SoundBank.cs` | Synthesises every effect at start-up (in the browser, when sound is first turned on) (filtered noise, sine partials, envelopes) as mono 48 kHz samples. No sound files; the noise is seeded per effect, so the bank is the same on every run. |
 | `SoundMixer.cs` | Mixes one-shot voices and continuous loops to stereo, low-passes muffled ones, applies master volume, pause and a soft limiter. |
 | `SdlAudioOutput.cs` | The SDL audio device. SDL calls back on its own thread for samples and the mixer fills the buffer (512 samples, about 11 ms). |
@@ -329,6 +358,10 @@ from repeating on the frames drawn between steps.
 | Pickup | `OreCollected`. At most every 3 steps; a run of pickups climbs in pitch. |
 | Ore unloaded | `OreUnloaded` at a relay (`Target` `Machine`, player only): the pickup sound, quieter, once per unit. A bank at the core (`Target` `Base`) is one deposit per pour, louder for a bigger load, and ore burned to restart a dark base the same deposit pitched down (`StepEventSounds.Ore.cs`) |
 | Dock | `Docked` (player only; a respawn is not a docking) |
+| Drop announced, landed, taken, gone | `PowerupAnnounced` (a soft ping), `PowerupLanded` (a clear chime, the loudest), `PowerupCollected` (a falling pair of notes for a drop someone else took; a rising flourish, `PlayerCueFor`, for one the player took), `PowerupExpired` (the ping again, lower and quieter). Every player hears them, unplaced. Silent in the steps after the match was decided (`QuietOnceDecided`), as is the kill confirmation. |
+| Powerup run out | `PowerupEnded` on the player's own tank |
+| Kill confirmed | `TankDied` whose `Killer` is the player (`KillCueFor`), beside the death itself, in any match; not once the match was decided before the step |
+| Match clock | From `World.MatchClock`, not an event (`StepEventSounds.ClockCue`): three strokes as the last minute starts, a tick on each of the last ten seconds (higher for the last three), an alarm as sudden death starts, a horn when the match ends. A clock first heard part-way (a late join) says nothing of where it already stands. |
 | Warnings | Player only, most urgent first like the HUD banner: overheating, low shield, running hot. The thresholds are shared with the HUD through `PlayerWarnings`. Each repeats at its own interval while it lasts. These follow the tank's state, not events. |
 | Engine loop | Per tank, while alive: idle, or louder and higher on steps with `TankMoved` |
 | Dig loop | Per tank: `TankDug` |
@@ -351,6 +384,10 @@ away, from its smoothed change of distance. Both clients roll off at 12 dB per o
 one-pole low-pass stages, the browser with a Butterworth `BiquadFilterNode` at the cutoff the frame carries. One
 effect has at most 4 voices at once; a further one fades out the oldest. The mixer's limiter bends peaks above
 0.75 towards full scale instead of clipping.
+
+An announcement about the match (`CueHeard.Everyone`: the drops, a confirmed kill, the clock) is the exception: it
+is played at the listener, at its own gain, with no pan and no muffling, because where it happened is on the HUD
+and the sound must reach a player on the far side of the map as it reaches one beside it.
 
 ### Settings
 

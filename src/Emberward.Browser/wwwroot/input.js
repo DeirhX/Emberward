@@ -7,7 +7,6 @@ export class GameInput {
         this.touchMoves = new Map();
         this.releaseAction = false;
         this.enabled = false;
-        this.scoreboardAllowed = () => false;
         const movement = [
             "KeyW",
             "KeyA",
@@ -22,12 +21,6 @@ export class GameInput {
         window.addEventListener("keydown", (e) => {
             if (e.target instanceof HTMLInputElement) return;
             if (this.enabled && movement.includes(e.code)) e.preventDefault();
-            // Tab held shows the scoreboard, instead of moving the focus. It works while the match is on screen, also
-            // after it ended, when the controls are off (scoreboardAllowed).
-            if ((this.enabled || this.scoreboardAllowed()) && e.code === "Tab") {
-                e.preventDefault();
-                if (!e.repeat) action("scoreboard", true);
-            }
             if (!e.repeat) {
                 if (e.code === "Escape") {
                     e.preventDefault();
@@ -60,11 +53,7 @@ export class GameInput {
             }
             if (this.enabled) this.keys.add(e.code);
         });
-        window.addEventListener("keyup", (e) => {
-            this.keys.delete(e.code);
-            if (e.code === "Tab") action("scoreboard", false);
-        });
-        window.addEventListener("blur", () => action("scoreboard", false));
+        window.addEventListener("keyup", (e) => this.keys.delete(e.code));
         canvas.addEventListener("pointermove", (e) => {
             if (!this.enabled) return;
             const r = canvas.getBoundingClientRect();
