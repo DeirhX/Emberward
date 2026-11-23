@@ -9,12 +9,15 @@ using Emberward.Desktop.Gui;
 /// <param name="BasePower">The base charge readout, present in an energy-network match.</param>
 /// <param name="MachineUpgrade">The machine next to the tank and its upgrade panel; null when none is in reach.</param>
 /// <param name="Reserve">The reserve's stage tag and burn prompt; null when there is nothing to say.</param>
+/// <param name="Arcade">A timed match's clock, board, drops and powerups; null in a match without a clock and in a network lobby.</param>
+/// <param name="Objective">What a timed match asks of the player (<see cref="Scoreboards.Objective"/>), shown where a core
+/// race shows its objective, from the lobby on; null in a match without a clock.</param>
 public sealed record BrowserFrame(
     int Seed, int Tick, int TickRate, PlayerStatus Player,
     SoundFrame Sounds, BuildOption[] Builds,
     UpgradeOption[] Upgrades, PlantPreview? Preview, GoalStatus? Goal, GuidanceStatus Guidance, HeatDial? Dial,
     NetStatus? Net = null, BaseCharge? BasePower = null, MachineUpgradeStatus? MachineUpgrade = null,
-    ReserveStatus? Reserve = null);
+    ReserveStatus? Reserve = null, ArcadeStatus? Arcade = null, string? Objective = null);
 
 /// <summary>
 /// The tank's reserve (<c>ReserveTags</c>, shared with the desktop): the stage tag drawn beside OFF NETWORK with its

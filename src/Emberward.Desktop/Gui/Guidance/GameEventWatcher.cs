@@ -8,7 +8,7 @@ using Emberward.Desktop.Gui.Guidance.Events;
 /// <summary>
 /// Posts a toast when something happens on the player's side that the player should know about. Each system has its
 /// own watch in <c>Guidance/Events</c> (base attacks, upgrades, the sector goal, the network, the base's power, ore,
-/// radar, nests); this holds them in the order their toasts stack within a frame. A new system's notifications are a
+/// radar, nests, the timed match and its drops); this holds them in the order their toasts stack within a frame. A new system's notifications are a
 /// new watch and a line in <see cref="_watches"/>; retiring a system deletes its watch and that line. It only reads
 /// Core state. What happens inside a step a watch hears from <see cref="World.StepEvents"/> in <see cref="AfterStep"/>.
 /// </summary>
@@ -17,6 +17,8 @@ public sealed class GameEventWatcher
     private readonly BaseAttackWatch _baseAttack = new();
     private readonly IEventWatch[] _watches;
     private bool _primed;
+    private Func<int, string>? _localNames;
+    private int _localNamesSlot = -1;
 
     public GameEventWatcher()
     {
@@ -30,6 +32,7 @@ public sealed class GameEventWatcher
             new OreWatch(),
             new RadarWatch(),
             new NestWatch(),
+            new ArcadeWatch(),
         ];
     }
 
@@ -63,7 +66,7 @@ public sealed class GameEventWatcher
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(player);
         foreach (IEventWatch watch in _watches)
-            watch.OnStep();
+            watch.OnStep(world);
         foreach (ref readonly StepEvent e in world.StepEvents)
             foreach (IEventWatch watch in _watches)
                 watch.OnStepEvent(world, player, in e);
@@ -73,14 +76,22 @@ public sealed class GameEventWatcher
     /// The tutorial has not yet explained the network, so the toasts for leaving it and for scattered radar wait: the
     /// player is told what they mean at that step, and the clock on the HUD shows the state meanwhile.
     /// </param>
-    public void Update(World world, Tank player, NotificationFeed feed, float now, bool introQuiet = false)
+    /// <param name="names">What to call the tank in a slot; null for a local match's names (<see cref="SlotNames.Local"/>).</param>
+    public void Update(World world, Tank player, NotificationFeed feed, float now, bool introQuiet = false,
+        Func<int, string>? names = null)
     {
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(player);
         if (player.Base is not { } home)
             return;
 
-        var frame = new GuidanceFrame(world, player, home, world.GetNetworkStatus(home), feed, now, introQuiet, _primed);
+        if (names == null)
+        {
+            if (_localNames == null || _localNamesSlot != player.Color)
+                (_localNames, _localNamesSlot) = (SlotNames.Local(player.Color), player.Color);
+            names = _localNames;
+        }
+        var frame = new GuidanceFrame(world, player, home, world.GetNetworkStatus(home), feed, now, introQuiet, _primed, names);
         foreach (IEventWatch watch in _watches)
             watch.Update(in frame);
         _primed = true;

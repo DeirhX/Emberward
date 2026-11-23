@@ -88,12 +88,13 @@ Run `Emberward.Desktop --help` for the full list. The common ones:
 | `--windowed[=WxH]` | Resizable window instead of borderless fullscreen |
 | `--display=N` | Open on display N (or `secondary`) |
 | `--size=WxH`, `--large` | Terrain size |
-| `--no-ai` | No enemy tank |
+| `--players=N` | Tanks in the match, 2 to 8. A local match (default 2) has yours and a bot in every other; without `--size`, more than two play on the 480x300 map. With `--net` it is the tanks of the room you open (default 4); bots take the slots nobody joins |
+| `--arcade`, `--mode=arcade` | Play the arcade mode instead of the standard match (`--mode=standard`): locally, or as the mode of the room you open. An arcade match of up to four tanks defaults to the 320x200 map |
+| `--no-ai` | No bots: the other tanks stand still |
 | `--no-fog` | No fog of war: the whole map is shown live |
 | `--net[=ROOM]` | Join ROOM (default `lobby`) on the shared relay; the first player in opens it and their settings apply |
 | `--relay=URL` | Use the relay at URL instead (`ws://` or `wss://`, ending in `/play`) |
 | `--room=NAME` | The room to join, when `--relay` is given without `--net` |
-| `--players=N` | Tanks in the match when opening the room, 2 to 8 (default 4); bots take the slots nobody joins |
 | `--name=NAME` | Your name in the room. If you drop out, starting again with the same room and name puts you back in |
 | `--secret=TEXT` | The relay's shared secret, if it has one (up to 256 characters); `EMBERWARD_RELAY_SECRET` does the same |
 | `--volume=N` | Master volume, 0 to 100 (default 70); `EMBERWARD_VOLUME` does the same |
@@ -114,7 +115,7 @@ dotnet run --project src/Emberward.Desktop -- --net=friday --name=Ann
 ```
 
 Without arguments, press Esc in the game and then N (or click "Network match") for the network menu: your name, the
-room, and Join or Create (F2: number of tanks, map size, seed). The game then starts again in that match. The menu
+room, and Join or Create (F2: match mode, number of tanks, map size, seed). The game then starts again in that match. The menu
 remembers your choices in `settings.ini` under the user's application data folder (`EMBERWARD_SETTINGS_FILE` names another file);
 if the relay refuses you (room full or started, wrong secret, other build, not reachable) you come back to the menu
 with the reason on screen. A relay's secret is asked for only when it is needed, and kept in that file in plain text. In a
@@ -123,7 +124,8 @@ network match the same pause-menu button reads "Leave network match" (L, also in
 The public relay is open, so no secret is needed. A relay that asks for one: set `EMBERWARD_RELAY_SECRET` (or pass
 `--secret=`) to the value whoever runs the relay gives you. The lobby shows who is in. The match starts when the room is full, or when the host (the first player in)
 presses Enter; bots play the tanks nobody took. It is a race: the first base to tap the core wins, and a tank out
-of lives is out. The first player's `--seed`, `--size`, `--fast` and `--players` decide the match for everyone.
+of lives is out. The first player's `--seed`, `--size`, `--fast`, `--players` and `--arcade` decide the match for
+everyone, and the lobby names the room's mode, tanks and map.
 All players must run the same build, and every machine must be fast enough to simulate the map in real time.
 P pauses and resumes the match for everyone; Escape only opens your own menu. When the match is over, Enter
 plays again in the same room: the first player to press it opens the room, the others join. If you lose the

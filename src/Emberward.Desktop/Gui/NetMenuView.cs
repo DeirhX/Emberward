@@ -63,7 +63,7 @@ public sealed class NetMenuView
         80f + NoticeHeight(m) + RowH * (m.SecretRequired ? 3 : 2) + 20f + 40f + 16f + ButtonH + 50f;
 
     private static float CreateHeight(NetMenuModel m) =>
-        80f + NoticeHeight(m) + RowH * 5 + (MapPresets.Warning(m.Map) != null ? 24f : 0f) + 16f + 28f + ButtonH + 30f;
+        80f + NoticeHeight(m) + RowH * 6 + (MapPresets.Warning(m.Map) != null ? 24f : 0f) + 16f + 28f + ButtonH + 30f;
 
     private NetMenuResult DrawJoin(ImDrawListPtr dl, NetMenuModel m, float x, float y)
     {
@@ -93,6 +93,10 @@ public sealed class NetMenuView
     {
         DrawTextRow(dl, m, NetMenuField.Name, "You", x, ref y);
         DrawTextRow(dl, m, NetMenuField.CreateName, "Room name", x, ref y);
+
+        DrawChoiceRow(dl, m, NetMenuField.Mode, "Mode", MatchModes.Label(m.Mode), x, y);
+        Text(dl, 14f, new Vector2(x + LabelW + StepperW + 14f, y + 13f), MatchModes.RoomHint(m.Mode), HudTheme.TextDim);
+        y += RowH;
 
         // Tanks: the slot count is the bot setting, because every tank nobody takes is a bot.
         DrawChoiceRow(dl, m, NetMenuField.Tanks, "Tanks", m.Players.ToString(System.Globalization.CultureInfo.InvariantCulture), x, y);

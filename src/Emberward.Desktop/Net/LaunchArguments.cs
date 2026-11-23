@@ -1,6 +1,7 @@
 namespace Emberward.Desktop.Net;
 
 using System.Globalization;
+using Emberward.Core.Match;
 using Emberward.Core.Types;
 using Emberward.Desktop.Config;
 
@@ -20,13 +21,24 @@ public sealed record LaunchArguments
     /// <summary>The map and simulation seed (<c>--seed</c>); null lets the game choose.</summary>
     public int? Seed { get; init; }
 
+    /// <summary>The kind of match (<c>--arcade</c>, <c>--mode=</c>): of a local match, or of the room this client opens.</summary>
+    public MatchMode Mode { get; init; }
+
+    /// <summary><c>--players</c>: how many tanks the match has; null when the option was not given.</summary>
+    public int? PlayersAsked { get; init; }
+
+    /// <summary>Tanks in a local match: the player's and a bot in every other.</summary>
+    public int LocalPlayers => PlayersAsked ?? Emberward.Core.Config.Tweaks.LevelGen.DefaultPlayers;
+
     // Network match
     /// <summary>The relay of a network match (<c>--relay</c>, or the default relay for <c>--net</c>); null plays locally.</summary>
     public Uri? Relay { get; init; }
 
     public string Room { get; init; } = DefaultRoom;
     public string Name { get; init; } = Environment.UserName;
-    public int Players { get; init; } = NetworkTweaks.DefaultPlayers;
+
+    /// <summary>Tanks in the room this client opens; bots take the slots nobody joins.</summary>
+    public int Players => PlayersAsked ?? NetworkTweaks.DefaultPlayers;
 
     /// <summary>The relay's secret from <c>--secret</c> or <c>EMBERWARD_RELAY_SECRET</c>.</summary>
     public string Secret { get; init; } = string.Empty;
@@ -52,7 +64,7 @@ public sealed record LaunchArguments
 
     /// <summary>The network match this asks for, or null for a local one.</summary>
     public NetLaunchOptions? Net =>
-        Relay is null ? null : new NetLaunchOptions(Relay, Room, Name, Players, Secret, TerrainSize, Seed);
+        Relay is null ? null : new NetLaunchOptions(Relay, Room, Name, Players, Secret, TerrainSize, Seed, Mode);
 
     /// <summary>
     /// Reads the arguments, on top of what the environment variables say. An option that makes no sense is left out
@@ -172,8 +184,17 @@ public sealed record LaunchArguments
         if (arg.StartsWith("--players=", StringComparison.Ordinal))
         {
             if (int.TryParse(arg[10..], out int count) && count is >= 2 and <= Emberward.Core.Config.Tweaks.World.MaxPlayers)
-                return this with { Players = count };
-            Warn($"Unknown player count '{arg[10..]}', expected 2 to 8. Using {Players.ToString(CultureInfo.InvariantCulture)}.");
+                return this with { PlayersAsked = count };
+            Warn($"Unknown player count '{arg[10..]}', expected 2 to 8. Using the default.");
+            return this;
+        }
+        if (arg == "--arcade")
+            return this with { Mode = MatchMode.Arcade };
+        if (arg.StartsWith("--mode=", StringComparison.Ordinal))
+        {
+            if (MatchModes.Parse(arg[7..]) is { } mode)
+                return this with { Mode = mode };
+            Warn($"Unknown mode '{arg[7..]}', expected standard or arcade. Using {MatchModes.Name(Mode)}.");
             return this;
         }
         if (arg.StartsWith("--seed=", StringComparison.Ordinal))
@@ -185,6 +206,22 @@ public sealed record LaunchArguments
         }
         Warn($"Unknown option '{arg}' ignored. Run with --help to list the options.");
         return this;
+    }
+
+    /// <summary>
+    /// The options that play a match's map again in a local match, as the pause menu shows them: the seed, and
+    /// whatever else the map depends on that is not the default (the generator, the number of tanks, the mode). A
+    /// map size chosen with <c>--size</c> or in a room is not among them.
+    /// </summary>
+    public static string ReplayArguments(int seed, bool fastGen, int players, MatchMode mode)
+    {
+        var text = new System.Text.StringBuilder(fastGen ? "--fast " : string.Empty);
+        text.Append(CultureInfo.InvariantCulture, $"--seed={seed}");
+        if (players != Emberward.Core.Config.Tweaks.LevelGen.DefaultPlayers)
+            text.Append(CultureInfo.InvariantCulture, $" --players={players}");
+        if (mode != MatchMode.Standard)
+            text.Append(" --").Append(MatchModes.Name(mode));
+        return text.ToString();
     }
 
     /// <summary>

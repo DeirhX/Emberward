@@ -81,6 +81,35 @@ public sealed record MatchRules
     /// </summary>
     public bool TankShield { get; init; }
 
+    /// <summary>
+    /// The match has a clock of this many seconds and is won on kills (<see cref="MatchScore"/>, DESIGN.md §6.8): when
+    /// the clock runs out the tank that leads alone wins, and while the top score is tied the match goes on until one
+    /// does. 0, the default, is no clock and no score.
+    /// </summary>
+    public int TimeLimitSeconds
+    {
+        get;
+        init => field = value >= 0 ? value : throw new ArgumentOutOfRangeException(nameof(TimeLimitSeconds), value, "Cannot be negative.");
+    }
+
+    /// <summary>
+    /// No base can be destroyed, so no side is ever out of the match: a shell that reaches a core bursts on it as on a
+    /// wall. The gate shield and the gates work as they do without the rule. Off, a base falls when its core does.
+    /// </summary>
+    public bool BasesHold { get; init; }
+
+    /// <summary>
+    /// A dead tank is back after <see cref="Tweaks.Arcade.RespawnSeconds"/> whatever its base's charge. Off, an energy
+    /// match makes it wait longer the emptier the base's store is.
+    /// </summary>
+    public bool QuickRespawn { get; init; }
+
+    /// <summary>
+    /// Powerup drops land on a fixed, seeded schedule, each announced a full period ahead to every side
+    /// (DESIGN.md §6.8, <see cref="Entities.Powerups.PowerupDrops"/>). Off, the world has no drops.
+    /// </summary>
+    public bool Powerups { get; init; }
+
     /// <summary>A normal match: hot and frost pockets, ore, regrowth, and the energy rules (the energy network with its gate
     /// shields, machine upgrades and the tank's reserve); the core does not end it.
     /// </summary>
@@ -93,6 +122,33 @@ public sealed record MatchRules
         MachineUpgrades = true,
         TankReserve = true,
         TankShield = true,
+    };
+
+    /// <summary>
+    /// An arcade match (DESIGN.md §6.8): a standard match with emberites that runs <see cref="Tweaks.Arcade.TimeLimitSeconds"/>
+    /// and is won on kills, where bases hold, dead tanks are back quickly, powerups drop and the core does not end the
+    /// match.
+    /// </summary>
+    public static MatchRules Arcade { get; } = Standard with
+    {
+        Emberites = true,
+        CoreTapWins = false,
+        TimeLimitSeconds = Tweaks.Arcade.TimeLimitSeconds,
+        BasesHold = true,
+        QuickRespawn = true,
+        Powerups = true,
+    };
+
+    /// <summary>
+    /// The rules of a match of <paramref name="mode"/>, for every host alike. A standard match has emberites and ends
+    /// on the core when <paramref name="coreTapWins"/>; an arcade match is <see cref="Arcade"/>, whose clock ends it
+    /// (<paramref name="coreTapWins"/> is ignored).
+    /// </summary>
+    public static MatchRules ForMode(MatchMode mode, bool coreTapWins) => mode switch
+    {
+        MatchMode.Standard => Standard with { CoreTapWins = coreTapWins, Emberites = true },
+        MatchMode.Arcade => Arcade,
+        _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Not a match mode."),
     };
 
     /// <summary>The rules as one number, the same on every machine and run (unlike <see cref="GetHashCode"/>).</summary>
@@ -118,6 +174,17 @@ public sealed record MatchRules
         // Version of the emberite rules: raised when what creatures do changes (a dying one drops its nest's ore).
         if (Emberites)
             hash = Fnv1a.Mix(hash, 0x4D50u);
+        // The arcade rules, each mixed only when it is on, so the rules of a match without them hash as they always did.
+        if (TimeLimitSeconds > 0)
+            hash = Fnv1a.Mix(Fnv1a.Mix(hash, 0x544Cu), (uint)TimeLimitSeconds);
+        if (BasesHold)
+            hash = Fnv1a.Mix(hash, 0x4248u);
+        if (QuickRespawn)
+            hash = Fnv1a.Mix(hash, 0x5152u);
+        // Version of the powerup rules: raised when the schedule, the sites, the kinds or what a kind does changes
+        // (last: a drop lies only until the next lands, and the contested sites' turns go in shuffled rounds).
+        if (Powerups)
+            hash = Fnv1a.Mix(hash, 0x5056u);
         return hash;
     }
 }

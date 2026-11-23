@@ -33,6 +33,8 @@ public class SnapshotCoverageTests
         "Entities.Tanks.TankReserveSystem._near: scratch: filled and read within one question",
         "Entities.Tanks.Tank._nearMachines: scratch: TouchedRelay and NearestDropOff fill it before they read it",
         "Entities.Tanks.Tank._shield: fixed for the match: the world's shield system, handed over at construction; the world saves it once",
+        "Entities.Tanks.Tank._powerups: fixed for the match: the world's powerup drops, handed over at construction; the world saves them once",
+        "Entities.Powerups.PowerupDrops._nearMachines: scratch: a site check fills it before it reads it",
         "Match.MatchRules: fixed for the match: the world is built with the same rules",
         "Network.LinkMap._linksByTile: rebuilt on load from the link list (OnSnapshotLoaded); looked up by key only",
         "Regrowth.RegrowthBlockerIndex._lookup: scratch: filled and read within Update",

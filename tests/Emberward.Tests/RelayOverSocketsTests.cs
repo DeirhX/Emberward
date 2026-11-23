@@ -156,6 +156,37 @@ public partial class RelayOverSocketsTests
         Assert.Contains("level generator", refused.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ARoomOpenedAsArcade_IsArcadeForWhoeverJoinsIt()
+    {
+        var (app, play) = await StartRelayAsync();
+        await using var _ = app;
+        var arcade = NetMatch.ProposeConfig(
+            42, MapSize, Core.LevelGen.LevelGenMode.Deterministic, players: 2, Core.Match.MatchMode.Arcade);
+
+        using var ann = NetLaunch.Join(Options(play, "Ann") with { Room = "arcade" }, arcade);
+        // Bob proposes a standard match with another seed; the room has its settings already.
+        using var bob = NetLaunch.Join(Options(play, "Bob") with { Room = "arcade" }, Config(seed: 7));
+
+        Assert.Equal((0, 1), (ann.Slot, bob.Slot));
+        Assert.Equal(arcade, bob.Config);
+        Assert.Equal(Core.Match.MatchMode.Arcade, NetMatch.ModeOf(bob.Config));
+        Assert.Equal("Arcade match   2 tanks   map 320x200", LobbyText.SettingsLine(bob.Config));
+    }
+
+    [Fact]
+    public async Task RoomWithAModeThisBuildDoesNotKnow_IsCarriedByTheRelayAndRefusedByTheClient()
+    {
+        var (app, play) = await StartRelayAsync();
+        await using var _ = app;
+        var future = Config(seed: 1) with { Mode = 99 };
+
+        var refused = Assert.Throws<RelayException>(() => NetLaunch.Join(Options(play, "Eve") with { Room = "future" }, future));
+
+        Assert.Contains("match mode (99)", refused.Message, StringComparison.Ordinal);
+        Assert.Contains("Update the game", refused.Message, StringComparison.Ordinal);
+    }
+
     private static Hello HelloFor(string name) =>
         new(MessageCodec.ProtocolVersion, NetMatch.BuildId, name, RoomName, Config(seed: 42));
 

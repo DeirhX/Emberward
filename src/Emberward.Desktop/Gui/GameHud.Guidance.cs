@@ -23,7 +23,11 @@ public partial class GameHud
     private const float CardWidth = 470f;
 
     /// <summary>Call after each simulation step, while <see cref="World.StepEvents"/> still holds that step's events.</summary>
-    public void AfterStep(World world, Tank player) => _guidance.AfterStep(world, player);
+    public void AfterStep(World world, Tank player)
+    {
+        _guidance.AfterStep(world, player);
+        _drops.AfterStep(world);
+    }
 
     /// <summary>While enemy fire lands on the player's base, a red arrow at the edge of the view points to it if it is off screen.</summary>
     private void DrawBaseAttackPointer(Tank player)
@@ -54,7 +58,7 @@ public partial class GameHud
             HudTheme.TextAt(dlh, 15f, new Vector2(vp.x + 22f + capW, y + 2f), "show tutorial", HudTheme.TextDim);
             y += 28f;
         }
-        DrawToasts(vp.x + 14f, y);
+        _guidanceBottom = DrawToasts(vp.x + 14f, y);
     }
 
     /// <summary>Draws the tutorial card and returns its bottom edge.</summary>
@@ -85,7 +89,8 @@ public partial class GameHud
         return bottom;
     }
 
-    private void DrawToasts(float x, float y)
+    /// <summary>Draws the toasts under one another from <paramref name="y"/> and returns where the column ends.</summary>
+    private float DrawToasts(float x, float y)
     {
         var dl = ImGui.GetForegroundDrawList();
         const float titleSize = 19f, detailSize = 15.5f, padX = 16f, padY = 11f;
@@ -116,6 +121,7 @@ public partial class GameHud
                 HudTheme.WithAlphaByte(HudTheme.Text, a), wrap);
             y += h + 8f;
         }
+        return y;
     }
 
     /// <summary>

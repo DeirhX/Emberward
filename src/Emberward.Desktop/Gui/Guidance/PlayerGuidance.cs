@@ -43,8 +43,19 @@ public sealed class PlayerGuidance
     /// <summary>The warning banner, or null for none.</summary>
     public PlayerWarning? Warning { get; private set; }
 
+    /// <summary>
+    /// What a toast calls the tank in a slot (a kill, a drop taken, a new leader). The host of a network match sets the
+    /// players' names; null, as in a local match, says <c>YOU</c> and <c>BOT n</c> (<see cref="SlotNames.Local"/>).
+    /// </summary>
+    public Func<int, string>? Names { get; set; }
+
     /// <summary>Call after each simulation step, while <see cref="World.StepEvents"/> still holds that step's events.</summary>
-    public void AfterStep(World world, Tank player) => _events.AfterStep(world, player);
+    public void AfterStep(World world, Tank player)
+    {
+        ArgumentNullException.ThrowIfNull(world);
+        Watch(world);
+        _events.AfterStep(world, player);
+    }
 
     /// <param name="now">Seconds on the host's HUD clock; toasts and timed tutorial steps run on it.</param>
     /// <param name="offerThermalView">The host has a thermal view and it is off (<see cref="PlayerWarnings.Update"/>).</param>
@@ -52,15 +63,10 @@ public sealed class PlayerGuidance
     {
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(player);
-        if (!ReferenceEquals(world, _watchedWorld))
-        {
-            _watchedWorld = world;
-            _events.Reset();
-            _feed.Clear();
-        }
+        Watch(world);
 
         _events.Update(world, player, _feed, now,
-            introQuiet: !_tutorial.HasReached(TutorialDirector.NetworkStepTitle));
+            introQuiet: !_tutorial.HasReached(TutorialDirector.NetworkStepTitle), Names);
         _feed.Update(now);
         Tutorial = player.IsDead ? null : _tutorial.Update(world, player, now);
         if (Tutorial == null && _tutorial.IsComplete && float.IsNaN(_tutorialDoneAt))
@@ -85,5 +91,18 @@ public sealed class PlayerGuidance
         }
 
         Warning = _warnings.Update(player, offerThermalView, now);
+    }
+
+    /// <summary>
+    /// Forgets what the watches knew of the last world on first seeing a new one (a rematch, a rejoin), before reading
+    /// anything of it: its first step must not be heard with the old match's flags (a decided match keeps quiet).
+    /// </summary>
+    private void Watch(World world)
+    {
+        if (ReferenceEquals(world, _watchedWorld))
+            return;
+        _watchedWorld = world;
+        _events.Reset();
+        _feed.Clear();
     }
 }

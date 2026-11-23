@@ -28,7 +28,10 @@ public sealed class ThermalLedger
     /// <summary>Energy vented by the base radiators.</summary>
     public double SunkBase { get; private set; }
 
-    /// <summary>Energy a wrecked tank still held when it respawned cold (<c>TankThermals.ResetForSpawn</c>).</summary>
+    /// <summary>
+    /// Energy a wrecked tank still held when it respawned cold (<c>TankThermals.ResetForSpawn</c>), and what an
+    /// overhaul's coolant took out of a live one (<c>TankThermals.CoolFromPickup</c>).
+    /// </summary>
     public double SunkTank { get; private set; }
 
     /// <summary>

@@ -14,6 +14,9 @@ export class GuidanceView {
     tutorialHidden = false;
     guidance = null;
     goal = null;
+    // A timed match's objective line (BrowserFrame.Objective, from the lobby on), which stands where a race's core goal
+    // does; null in a race.
+    objective = null;
     toasts = new Map();
 
     // `onToggle` runs after F2 or the card's button shows or hides the tutorial, so the pointer follows at once.
@@ -35,9 +38,10 @@ export class GuidanceView {
             : (this.guidance?.tutorial?.target ?? null);
     }
 
-    update(guidance, goal) {
+    update(guidance, goal, objective = null) {
         this.guidance = guidance;
         this.goal = goal;
+        this.objective = objective;
         this.showCard();
         this.showToasts(guidance.toasts);
         this.showHint(guidance.hint);
@@ -45,7 +49,7 @@ export class GuidanceView {
     }
 
     clear() {
-        this.guidance = this.goal = null;
+        this.guidance = this.goal = this.objective = null;
         this.toasts.clear();
         $("toasts").replaceChildren();
         $("warning").hidden = true;
@@ -54,6 +58,7 @@ export class GuidanceView {
     showCard() {
         const tutorial = this.guidance?.tutorial;
         const showTutorial = tutorial && !this.tutorialHidden;
+        const timed = this.objective !== null;
         setHidden($("tutorial-toggle"), !tutorial);
         const toggle = $("tutorial-toggle").firstChild;
         const toggleText = showTutorial ? "Hide " : "Tutorial ";
@@ -62,13 +67,16 @@ export class GuidanceView {
             $("mission-label"),
             showTutorial
                 ? `NEXT STEP ${tutorial.number} / ${tutorial.count}`
-                : "SECTOR OBJECTIVE",
+                : timed
+                  ? "MATCH OBJECTIVE"
+                  : "SECTOR OBJECTIVE",
         );
         setText(
             $("mission-title"),
-            showTutorial ? tutorial.title : "Tap the hot core",
+            showTutorial ? tutorial.title : timed ? "Timed match" : "Tap the hot core",
         );
-        setText($("guidance"), showTutorial ? tutorial.body : OBJECTIVE);
+        setText($("guidance"), showTutorial ? tutorial.body : timed ? "" : OBJECTIVE);
+        setHidden($("guidance"), !showTutorial && timed);
         const progress = showTutorial && tutorial.progress;
         setHidden($("tutorial-progress"), !progress);
         if (progress) {
@@ -81,9 +89,11 @@ export class GuidanceView {
         const g = this.goal;
         setText(
             $("goal"),
-            g
-                ? `${g.output.toFixed(0)} / ${g.required.toFixed(0)} POWER · ${g.hold.toFixed(0)} / ${g.requiredHold.toFixed(0)}s HELD`
-                : "",
+            timed
+                ? this.objective
+                : g
+                  ? `${g.output.toFixed(0)} / ${g.required.toFixed(0)} POWER · ${g.hold.toFixed(0)} / ${g.requiredHold.toFixed(0)}s HELD`
+                  : "",
         );
     }
 

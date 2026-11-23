@@ -14,9 +14,9 @@ public class TankList
     public int Count => _tanks.Count;
 
     public Tank AddTank(int color, TankBase tankBase, int rngSeed = 0, SimulationSettings? settings = null,
-        TankShieldSystem? shield = null)
+        TankShieldSystem? shield = null, Powerups.PowerupDrops? powerups = null)
     {
-        var tank = new Tank(color, tankBase, rngSeed, settings, shield);
+        var tank = new Tank(color, tankBase, rngSeed, settings, shield, powerups);
         _tanks.Add(tank);
         return tank;
     }

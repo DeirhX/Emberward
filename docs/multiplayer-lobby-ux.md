@@ -138,6 +138,7 @@ will idle and could be lost.
 ```
  +------------------------- CREATE ROOM -------------------------+
  | Name      [ Ann's game_______ ]                               |
+ | Mode      <  Standard  >   race to the core                   |
  | Tanks     <  4  >          bots drive the slots nobody takes  |
  | Map       <  Medium 480x300  >                                |
  | Seed      ( ) new map each match   ( ) fixed [ _______ ]      |
@@ -150,13 +151,17 @@ will idle and could be lost.
 | Setting | Choice | Default | Why |
 |---|---|---|---|
 | Name | text, 1 to 64 characters | "&lt;name&gt;'s game" | Readable in a list. A typed name that already exists is refused (§7 `HelloIntent`) |
+| Mode | Standard, Arcade (`MatchMode`; names and labels in `MatchModes`) | Standard | What kind of match the room plays: Standard is the race to the core, Arcade a timed match for score. A short hint beside the choice says which. Left and Right go round, as on the other rows |
 | Tanks | 2 to 8 (`Tweaks.World.MaxPlayers`, `MessageCodec.MaxSlots`) | 4 (`NetworkTweaks.DefaultPlayers`) | The slot count *is* the bot setting: every tank nobody takes is a bot |
-| Map | Small 320x200, Medium 480x300, Large 1500x750 | Small for 2 tanks, otherwise Medium (the rule `Program.cs` uses today) | Presets, not free numbers. Large shows an amber warning, because a slow machine falls behind |
+| Map | Small 320x200, Medium 480x300, Large 1500x750 | Small for 2 tanks, otherwise Medium; Small for an Arcade room of up to 4 tanks (`MapPresets.DefaultFor`, the one rule the command line, the menu and the browser ask) | Presets, not free numbers. The default follows the mode and the tanks until the player picks a map, which then stays. Large shows an amber warning, because a slow machine falls behind. Arcade stays small because four tanks on the medium map split into two duels |
 | Seed | new each match / fixed | new | Fixed is for replaying a map someone liked |
 
 Not offered: **speed** (`TicksPerSecond` is the simulation rate, a game constant, not a taste setting), **fast
 generation** (`GenMode`, a development option; `--fast` still works), **password** (§5), **"bots on/off"** (fewer
-tanks is the same thing). The chosen values are remembered for the next time.
+tanks is the same thing). The chosen values are remembered for the next time, the mode among them (`create.mode`
+in `settings.ini`; the browser keeps its MODE choice in `localStorage` with the name and the room). The mode is
+the room's from the moment it opens: someone who joins a room that exists gets the room's mode, whatever their own
+menu says, and the lobby shows it (§3.4).
 
 ### 3.4 Lobby (the existing plate, extended)
 
@@ -167,13 +172,17 @@ tanks is the same thing). The chosen values are remembered for the next time.
  | [#] open: a bot plays if nobody joins                    |
  | [#] open: a bot plays if nobody joins                    |
  |----------------------------------------------------------|
- | 4 tanks, 480x300, new map             relay 38 ms        |
+ | Standard match, 4 tanks, 480x300, new map   relay 38 ms  |
  | Press Enter to start with 2 players; bots take the open  |
  | slots. (Starts when Bob's map is built.)                 |
  | Esc menu   L leave                                       |
  +----------------------------------------------------------+
 ```
 
+- **The settings line** names the room's match, mode first, so that someone who joined sees what the first player
+  chose. Built today as a line under the title, on the desktop and in the browser alike
+  (`LobbyText.SettingsLine`: "Arcade match   4 tanks   map 320x200"); the seed and the relay's round trip are not
+  in it yet.
 - **Swatches** are the slot colours, as today (`SlotColor`). Open slots are dimmed text. Bots get no name until the
   match starts, when the name tags read "Bot", as today.
 - **Ready state** comes from the relay (§7 `Roster.ReadyMask`): "building..." until that client has sent `Ready`.

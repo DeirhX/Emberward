@@ -11,14 +11,22 @@ using Emberward.Desktop.Config;
 
 /// <summary>What the command line asked for, as far as building the world goes.</summary>
 /// <param name="TerrainTest">Static test patterns (<c>--terrain-test</c>) instead of a generated match.</param>
-/// <param name="TerrainSizeOverride"><c>--size</c> / <c>--large</c>; null uses the default for the mode.</param>
+/// <param name="TerrainSizeOverride">
+/// <c>--size</c> / <c>--large</c>, or the room's map; null uses the terrain test's size, or the map a match of this
+/// mode and this many tanks gets (<see cref="Net.MapPresets.DefaultSizeFor"/>).
+/// </param>
 /// <param name="GenMode"><see cref="LevelGenMode.Optimized"/> for <c>--fast</c>.</param>
 /// <param name="Seed">Map and simulation seed (see <c>Game.Seed</c>).</param>
 /// <param name="Players">How many bases, and so tanks, the match has.</param>
 /// <param name="CoreTapWins">The first base to tap the core wins the match (a network match is a race).</param>
+/// <param name="Mode">The kind of match, which with <paramref name="CoreTapWins"/> decides its rules (<see cref="MatchRules.ForMode"/>).</param>
 public readonly record struct WorldLaunchOptions(
     bool TerrainTest, Size? TerrainSizeOverride, LevelGenMode GenMode, int Seed,
-    int Players = Tweaks.LevelGen.DefaultPlayers, bool CoreTapWins = false);
+    int Players = Tweaks.LevelGen.DefaultPlayers, bool CoreTapWins = false, MatchMode Mode = MatchMode.Standard)
+{
+    /// <summary>The rules a match built from these options runs with.</summary>
+    public MatchRules Rules => MatchRules.ForMode(Mode, CoreTapWins);
+}
 
 /// <param name="Parallel">Draw and materialise on several threads (only with <c>--fast</c>).</param>
 /// <param name="Seed">The seed the world was built from (<see cref="WorldLaunchOptions.Seed"/>).</param>
@@ -47,9 +55,8 @@ public static class WorldFactory
         int seed = options.Seed;
         World world = options.TerrainTest
             ? BuildTerrainTest(options.TerrainSizeOverride ?? TerrainTestPatternGenerator.DefaultSize)
-            : BuildMatch(options.TerrainSizeOverride ?? DesktopScreenTweaks.RenderSurfaceSize,
-                options.GenMode, seed, parallel, options.Players,
-                MatchRules.Standard with { CoreTapWins = options.CoreTapWins, Emberites = true });
+            : BuildMatch(options.TerrainSizeOverride ?? Net.MapPresets.DefaultSizeFor(options.Mode, options.Players),
+                options.GenMode, seed, parallel, options.Players, options.Rules);
         return new BuiltWorld(world, parallel, seed);
     }
 

@@ -25,6 +25,7 @@ public class ProjectileList
     private FastRandom _rng;
     private readonly StepEventLog? _events;
     private readonly BasePowerSystem? _basePower;
+    private readonly bool _basesHold;
 
     /// <summary>
     /// Single source of truth for per-type projectile behavior.
@@ -47,11 +48,13 @@ public class ProjectileList
     }
 
     /// <param name="events">Where impacts, hits and explosions are recorded (<see cref="World.StepEvents"/>); null records nothing.</param>
-    public ProjectileList(int seed, StepEventLog? events = null, BasePowerSystem? basePower = null)
+    /// <param name="basesHold">No shell damages a base's core (<see cref="Match.MatchRules.BasesHold"/>).</param>
+    public ProjectileList(int seed, StepEventLog? events = null, BasePowerSystem? basePower = null, bool basesHold = false)
     {
         _rng = new FastRandom(seed);
         _events = events;
         _basePower = basePower;
+        _basesHold = basesHold;
     }
 
     public int Count => _projectiles.Count + _pending.Count;
@@ -109,7 +112,7 @@ public class ProjectileList
                 onTank: tank =>
                 {
                     if (tank.Color == p.OwnerColor) return false;
-                    if (tank.TakeDamage(p.Damage, DamageCause.EnemyFire, p.Speed))
+                    if (tank.TakeDamage(p.Damage, DamageCause.EnemyFire, p.Speed, attacker: p.OwnerColor))
                         TankDamageEvents.Record(self._events, tank, ipos, hullEvent: true);
                     if (bursts)
                         self.RecordImpact(ipos, p, ImpactTarget.Tank);
@@ -146,8 +149,9 @@ public class ProjectileList
                         p.PiercedCell = ipos;
                         return false;
                     }
-                    // Walls take no damage; only a shell that reaches the core wears a base down.
-                    if (Pixel.IsBaseCore(pix) && solver.EnemyBaseAt(ipos, p.OwnerColor) is { } target)
+                    // Walls take no damage; only a shell that reaches the core wears a base down. Where bases hold,
+                    // the core is one more wall.
+                    if (Pixel.IsBaseCore(pix) && !self._basesHold && solver.EnemyBaseAt(ipos, p.OwnerColor) is { } target)
                     {
                         int raw = p.Damage;
                         target.TakeDamage(self._basePower?.CoreDamage(target, raw) ?? raw);

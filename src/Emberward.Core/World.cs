@@ -18,6 +18,7 @@ using Emberward.Core.Network;
 using Emberward.Core.Regrowth;
 using Emberward.Core.Entities.Bases;
 using Emberward.Core.Entities.Emberites;
+using Emberward.Core.Entities.Powerups;
 
 public partial class World
 {
@@ -33,6 +34,7 @@ public partial class World
     private readonly List<Position> _frostRockPockets = new();
     private readonly List<LevelGen.OreDeposit> _oreDeposits = new();
     private readonly MatchResult _matchResult;
+    private readonly MatchScore? _score;
     private SectorGoal? _sectorGoal;
     private readonly EnergyNetwork? _energy;
     private readonly BasePowerSystem? _basePower;
@@ -40,6 +42,7 @@ public partial class World
     private readonly TankReserveSystem? _reserve;
     private readonly TankShieldSystem? _tankShield;
     private readonly EmberiteSwarm? _emberites;
+    private readonly PowerupDrops? _powerups;
     // What tanks and machines see of the world each step; the same every step, so built once.
     [NotSaved("fixed for the match: closures over this world")]
     private readonly SimulationContext _tankContext;
@@ -102,7 +105,7 @@ public partial class World
     /// <summary>
     /// What happened during the last <see cref="Advance"/> step (shots, impacts, deaths, plantings, dockings...),
     /// valid until the next step begins. Presentation code learns about one-off happenings here instead of
-    /// comparing state between steps; nothing in the simulation reads it.
+    /// comparing state between steps. In the simulation only the swarm and the match score read the step's own log.
     /// </summary>
     public ReadOnlySpan<StepEvent> StepEvents => _stepEvents.Events;
 
@@ -192,14 +195,19 @@ public partial class World
             _reserve = new TankReserveSystem(_machines, _terrain, _energy);
         if (Rules.TankShield)
             _tankShield = new TankShieldSystem();
-        _projectiles = new ProjectileList(_simulationSeed ^ 0x5f3759df, _stepEvents, _basePower);
+        _projectiles = new ProjectileList(_simulationSeed ^ 0x5f3759df, _stepEvents, _basePower, Rules.BasesHold);
         _linkMap = new LinkMap(_simulationSeed ^ 0x13579BDF);
         if (Rules.Emberites)
             _emberites = new EmberiteSwarm(_terrain, _tankList, _tankBases, _stepEvents, _simulationSettings, _simulationSeed ^ 0x4D0B5, IsCellOccupied);
+        if (Rules.Powerups)
+            _powerups = new PowerupDrops(_terrain, _tankList, _tankBases, _machines, _emberites, _tankShield,
+                _hotRockPockets, _frostRockPockets, _stepEvents, _simulationSeed ^ 0x504F57);
         _collisionSolver = new CollisionSolver(_terrain, _tankBases, _basePower, _emberites);
         if (Rules.TerrainRegrowth)
             _terrainRegrowth = new TerrainRegrowth(_simulationSeed);
         _matchResult = new MatchResult(_tankList.Tanks);
+        if (Rules.TimeLimitSeconds > 0)
+            _score = new MatchScore(_tankList.Tanks, _stepEvents, Rules.TimeLimitSeconds);
         _tankContext = new SimulationContext
         {
             Terrain = _terrain,
@@ -282,9 +290,10 @@ public partial class World
             {
                 uint mixed = (uint)_simulationSeed ^ (uint)(i + 1) * 0x9e3779b9u;
                 int tankSeed = unchecked((int)mixed);
-                _tankList.AddTank(i, tankBase, tankSeed, _simulationSettings, _tankShield);
+                _tankList.AddTank(i, tankBase, tankSeed, _simulationSettings, _tankShield, _powerups);
             }
         }
+        _powerups?.Begin(CorePocket);
         _terrainRegrowth?.Survey(_terrain);
         // The world now knows whether it has a core, and so whether the sector goal runs.
         _systems = BuildSystems();
@@ -351,6 +360,8 @@ public partial class World
             _tankList.Advance(in _tankContext, getInput);
             _basePower?.LatchBlackouts();
         }));
+        if (_powerups is { } powerups)
+            systems.Add(new("powerups", _ => powerups.Advance()));
         if (_emberites is { } swarm)
             systems.Add(new("emberites", _ => swarm.Advance()));
         if (_energy is EnergyNetwork network)
@@ -367,7 +378,9 @@ public partial class World
         }));
         if (_sectorGoal is SectorGoal goal)
             systems.Add(new("goal", _ => goal.Advance(_machines, seconds)));
-        systems.Add(new("match", _ => _matchResult.Latch(RaceWinner)));
+        if (_score is MatchScore score)
+            systems.Add(new("score", _ => AdvanceScore(score)));
+        systems.Add(new("match", _ => _matchResult.Latch(RaceWinner, ScoreWinner)));
         systems.Add(new("links", _ => _linkMap.Advance(_terrain, _simulationSettings.AdvanceStep)));
         systems.Add(new("dock", _ =>
         {
@@ -604,14 +617,15 @@ public partial class World
     private TankBase? RaceWinner => Rules.CoreTapWins ? _sectorGoal?.FirstToTapCore : null;
 
     /// <summary>
-    /// The tank that has won, and how: the first to tap the core when <see cref="MatchRules.CoreTapWins"/>, or the
+    /// The tank that has won, and how: the first to tap the core when <see cref="MatchRules.CoreTapWins"/>, the one that
+    /// leads on kills when the clock of a timed match has run out (<see cref="MatchRules.TimeLimitSeconds"/>), or the
     /// only side with an intact base. Null while undecided or after simultaneous elimination.
     /// Once the step that decided the match has run, it never changes.
     /// </summary>
-    public (Tank Tank, MatchWinReason Reason)? MatchWinner => _matchResult.Winner(RaceWinner);
+    public (Tank Tank, MatchWinReason Reason)? MatchWinner => _matchResult.Winner(RaceWinner, ScoreWinner);
 
     /// <summary>A match is over once a side has won or every base has been destroyed. It stays over.</summary>
-    public bool IsMatchOver => _matchResult.IsOver(RaceWinner);
+    public bool IsMatchOver => _matchResult.IsOver(RaceWinner, ScoreWinner);
 
     /// <summary>How the match stands for <paramref name="player"/>.</summary>
     public MatchOutcome MatchOutcomeFor(Tank player) => MatchReferee.OutcomeFor(player, MatchWinner?.Tank);

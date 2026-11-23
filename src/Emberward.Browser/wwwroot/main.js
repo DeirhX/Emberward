@@ -7,6 +7,7 @@ import { Simulation } from "./simulation.js";
 import { GuidanceView } from "./guidance.js";
 import { StatusView } from "./hud.js";
 import { StripView } from "./strip.js";
+import { ArcadeView } from "./arcade.js";
 import { RelaySocket, defaultRelay } from "./net.js";
 import { LoadProgress } from "./progress.js";
 
@@ -45,7 +46,11 @@ let sentView = {},
     pausedFrameSent = false;
 // Add ?perf to the address for a readout of frame and simulation times, and ?map=3000x1500 and ?machines=400 for a
 // larger map and networks of that many machines grown from every base before play (docs/browser.md), to measure by.
+// ?mode=arcade plays an arcade match and ?players=4 a solo match of that many tanks; what they mean is the game's
+// (BrowserLaunch), so they are passed on as they stand.
 const query = new URLSearchParams(location.search);
+const matchMode = (query.get("mode") || "").toLowerCase();
+const soloPlayers = Number.parseInt(query.get("players"), 10) || 0;
 const [mapWidth, mapHeight] = (query.get("map") || "")
     .split("x")
     .map((n) => Number.parseInt(n, 10) || 0);
@@ -74,6 +79,9 @@ const input = new GameInput(canvas, (action, direction) => {
         );
 });
 const statusView = new StatusView(input);
+// A timed match's clock, board, drops and powerups (arcade.js); the renderer draws its pointers to drops out of sight.
+const arcade = new ArcadeView();
+renderer.arcadeLayout = arcade.layout;
 // A tap on the lit machine opens its upgrade panel (touch; input.js).
 input.tapMachine = (p) => renderer.machineAt(p);
 // The desktop's art strip in the bottom corners, where the screen is wide and there is a mouse (strip.js); the
@@ -206,8 +214,11 @@ function openMenu() {
     input.enabled = false;
     input.clear();
     const winner = state?.net?.winner;
-    $("menu-title").textContent =
-        state?.player.outcome === "Victory"
+    // A match the score decided says so in the desktop's words (BrowserArcade).
+    const over = state?.arcade?.over;
+    $("menu-title").textContent = over
+        ? `${over.title}. ${over.reason}.`
+        : state?.player.outcome === "Victory"
             ? net
                 ? "Core tapped. You won the race."
                 : "Core tapped. Well done."
@@ -248,6 +259,7 @@ function reset() {
     for (const id of ["hud", "guide", "upgrades", "machine-upgrade", "touch", "death", "hit"])
         $(id).hidden = true;
     guidance.clear();
+    arcade.clear();
     strip.reset();
     setThermalView(false);
     renderer.pointerTarget = null;
@@ -282,6 +294,8 @@ async function start() {
         mapWidth: mapWidth || 0,
         mapHeight: mapHeight || 0,
         machines,
+        players: soloPlayers,
+        mode: matchMode,
     });
 }
 
@@ -300,7 +314,7 @@ async function join(event) {
             "Online play needs a browser with WebAssembly, Web Workers and WebSockets. Try a current Chrome, Edge, Firefox, or Safari.";
         return;
     }
-    saveNetSettings({ name, room, players: $("net-players").value });
+    saveNetSettings({ name, room, players: $("net-players").value, mode: $("net-mode").value });
     net = { socket: null, command: null, requestedAt: 0, stepAt: 0 };
     $("join").disabled = true;
     const values = new Int32Array(1);
@@ -310,6 +324,7 @@ async function join(event) {
         room,
         name,
         players: Number($("net-players").value),
+        mode: $("net-mode").value,
         seed: values[0],
         mapWidth: mapWidth || 0,
         mapHeight: mapHeight || 0,
@@ -388,6 +403,9 @@ function saveNetSettings(settings) {
     $("net-name").value = saved.name || "";
     $("net-room").value = saved.room || "lobby";
     if (saved.players) $("net-players").value = saved.players;
+    // The mode the address asks for, else the one of the last room; a mode the form does not offer leaves it alone.
+    const mode = matchMode || saved.mode;
+    if ([...$("net-mode").options].some((option) => option.value === mode)) $("net-mode").value = mode;
 }
 $("online-form").onsubmit = join;
 
@@ -436,6 +454,7 @@ function updateNet(n) {
     $("lobby").hidden = !lobby;
     if (lobby) {
         $("lobby-room").textContent = n.room;
+        $("lobby-settings").textContent = n.settings || "";
         $("lobby-roster").replaceChildren(
             ...n.roster.map((slot) => {
                 const item = document.createElement("li");
@@ -595,7 +614,8 @@ function updateHud(f) {
     const stripBegan = performance.now();
     strip.update(f, visualTime, wideScreen.matches);
     const stripMs = performance.now() - stripBegan;
-    guidance.update(f.guidance, f.goal);
+    guidance.update(f.guidance, f.goal, f.objective);
+    arcade.update(f);
     updateNet(f.net);
     renderer.pointerTarget = guidance.target;
     perf?.hud(performance.now() - began, stripMs);

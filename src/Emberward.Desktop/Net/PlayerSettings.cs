@@ -2,6 +2,7 @@ namespace Emberward.Desktop.Net;
 
 using System.Globalization;
 using System.Text;
+using Emberward.Core.Match;
 
 /// <summary>The last network match a player was in: where to find it again, and the name the relay gave them in it.</summary>
 public sealed record LastMatch(string Relay, string Room, string Name, DateTimeOffset At);
@@ -43,6 +44,9 @@ public sealed class PlayerSettings
 
     /// <summary>The fixed seed of the rooms the player creates; null makes a new map each match.</summary>
     public int? CreateSeed { get; set; }
+
+    /// <summary>The mode of the rooms the player creates; null until they have created one.</summary>
+    public MatchMode? CreateMode { get; set; }
 
     public LastMatch? LastMatch { get; set; }
 
@@ -107,6 +111,9 @@ public sealed class PlayerSettings
                     ? seed
                     : null;
                 return true;
+            case "create.mode":
+                CreateMode = MatchModes.Parse(value);
+                return true;
             default:
                 return false;
         }
@@ -163,6 +170,7 @@ public sealed class PlayerSettings
         if (CreatePlayers is { } players) yield return string.Create(CultureInfo.InvariantCulture, $"create.players={players}");
         if (CreateMap is { } map) yield return "create.map=" + map;
         if (CreateSeed is { } seed) yield return string.Create(CultureInfo.InvariantCulture, $"create.seed={seed}");
+        if (CreateMode is { } mode) yield return "create.mode=" + MatchModes.Name(mode);
         if (LastMatch is { } last)
         {
             yield return LastMatchPrefix + "relay=" + last.Relay;

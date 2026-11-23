@@ -45,7 +45,9 @@ public class TankTurret
 
     /// <param name="terrain">The ground the barrel reaches over: the shell starts where <see cref="ProjectileList.MuzzleOf"/> says.</param>
     /// <param name="delayFactor">How many times the usual delay the next shot waits (a degraded reserve slows the gun).</param>
-    public Projectile? TryShoot(Position tankPos, ProjectileList projectileList, ITerrainPixelReadOnly terrain, int delayFactor = 1)
+    /// <param name="damage">What the shell deals (an overcharged tank's deal more).</param>
+    public Projectile? TryShoot(Position tankPos, ProjectileList projectileList, ITerrainPixelReadOnly terrain, int delayFactor = 1,
+        int damage = Tweaks.Weapon.BulletDamage)
     {
         if (!IsShooting || _cooldown > 0) return null;
 
@@ -53,7 +55,7 @@ public class TankTurret
         var barrel = GetBarrelTip(tankPos);
         var speed = _direction.ToVector(Tweaks.Weapon.CannonBulletSpeed);
         var muzzle = projectileList.MuzzleOf(terrain, tankPos, (Position)barrel, _ownerColor);
-        var bullet = Projectile.CreateBullet(muzzle, speed, _ownerColor);
+        var bullet = Projectile.CreateBullet(muzzle, speed, _ownerColor, damage);
         projectileList.Add(bullet);
         return bullet;
     }

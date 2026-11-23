@@ -52,9 +52,10 @@ public partial class World
     /// <see cref="CanBreakBase(Tank, TankBase)"/> with the attacker's fire counted <paramref name="fireFactor"/> times as
     /// strong: the bot holds a decision it has made with a margin (<see cref="Tweaks.Bot.SiegeHoldFireFactor"/>).
     /// </summary>
+    /// <remarks>Never, where bases hold (<see cref="Match.MatchRules.BasesHold"/>): no shell damages a core.</remarks>
     public bool CanBreakBase(Tank attacker, TankBase target, double fireFactor)
     {
-        if (target.IsDestroyed || ReferenceEquals(attacker.Base, target))
+        if (Rules.BasesHold || target.IsDestroyed || ReferenceEquals(attacker.Base, target))
             return false;
         var gun = TankReserveEffects.For(ReserveOf(attacker).Stage);
         if (!gun.CanShoot)

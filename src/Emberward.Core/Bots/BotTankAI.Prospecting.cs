@@ -39,15 +39,19 @@ public partial class BotTankAI
     public Position? OreTarget => _prospector.OreCell;
 
     /// <summary>
-    /// Whether the bot prospects this tick: it roams, the match has ore, the opening (<see cref="Tweaks.Bot.ProspectSeconds"/>)
-    /// is not over, and nothing has engaged it for <see cref="Tweaks.Bot.EngageHoldSeconds"/>: its enemy within
-    /// <see cref="Tweaks.Bot.EngageRangeCells"/>, in sight nearer than <see cref="Tweaks.Bot.EngageSightCells"/>, or at the bot's own base, or a hit (<see cref="TrackHits"/>).
+    /// Whether the bot prospects this tick: it roams, the match has ore and no clock, the opening (<see cref="Tweaks.Bot.ProspectSeconds"/>)
+    /// is not over, it goes for no powerup drop (<see cref="ChooseDrop"/>, called first), and nothing has engaged it for
+    /// <see cref="Tweaks.Bot.EngageHoldSeconds"/>: its enemy within <see cref="Tweaks.Bot.EngageRangeCells"/>, in sight
+    /// nearer than <see cref="Tweaks.Bot.EngageSightCells"/>, or at the bot's own base, or a hit (<see cref="TrackHits"/>).
+    /// A timed match (<see cref="Match.MatchRules.TimeLimitSeconds"/>, arcade) is won on kills alone and its bases hold,
+    /// so ore wins it nothing: there the bot hunts from the start.
     /// </summary>
     private bool UpdateProspecting(Tank tank, Tank? enemy, World world)
     {
         if (_engageFrames > 0)
             _engageFrames--;
-        bool may = _mode == TwitchMode.Twitch && world.OreDeposits.Count > 0 && _gunner.Frame < ProspectFrames;
+        bool may = _mode == TwitchMode.Twitch && world.OreDeposits.Count > 0 && world.Rules.TimeLimitSeconds == 0 &&
+            _dropSite == null && _gunner.Frame < ProspectFrames;
         if (may && IsEngagedBy(tank, enemy))
             _engageFrames = EngageHoldFrames;
         _prospecting = may && _engageFrames == 0;

@@ -69,9 +69,14 @@
 //  28 core heat   — a core's heat glow and deposit pulse, or a relay's flash: .x = heat (the reactor's heat store,
 //                   0..1), .y = pulse (0..1: a ring expands as it falls), .z = phase (0..1 of a 4 s cycle), .w = mode
 //                   (0 store: gold, 1 burn: cyan-white); color.r = radius (cells). Additive.
+//  29 powerup     — a powerup drop's marks: .x = radius (cells), .z = phase (s), .w = mode (0 the site the next drop
+//                   lands on, 1 a drop on the ground, 2 the halo of a tank with a powerup running) plus 0.5 while it is
+//                   urgent (about to land, to run out, to end: it blinks), .y = the forecast's approach (1 well before
+//                   the landing, closing to 0 as it lands), the share of a drop's time on the ground that is left, or
+//                   the share of a halo's powerup that is left; color.rgb = the kind's colour
 //
 // color.rgb is the team colour (tank hull, turret), the body colour (hot shot),
-// the tint (reach area, coverage, power label) or data (radar blip, tank fire, fire particle). Every other kind owns its colours
+// the tint (reach area, coverage, power label, danger ring, powerup) or data (radar blip, tank fire, fire particle). Every other kind owns its colours
 // here in the shader; the C# side sends black for them.
 // ============================================================================
 
@@ -108,6 +113,7 @@ static const float kKindFireParticle = 25.0;
 static const float kKindDangerRing = 26.0;
 static const float kKindOreCrystal = 27.0;
 static const float kKindCoreHeat = 28.0;
+static const float kKindPowerup = 29.0;
 
 // Machine flags (params.w); EntityShape's MachineFlag* constants must match.
 static const float kMachineFlagStalled = 1.0;

@@ -116,6 +116,10 @@ public static class WorldStateHash
         hash = world.TankShieldSystem?.MixState(hash) ?? hash;
         // The emberites; a world without them hashes as it always did.
         hash = world.Emberites?.MixState(hash) ?? hash;
+        // The score and clock of a timed match; a world without one hashes as it always did.
+        hash = world.ScoreSystem?.MixState(hash) ?? hash;
+        // The powerup drops and the tanks' running powerups; a world without them hashes as it always did.
+        hash = world.PowerupDrops?.MixState(hash) ?? hash;
         // The energy network's islands and capacitors; a world without one hashes as it always did.
         return world.MixBasePower(world.Energy?.MixState(hash) ?? hash);
     }
@@ -218,6 +222,7 @@ public static class WorldStateHash
         hash = world.Terrain.MixHeatActivity(hash);
         hash = world.UpgradeSystem?.MixLatent(hash) ?? hash;
         hash = world.Emberites?.MixLatent(hash) ?? hash;
+        hash = world.PowerupDrops?.MixLatent(hash) ?? hash;
         return world.RegrowthSystem?.MixLatent(hash) ?? hash;
     }
 }

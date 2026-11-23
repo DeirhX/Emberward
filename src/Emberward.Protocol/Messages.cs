@@ -7,6 +7,11 @@ using System.Collections.Immutable;
 /// same ones to everyone who joins. The relay does not interpret them beyond <see cref="Slots"/>,
 /// <see cref="TicksPerSecond"/> and <see cref="InputKeyMask"/>.
 /// </summary>
+/// <param name="Mode">
+/// The kind of match (the game's <c>MatchMode</c>; 0 is the standard one), from which each client makes the rules it
+/// builds the world with. The protocol and the relay carry the byte without knowing what a value means, so a new
+/// mode needs no new relay; a client refuses a room whose mode it does not know.
+/// </param>
 /// <param name="Slots">How many tanks the match has: the most players it can take.</param>
 /// <param name="TicksPerSecond">The simulation rate, which is the rate the relay closes ticks at.</param>
 /// <param name="GenMode">The level generator variant; the two make different maps from one seed.</param>
@@ -15,7 +20,7 @@ using System.Collections.Immutable;
 /// outside this mask (see <see cref="LockstepRoom"/>).
 /// </param>
 public sealed record MatchConfig(
-    int Seed, int MapWidth, int MapHeight, int GenMode, int Slots, int TicksPerSecond, uint InputKeyMask);
+    int Seed, int MapWidth, int MapHeight, int GenMode, int Slots, int TicksPerSecond, uint InputKeyMask, byte Mode = 0);
 
 /// <summary>One message between a client and the relay. <see cref="MessageCodec"/> turns it into bytes and back.</summary>
 public abstract record Message;

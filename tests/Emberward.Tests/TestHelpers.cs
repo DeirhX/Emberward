@@ -35,7 +35,11 @@ internal static class TestHelpers
         bool tankReserve = false,
         bool emberites = false,
         bool tankShield = false,
-        SimulationSettings? simulationSettings = null)
+        SimulationSettings? simulationSettings = null,
+        int timeLimitSeconds = 0,
+        bool basesHold = false,
+        bool quickRespawn = false,
+        bool powerups = false)
     {
         var mapSize = size ?? DefaultMapSize;
         var gen = new ToastGenerator();
@@ -55,6 +59,10 @@ internal static class TestHelpers
                 TankReserve = tankReserve,
                 Emberites = emberites,
                 TankShield = tankShield,
+                TimeLimitSeconds = timeLimitSeconds,
+                BasesHold = basesHold,
+                QuickRespawn = quickRespawn,
+                Powerups = powerups,
             });
         world.Initialize(terrain, spawns, decorationSeed: seed + 1);
         return world;

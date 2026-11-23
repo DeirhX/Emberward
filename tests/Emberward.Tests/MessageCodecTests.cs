@@ -13,6 +13,8 @@ public class MessageCodecTests
         new Hello(MessageCodec.ProtocolVersion, "1.0.0+abc", "Žofie", "lobby", Config, Secret: "s3cret"),
         new Welcome(3, Config),
         new Welcome(-1, Config),
+        new Welcome(1, Config with { Mode = 1 }),
+        new Hello(MessageCodec.ProtocolVersion, "b", "Ann", "arcade room", Config with { Mode = 1 }),
         new JoinHoldState("Cat"),
         new JoinHoldState(""),
         new Roster(["Ann", "", "Bob", ""]),
@@ -169,6 +171,26 @@ public class MessageCodecTests
 
         Assert.Equal(new Welcome(0, small), MessageCodec.Decode(MessageCodec.Encode(new Welcome(0, small))));
         Assert.Equal(new Welcome(0, large), MessageCodec.Decode(MessageCodec.Encode(new Welcome(0, large))));
+    }
+
+    [Fact]
+    public void MatchMode_IsTheLastByteOfTheSettings_AndAnyValueIsCarried()
+    {
+        Assert.Equal(14, MessageCodec.ProtocolVersion);
+        Assert.Equal(0, Config.Mode);
+
+        // A welcome ends with its settings, and they with the mode.
+        byte[] standard = MessageCodec.Encode(new Welcome(0, Config));
+        byte[] arcade = MessageCodec.Encode(new Welcome(0, Config with { Mode = 1 }));
+        Assert.Equal(standard.Length, arcade.Length);
+        Assert.Equal(standard[..^1], arcade[..^1]);
+        Assert.Equal((0, 1), (standard[^1], arcade[^1]));
+
+        // The relay does not know what a mode means: a value no game has yet goes through it as it came.
+        var future = Config with { Mode = 200 };
+        Assert.Equal(new Welcome(0, future), MessageCodec.Decode(MessageCodec.Encode(new Welcome(0, future))));
+        var hello = new Hello(MessageCodec.ProtocolVersion, "b", "Ann", "room", future);
+        Assert.Equal(hello, MessageCodec.Decode(MessageCodec.Encode(hello)));
     }
 
     [Fact]

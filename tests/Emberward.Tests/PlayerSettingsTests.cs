@@ -1,5 +1,6 @@
 namespace Emberward.Tests;
 
+using Emberward.Core.Match;
 using Emberward.Desktop.Net;
 
 public sealed class PlayerSettingsTests : IDisposable
@@ -23,6 +24,7 @@ public sealed class PlayerSettingsTests : IDisposable
         CreatePlayers = 6,
         CreateMap = MapPreset.Large,
         CreateSeed = 424242,
+        CreateMode = MatchMode.Arcade,
         LastMatch = new LastMatch("wss://crust.bokovka.cz/play", "friday", "Ann (2)",
             new DateTimeOffset(2026, 11, 18, 9, 30, 15, TimeSpan.Zero)),
     };
@@ -41,6 +43,8 @@ public sealed class PlayerSettingsTests : IDisposable
         Assert.Equal(6, loaded.CreatePlayers);
         Assert.Equal(MapPreset.Large, loaded.CreateMap);
         Assert.Equal(424242, loaded.CreateSeed);
+        Assert.Equal(MatchMode.Arcade, loaded.CreateMode);
+        Assert.Contains("create.mode=arcade", File.ReadAllLines(FilePath));
         Assert.Equal(Filled().LastMatch, loaded.LastMatch);
     }
 
@@ -57,6 +61,7 @@ public sealed class PlayerSettingsTests : IDisposable
         Assert.Null(loaded.CreatePlayers);
         Assert.Null(loaded.CreateMap);
         Assert.Null(loaded.CreateSeed);
+        Assert.Null(loaded.CreateMode);
         Assert.Null(loaded.LastMatch);
         Assert.Empty(loaded.UnknownKeys);
     }
@@ -97,6 +102,7 @@ public sealed class PlayerSettingsTests : IDisposable
             "create.players=99",
             "create.map=gigantic",
             "create.seed=-4",
+            "create.mode=deathmatch",
             "=value without a key",
             "lastmatch.relay=wss://x/play",
             "lastmatch.room=r",
@@ -110,6 +116,7 @@ public sealed class PlayerSettingsTests : IDisposable
         Assert.Null(loaded.CreatePlayers);
         Assert.Null(loaded.CreateMap);
         Assert.Null(loaded.CreateSeed);
+        Assert.Null(loaded.CreateMode);
         Assert.Null(loaded.LastMatch);
     }
 
