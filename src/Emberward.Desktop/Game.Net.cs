@@ -27,6 +27,9 @@ public partial class Game
 
     private bool IsNetMatch => _relay != null;
 
+    // The scoreboard's driver lookup, made once rather than a closure each frame.
+    private Func<int, string>? _driverNames;
+
     /// <summary>
     /// A network match cannot stop for one player: the others' ticks keep coming. The pause menu still opens, over
     /// a running game.
@@ -178,7 +181,7 @@ public partial class Game
         _hud.CanRestartMatch = _world.IsMatchOver;
         var winner = _world.MatchWinner?.Tank;
         _hud.WinnerName = winner != null && _netPlaying ? relay.DriverName(winner.Color, _netSession!.HumanMask) : null;
-        _hud.DriverName = _netPlaying ? slot => relay.DriverName(slot, _netSession!.HumanMask) : null;
+        _hud.DriverName = _netPlaying ? _driverNames ??= slot => relay.DriverName(slot, _netSession!.HumanMask) : null;
 
         var play = _hud.PlayRect;
         var anchor = new Vector2(play.x + play.w * 0.5f, play.y + 18f);

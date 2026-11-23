@@ -78,6 +78,9 @@ const input = new GameInput(canvas, (action, direction) => {
             Math.min(8, renderer.zoom + direction * 0.5),
         );
 });
+// Tab shows the scoreboard whenever the match is on screen (also when it has ended), not under the menu or in a lobby.
+input.scoreboardAllowed = () =>
+    playing && !paused && !$("menu").open && (!net || state?.net?.started === true);
 const statusView = new StatusView(input);
 const scoreboard = new ScoreboardView();
 // A tap on the lit machine opens its upgrade panel (touch; input.js).

@@ -136,6 +136,25 @@ public sealed class BrowserSession
     /// <summary>The tutorial, toasts, hint and warning, as the desktop HUD chooses them; updated after each step.</summary>
     public PlayerGuidance Guidance { get; } = new();
 
+    private ScoreboardStatus? _scoreboard;
+    private (int Deaths, int Seconds, int Player) _scoreboardKey = (-1, -1, -1);
+
+    /// <summary>
+    /// The scoreboard for the frame. What it shows changes only with a death, the match clock's second or the player's
+    /// tank, so it is built when one of those does and the same one is handed out until then, not rebuilt every frame
+    /// while Tab is up.
+    /// </summary>
+    public ScoreboardStatus ScoreboardFor(World world, Tank player)
+    {
+        var key = (world.Deaths.Count, (int)world.MatchTime.TotalSeconds, player.Color);
+        if (_scoreboard is null || key != _scoreboardKey)
+        {
+            _scoreboard = BrowserFrameBuilder.Scoreboard(world, player);
+            _scoreboardKey = key;
+        }
+        return _scoreboard;
+    }
+
     /// <summary>
     /// The thermal view (H), as on the desktop: the frame tints the ground by its heat, so that enemy tunnels glow.
     /// It changes only what is drawn, never the world.

@@ -37,15 +37,17 @@ export class ScoreboardView {
                 kills.textContent = String(row.kills);
                 kills.classList.toggle("none", row.kills === 0);
                 const count = document.createElement("b");
-                count.textContent = String(row.deaths.length);
+                count.textContent = String(row.deathCount);
                 const times = document.createElement("span");
                 times.className = "times";
-                times.textContent = row.deaths.length
-                    ? row.deaths.join("    ")
+                const earlier = row.deathCount - row.deaths.length;
+                times.textContent = row.deathCount
+                    ? (earlier > 0 ? `+${earlier} earlier    ` : "") +
+                      row.deaths.join("    ")
                     : "no deaths";
                 item.append(swatch, name, kills, count, times);
                 item.classList.toggle("you", row.tank === board.you);
-                item.classList.toggle("none", row.deaths.length === 0);
+                item.classList.toggle("none", row.deathCount === 0);
                 return item;
             }),
         );

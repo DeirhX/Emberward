@@ -65,7 +65,7 @@ public class TankDeathTests
         Step(s, events, feed, 1f);
         Notification toast = Assert.Single(feed.Active, n => n.Key.StartsWith("tank-died-", StringComparison.Ordinal));
         Assert.Equal($"{TankDeathView.ColorName(enemy.Color)} tank destroyed", toast.Title);
-        Assert.Equal("Shot down.", toast.Detail);
+        Assert.Equal("PLAYER 2: Shot down.", toast.Detail);
         Assert.Equal(NotificationKind.Good, toast.Kind);
 
         feed.Clear();
@@ -134,6 +134,7 @@ public class TankDeathTests
         Assert.Equal(s.Tank.Color, board.You);
         Assert.Equal(s.World.TankList.Count, board.Rows.Length);
         Assert.Equal(["0:00 froze"], board.Rows[enemy.Color].Deaths);
+        Assert.Equal(1, board.Rows[enemy.Color].DeathCount);
         Assert.Matches("^#[0-9a-f]{6}$", board.Rows[enemy.Color].Color);
     }
 
@@ -215,6 +216,103 @@ public class TankDeathTests
         Assert.Equal($"You destroyed the {TankDeathView.ColorName(enemy.Color)} tank", toast.Title);
         Assert.Equal(NotificationKind.Good, toast.Kind);
         Assert.Equal(1, TankDeathView.Rows(s.World)[s.Tank.Color].Kills);
+    }
+
+    /// <summary>Kills <paramref name="tank"/> by overheating (which a respawn shield does not stop) and steps until it is back.</summary>
+    private static void DieAndRespawn(RelayHeatTests.Scenario s, Tank tank)
+    {
+        tank.TakeDamage(100_000, DamageCause.Overheat);
+        for (int i = 0; i < 20_000 && (tank.IsDead || i == 0); i++)
+            s.World.Advance(_ => default);
+        Assert.False(tank.IsDead);
+    }
+
+    [Fact]
+    public void ARecall_IsNotADeathOnTheScoreboard()
+    {
+        var s = RelayHeatTests.CreateScenario();
+        Tank enemy = Enemy(s);
+        enemy.TakeDamage(10_000, DamageCause.Recalled);
+        s.World.Advance(_ => default);
+
+        ScoreRow row = TankDeathView.Rows(s.World)[enemy.Color];
+        Assert.Equal(0, row.DeathCount);
+        Assert.Empty(row.Deaths);
+        Assert.Equal("no deaths", TankDeathView.TimesLine(row));
+    }
+
+    [Fact]
+    public void ALongMatch_ListsTheLatestDeaths_AndCountsTheRest()
+    {
+        var s = RelayHeatTests.CreateScenario();
+        Tank enemy = Enemy(s);
+        int total = TankDeathView.MaxShownDeaths + 2;
+        for (int i = 0; i < total; i++)
+            DieAndRespawn(s, enemy);
+
+        ScoreRow row = TankDeathView.Rows(s.World)[enemy.Color];
+        Assert.Equal(total, row.DeathCount);
+        Assert.Equal(TankDeathView.MaxShownDeaths, row.Deaths.Count);
+        Assert.StartsWith("+2 earlier    ", TankDeathView.TimesLine(row), StringComparison.Ordinal);
+        Assert.Equal(total, BrowserFrameBuilder.Scoreboard(s.World, s.Tank).Rows[enemy.Color].DeathCount);
+    }
+
+    [Fact]
+    public void OtherSidesDeaths_ShareOneToast_ButAKillByThePlayerKeepsItsOwn()
+    {
+        var s = RelayHeatTests.CreateScenario();
+        var feed = new NotificationFeed();
+        var events = new GameEventWatcher();
+        Step(s, events, feed, 0f);
+
+        Tank enemy = Enemy(s);
+        enemy.TakeDamage(100_000, DamageCause.Overheat);
+        Step(s, events, feed, 1f);
+        Assert.Single(feed.Active, n => n.Key == "tank-died-other");
+
+        for (int i = 0; i < 20_000 && enemy.IsDead; i++)
+            Step(s, events, feed, 2f);
+        enemy.TakeDamage(100_000, DamageCause.Frostbite);
+        Step(s, events, feed, 3f);
+        Assert.Single(feed.Active, n => n.Key == "tank-died-other");
+
+        for (int i = 0; i < 20_000 && enemy.IsDead; i++)
+            Step(s, events, feed, 4f);
+        enemy.TakeDamage(100_000, DamageCause.Overheat, by: new Killer(s.Tank.Color));
+        Step(s, events, feed, 5f);
+        Assert.Contains(feed.Active, n => n.Key == $"tank-died-{enemy.Color}");
+    }
+
+    [Fact]
+    public void ABaseShotDown_CreditsItsKiller_WithTheTanksItTakesDown()
+    {
+        var s = RelayHeatTests.CreateScenario();
+        Tank enemy = Enemy(s);
+        Assert.NotNull(enemy.Base);
+        enemy.Base!.TakeDamage(1_000_000, new Killer(s.Tank.Color, MachineType.Turret));
+        Assert.Equal(new Killer(s.Tank.Color, MachineType.Turret), enemy.Base.DestroyedBy);
+        s.World.Advance(_ => default);
+
+        TankDeath death = Assert.Single(s.World.Deaths, d => d.Tank == enemy.Color);
+        Assert.Equal(DamageCause.BaseDestroyed, death.Cause);
+        Assert.Equal(new Killer(s.Tank.Color, MachineType.Turret), death.By);
+        Assert.Equal(1, TankDeathView.Rows(s.World)[s.Tank.Color].Kills);
+        Assert.Equal($"base fell to {TankDeathView.ColorName(s.Tank.Color)}", TankDeathView.CauseWord(death.Cause, death.By));
+    }
+
+    [Fact]
+    public void TheBrowserScoreboard_IsBuiltOnlyWhenWhatItShowsChanges()
+    {
+        var session = new BrowserSession(seed: 1);
+        var first = session.ScoreboardFor(session.World, session.Player);
+        Assert.Same(first, session.ScoreboardFor(session.World, session.Player));
+
+        Tank enemy = session.World.TankList.Tanks.First(t => t.Color != session.Player.Color);
+        enemy.TakeDamage(100_000, DamageCause.Overheat);
+        session.World.Advance(_ => default);
+        var after = session.ScoreboardFor(session.World, session.Player);
+        Assert.NotSame(first, after);
+        Assert.Equal(1, after.Rows[enemy.Color].DeathCount);
     }
 
     [Theory]

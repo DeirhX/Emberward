@@ -19,6 +19,7 @@ Match/
   MatchRules.cs              Which optional systems a world runs (regrowth, pockets, ore, the core race); World.Rules
   MatchOutcome.cs            MatchReferee: Victory / Defeat / InProgress for one tank (World.MatchOutcomeFor)
   MatchResult.cs             Latches the referee's first answer (World.MatchWinner, World.IsMatchOver)
+  TankDeathLog.cs            Every tank death, with its step and cause and who killed it (World.Deaths); output only, saved in the snapshot
   SectorGoal.cs              The core tap: each base's CoreTap (tap, hold timer, tapped), the first base to tap the core
 Config/
   Tweaks.cs                  Every gameplay and simulation constant (const / static readonly only)
@@ -47,6 +48,7 @@ Thermal/
   ThermalLedger.cs           Energy created or destroyed, by kind
   TankHeatEngine.cs          One tank's heat exchange with terrain and air
 Entities/
+  Killer.cs                  Who dealt a killing hit: a side's colour and the machine that fired, if any (Tank.DeathBy, TankDied events)
   Tanks/Tank.cs              Tank state and the per-tick order (below); delegates to the classes beside it
   Tanks/TankList.cs          Tank collection
   Tanks/SimulationContext.cs The slice of World a tank sees during Advance

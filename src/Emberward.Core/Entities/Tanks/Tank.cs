@@ -299,7 +299,7 @@ public class Tank
         SyncHoldCapacity();
 
         if (Base?.IsDestroyed == true)
-            TakeDamage(Reactor.HealthCapacity, DamageCause.BaseDestroyed);
+            TakeDamage(Reactor.HealthCapacity, DamageCause.BaseDestroyed, by: Base.DestroyedBy);
 
         // Under the reserve rule the recall key burns carried pyrite while there is any (TankReserveSystem).
         bool recall = input.Recall && CanRecall && !(ctx.Reserve != null && TankReserveSystem.CanBurn(this));

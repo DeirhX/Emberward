@@ -151,7 +151,8 @@ public class ProjectileList
                     if (Pixel.IsBaseCore(pix) && solver.EnemyBaseAt(ipos, p.OwnerColor) is { } target)
                     {
                         int raw = p.Damage;
-                        target.TakeDamage(self._basePower?.CoreDamage(target, raw) ?? raw);
+                        target.TakeDamage(self._basePower?.CoreDamage(target, raw) ?? raw,
+                            p.OwnerColor >= 0 ? new Killer(p.OwnerColor, p.FiredBy) : null);
                         self._events?.Record(new StepEvent(target.IsDestroyed ? StepEventKind.BaseDestroyed : StepEventKind.BaseDamaged,
                             ipos, target.Color));
                         if (bursts)

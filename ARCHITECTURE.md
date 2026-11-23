@@ -187,7 +187,8 @@ updates it after each step on the match's time (`BrowserSession.HudSeconds`) and
 - `GameEventWatcher` posts toasts to a `NotificationFeed` through one watch per system in `Guidance/Events`
   (`IEventWatch`): base attacks, upgrades, the sector goal, the network (relays linking or lost, harvesters started,
   stalled or out of charge, off network), the base's power (heat store, low charge, engine), ore (first ore, first pyrite banked,
-  full hold, full store, harvester deliveries), radar scattered by heat, and nests. Each watch compares its system's state with
+  full hold, full store, harvester deliveries), radar scattered by heat, nests, and other tanks' deaths (`TankDeathWatch`: who killed whom, from `StepEventKind.TankDied`; a
+  recall is not reported, and sides other than the player's share one toast). Each watch compares its system's state with
   the previous frame and hears the step's events (`AfterStep`); harvester deliveries are counted from
   `StepEventKind.OreHarvested`, not from the store, so a tank unloading in the same frame is not mistaken for them. A
   new system's toasts are a new watch and a line in the watcher's list; retiring a system deletes both. The feed

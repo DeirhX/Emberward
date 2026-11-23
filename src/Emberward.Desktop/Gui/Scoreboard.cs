@@ -55,9 +55,7 @@ public static class Scoreboard
         float height = Pad + TitleHeight;
         for (int i = 0; i < rows.Count; i++)
         {
-            lines[i] = rows[i].Deaths.Count == 0
-                ? "no deaths"
-                : string.Join("    ", rows[i].Deaths.Select(d => $"{d.Clock} {d.Cause}"));
+            lines[i] = TankDeathView.TimesLine(rows[i]);
             rowHeights[i] = MathF.Max(NameSize + 4f, HudTheme.Measure(TimeSize, lines[i], timesWidth).Y) + RowGap;
             height += rowHeights[i];
         }
@@ -85,11 +83,11 @@ public static class Scoreboard
                 row.Tank == player.Color ? HudTheme.Amber : HudTheme.Text);
             string kills = row.Kills.ToString(CultureInfo.InvariantCulture);
             HudTheme.TextAt(dl, NameSize, at + new Vector2(killsX, 0f), kills, row.Kills == 0 ? HudTheme.TextDim : HudTheme.Good);
-            string count = row.Deaths.Count.ToString(CultureInfo.InvariantCulture);
+            string count = row.DeathCount.ToString(CultureInfo.InvariantCulture);
             HudTheme.TextAt(dl, NameSize, at + new Vector2(countX, 0f), count,
-                row.Deaths.Count == 0 ? HudTheme.TextDim : HudTheme.Danger);
+                row.DeathCount == 0 ? HudTheme.TextDim : HudTheme.Danger);
             HudTheme.TextAt(dl, TimeSize, at + new Vector2(timesX, 1.5f), lines[i],
-                row.Deaths.Count == 0 ? HudTheme.TextDim : HudTheme.Text, wrap: timesWidth);
+                row.DeathCount == 0 ? HudTheme.TextDim : HudTheme.Text, wrap: timesWidth);
             at.Y += rowHeights[i];
         }
     }

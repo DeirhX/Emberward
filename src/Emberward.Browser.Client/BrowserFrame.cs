@@ -5,17 +5,17 @@ using Emberward.Core.Types;
 using Emberward.Desktop.Gui;
 
 /// <param name="Dial">The heat dial's colours, with a match's first frame only; null after it.</param>
+/// <param name="Scoreboard">What the scoreboard shows while Tab is held.</param>
 /// <param name="Net">The network match (<see cref="BrowserNetMatch"/>); null in a local one.</param>
 /// <param name="BasePower">The base charge readout, present in an energy-network match.</param>
 /// <param name="MachineUpgrade">The machine next to the tank and its upgrade panel; null when none is in reach.</param>
 /// <param name="Reserve">The reserve's stage tag and burn prompt; null when there is nothing to say.</param>
-/// <param name="Scoreboard">What the scoreboard shows while Tab is held.</param>
 public sealed record BrowserFrame(
     int Seed, int Tick, int TickRate, PlayerStatus Player,
     SoundFrame Sounds, BuildOption[] Builds,
     UpgradeOption[] Upgrades, PlantPreview? Preview, GoalStatus? Goal, GuidanceStatus Guidance, HeatDial? Dial,
-    NetStatus? Net = null, BaseCharge? BasePower = null, MachineUpgradeStatus? MachineUpgrade = null,
-    ReserveStatus? Reserve = null, ScoreboardStatus? Scoreboard = null);
+    ScoreboardStatus Scoreboard, NetStatus? Net = null, BaseCharge? BasePower = null, MachineUpgradeStatus? MachineUpgrade = null,
+    ReserveStatus? Reserve = null);
 
 /// <summary>
 /// The scoreboard (<c>TankDeathView</c>, shared with the desktop): the match clock and every tank with the times it
@@ -25,10 +25,10 @@ public sealed record BrowserFrame(
 public sealed record ScoreboardStatus(string Clock, int You, ScoreboardRow[] Rows);
 
 /// <summary>
-/// A tank's row: its slot, colour name and colour (#rrggbb), the tanks it killed, and each death as "3:07 shot by Red",
-/// oldest first.
+/// A tank's row: its slot, colour name and colour (#rrggbb), the tanks it killed, how many times it died, and its latest
+/// deaths as "3:07 shot by Red", oldest first (the earlier ones are only counted).
 /// </summary>
-public sealed record ScoreboardRow(int Tank, string Name, string Color, int Kills, string[] Deaths);
+public sealed record ScoreboardRow(int Tank, string Name, string Color, int Kills, int DeathCount, string[] Deaths);
 
 /// <summary>
 /// The tank's reserve (<c>ReserveTags</c>, shared with the desktop): the stage tag drawn beside OFF NETWORK with its

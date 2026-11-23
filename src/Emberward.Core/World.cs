@@ -54,7 +54,6 @@ public partial class World
     private readonly SideSensing _sensing;
 
     private int _advanceCount;
-    private TimeSpan _elapsed;
     private double _auditThermalEnergy = double.NaN;
     private double _auditNetExternalEnergy;
 
@@ -319,7 +318,6 @@ public partial class World
         _advanceCount++;
         _stepEvents.Clear();
         _terrain.DropSeenChanges();
-        _elapsed += _simulationSettings.AdvanceStep;
 
         for (int i = 0; i < _systems.Length; i++)
         {

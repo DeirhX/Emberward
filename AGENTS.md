@@ -30,7 +30,7 @@ Run from the repository root.
   - `Rendering/Shaders`: the HLSL it draws.
 - `src/Emberward.Rendering`: the rendering code every host shares (terrain fields and what a frame uploads of them,
   entity emitters and machine sprites, the shader constant block, sound (the step-event table, `SoundDirector` and `SoundBank`), the heat colours (`HeatScale`), what a build slot says (`BuildSlotView`), the HUD palette and the charge labels (`HudPalette`, `PowerLabels`) and the HUD's
-  guidance: tutorial, toasts, build-key hint and warnings), and a client's part in a network match (`NetSession`,
+  guidance: tutorial, toasts, build-key hint and warnings; `TankDeathView`, the tank deaths' wording and the Tab scoreboard's rows), and a client's part in a network match (`NetSession`,
   `SlotStepper`, `NetMatch`). Its sources are the files of `src/Emberward.Desktop` listed in
   `Emberward.Rendering.csproj`, which `Emberward.Desktop.csproj` leaves out: sharing a file means adding it to both
   lists. It references only Core and the protocol (`ArchitectureGuardTests`).

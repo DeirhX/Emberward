@@ -449,7 +449,7 @@ window and graphics dependencies out of the shared rendering assembly.
   world is drawn at; `perf.js` is the `?perf` readout.
 - `main.js` / `input.js`: HUD, seed selection, session lifecycle, input and the heat view (H, which the frame
   request carries to `BrowserSession.ThermalView`). Build costs, placement, coverage, match
-  outcome and upgrade descriptions come from Core. `guidance.js` shows the desktop's tutorial card (F2 hides it),
+  outcome and upgrade descriptions come from Core. `scoreboard.js` shows the Tab scoreboard (rows from `TankDeathView`, built by `BrowserSession.ScoreboardFor` only when a death, the clock's second or the player's tank changes; Tab works while the match is on screen, also after it ended), `guidance.js` shows the desktop's tutorial card (F2 hides it),
   toasts, hint line and warning banner as each frame after a step carries them (`guidance`), and the renderer points
   at the tutorial's target. `hud.js` shows the status panels, the upgrade list (base track above tank track, with
   level pips), the heat orb and bar in the desktop's heat colours (`HeatScale`) and the hit flash with a wedge

@@ -66,11 +66,14 @@ public static class BrowserFrameBuilder
             materials, player.IsDead ? TankDeathView.DeathLine(player) : null);
         return new BrowserFrame(session.Seed, world.AdvanceCount, Tweaks.Perf.TargetFps, status,
             session.Sounds.Frame(takePlays: includeEvents), builds, upgrades, preview, goal, Guidance(session.Guidance),
-            includeDial ? Dial() : null, net?.Status(), BasePower(world, player), MachineUpgrade(session),
-            Reserve(world.ReserveOf(player)), Scoreboard(world, player));
+            includeDial ? Dial() : null, session.ScoreboardFor(world, player), net?.Status(), BasePower(world, player), MachineUpgrade(session),
+            Reserve(world.ReserveOf(player)));
     }
 
-    /// <summary>The scoreboard's rows, as the desktop's Tab key shows them (<see cref="TankDeathView"/>).</summary>
+    /// <summary>
+    /// The scoreboard's rows, as the desktop's Tab key shows them (<see cref="TankDeathView"/>). Built afresh, not
+    /// cached: <see cref="BrowserSession.ScoreboardFor"/> reuses one while nothing it shows has changed.
+    /// </summary>
     public static ScoreboardStatus Scoreboard(World world, Tank player)
     {
         ArgumentNullException.ThrowIfNull(world);
@@ -79,7 +82,7 @@ public static class BrowserFrameBuilder
         {
             Color c = TankSprites.GetPixelColor(1, row.Tank);
             return new ScoreboardRow(row.Tank, row.Name, HudPalette.Hex(HudPalette.Rgba(c.R, c.G, c.B)), row.Kills,
-                row.Deaths.Select(d => $"{d.Clock} {d.Cause}").ToArray());
+                row.DeathCount, row.Deaths.Select(d => $"{d.Clock} {d.Cause}").ToArray());
         }).ToArray();
         return new ScoreboardStatus(TankDeathView.Clock(world.MatchTime), player.Color, rows);
     }

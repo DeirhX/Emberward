@@ -222,6 +222,10 @@ display's own resolution instead of being stretched by the OS.
 - **UI.** ImGui lays out in UI units: points divided by `ImGuiPlatform.UiScale`, which grows the UI on displays
   larger than 1920x1080 points. `ImGuiPlatform.DeviceScale` (UI scale times pixel density) is ImGui's framebuffer
   scale, so text and art land on device pixels. Mouse input arrives in points and is converted for the view.
+- **Tank deaths on the HUD.** `Gui/TankDeathView` (shared with the browser) holds the wording (colour names, who killed
+  whom, causes, the match clock) and the scoreboard's rows from `World.Deaths`: recalls are not deaths, and a row lists the
+  latest `MaxShownDeaths` and counts the rest. `Gui/Scoreboard` draws them while Tab is held in play (not paused, not in
+  a menu or lobby); `TankDeathWatch` toasts other tanks' deaths.
 - **HUD layout** (`Gui/HudLayout`). The bottom HUD art is one strip, 1024x223 art pixels, drawn in two parts so
   the middle of the view stays clear: TEMP, SHIELD and MATERIALS in the bottom-left corner, BUILD STRUCTURES in
   the bottom-right. Art coordinates still run across the whole strip; `HudLayout.At` moves the right part over.
