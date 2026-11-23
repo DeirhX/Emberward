@@ -50,6 +50,7 @@ public partial class World
     private readonly int _simulationSeed;
     private readonly SimulationSettings _simulationSettings;
     private readonly StepEventLog _stepEvents = new();
+    private readonly TankDeathLog _deaths = new();
     private readonly SideSensing _sensing;
 
     private int _advanceCount;
@@ -105,6 +106,15 @@ public partial class World
     /// comparing state between steps; nothing in the simulation reads it.
     /// </summary>
     public ReadOnlySpan<StepEvent> StepEvents => _stepEvents.Events;
+
+    /// <summary>Every tank death of the match, oldest first (<see cref="TankDeathLog"/>); output only.</summary>
+    public IReadOnlyList<TankDeath> Deaths => _deaths.Deaths;
+
+    /// <summary>How long the match has run, in simulated time, after step <paramref name="step"/>.</summary>
+    public TimeSpan MatchTimeAt(int step) => _simulationSettings.AdvanceStep * step;
+
+    /// <summary>How long the match has run, in simulated time.</summary>
+    public TimeSpan MatchTime => MatchTimeAt(_advanceCount);
 
     public SimulationProfile Profile { get; } = new();
 
@@ -216,6 +226,7 @@ public partial class World
             IsOccupied = IsCellOccupied,
             IsTankBlocked = _collisionSolver.BlocksTank,
             Events = _stepEvents,
+            Deaths = _deaths,
             MachineUpgrades = _machineUpgrades,
             Reserve = _reserve,
         };
@@ -348,6 +359,7 @@ public partial class World
         systems.Add(new("tanks", getInput =>
         {
             _linkMap.AgeOreFlow();
+            _deaths.BeginStep(_advanceCount);
             _tankList.Advance(in _tankContext, getInput);
             _basePower?.LatchBlackouts();
         }));

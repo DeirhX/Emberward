@@ -127,7 +127,8 @@ internal sealed class TankLifecycle
     {
         if (!_respawning)
         {
-            ctx.Events?.Record(new StepEvent(StepEventKind.TankDied, _tank.Position, _tank.Color));
+            ctx.Events?.Record(new StepEvent(StepEventKind.TankDied, _tank.Position, _tank.Color, Cause: DeathCause));
+            ctx.Deaths?.Record(_tank);
             var delay = _tank.Base is { } home ? ctx.BasePower?.RespawnDelay(home) : null;
             Die(ctx.Projectiles, ctx.Terrain, ctx.IsOccupied, delay, recall);
         }

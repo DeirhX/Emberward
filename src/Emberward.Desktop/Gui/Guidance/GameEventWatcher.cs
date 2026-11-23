@@ -6,8 +6,8 @@ using Emberward.Core.Types;
 using Emberward.Desktop.Gui.Guidance.Events;
 
 /// <summary>
-/// Posts a toast when something happens on the player's side that the player should know about. Each system has its
-/// own watch in <c>Guidance/Events</c> (base attacks, upgrades, the sector goal, the network, the base's power, ore,
+/// Posts a toast when something happens that the player should know about. Each system has its
+/// own watch in <c>Guidance/Events</c> (base attacks, enemy deaths, upgrades, the sector goal, the network, the base's power, ore,
 /// radar, nests); this holds them in the order their toasts stack within a frame. A new system's notifications are a
 /// new watch and a line in <see cref="_watches"/>; retiring a system deletes its watch and that line. It only reads
 /// Core state. What happens inside a step a watch hears from <see cref="World.StepEvents"/> in <see cref="AfterStep"/>.
@@ -23,6 +23,7 @@ public sealed class GameEventWatcher
         _watches =
         [
             _baseAttack,
+            new TankDeathWatch(),
             new UpgradeWatch(),
             new SectorGoalWatch(),
             new NetworkWatch(),

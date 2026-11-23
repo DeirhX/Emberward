@@ -895,6 +895,61 @@ footer i {
 #lobby .menu-actions {
     margin-top: 14px;
 }
+#scoreboard {
+    position: absolute;
+    left: 50%;
+    top: 14%;
+    transform: translateX(-50%);
+    width: min(620px, calc(100vw - 30px));
+    padding: 16px 24px 18px;
+    font-family: var(--hud-font);
+    pointer-events: none;
+    z-index: 2;
+}
+#scoreboard[hidden] {
+    display: none;
+}
+#scoreboard .eyebrow {
+    display: flex;
+    justify-content: space-between;
+}
+#scoreboard-clock {
+    color: var(--hud-dim);
+}
+#scoreboard ol {
+    list-style: none;
+    margin: 10px 0 0;
+    padding: 0;
+}
+#scoreboard li {
+    display: grid;
+    grid-template-columns: 16px max-content 2.5em 1fr;
+    align-items: baseline;
+    gap: 4px 10px;
+    padding: 4px 0;
+    font-size: 16px;
+    color: var(--hud-text);
+}
+#scoreboard li i {
+    width: 12px;
+    height: 12px;
+    align-self: center;
+}
+#scoreboard li.you .name {
+    color: var(--hud-amber);
+}
+#scoreboard li b {
+    text-align: right;
+    color: var(--hud-danger);
+}
+#scoreboard .times {
+    font-size: 14px;
+    white-space: pre-wrap;
+}
+#scoreboard li.none b,
+#scoreboard li.none .times {
+    color: var(--hud-dim);
+}
 #net-status {
     position: absolute;
     left: 50%;

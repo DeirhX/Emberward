@@ -310,6 +310,11 @@
                 </div>
             </section>
             <div id="net-status" class="plate" role="status" hidden></div>
+            <!-- Held Tab (scoreboard.js): when every tank died. -->
+            <section id="scoreboard" class="plate" hidden aria-label="Scoreboard">
+                <div class="eyebrow">DEATHS <span id="scoreboard-clock"></span></div>
+                <ol id="scoreboard-rows"></ol>
+            </section>
             <div id="net-latency" hidden></div>
             <div id="death" hidden></div>
             <button id="recall" class="plate" hidden><span id="recall-text">Drop cargo and respawn</span> <kbd>X</kbd></button>
@@ -461,6 +466,8 @@
                     Charge labels over machines: charge, capacity and flow a
                     second.
                 </dd>
+                <dt><kbd>Tab</kbd> (hold)</dt>
+                <dd>Scoreboard: when every tank died, and why.</dd>
                 <dt><kbd>F2</kbd></dt>
                 <dd>Show or hide the tutorial.</dd>
                 <dt><kbd>P</kbd></dt>

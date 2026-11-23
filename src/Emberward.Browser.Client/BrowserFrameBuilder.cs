@@ -6,6 +6,7 @@ using Emberward.Core.Config;
 using Emberward.Core.Entities.Bases;
 using Emberward.Core.Entities.Machines;
 using Emberward.Core.Entities.Tanks;
+using Emberward.Core.Rendering;
 using Emberward.Core.Types;
 using Emberward.Desktop.Gui;
 using Emberward.Desktop.Gui.Guidance;
@@ -66,7 +67,21 @@ public static class BrowserFrameBuilder
         return new BrowserFrame(session.Seed, world.AdvanceCount, Tweaks.Perf.TargetFps, status,
             session.Sounds.Frame(takePlays: includeEvents), builds, upgrades, preview, goal, Guidance(session.Guidance),
             includeDial ? Dial() : null, net?.Status(), BasePower(world, player), MachineUpgrade(session),
-            Reserve(world.ReserveOf(player)));
+            Reserve(world.ReserveOf(player)), Scoreboard(world, player));
+    }
+
+    /// <summary>The scoreboard's rows, as the desktop's Tab key shows them (<see cref="TankDeathView"/>).</summary>
+    public static ScoreboardStatus Scoreboard(World world, Tank player)
+    {
+        ArgumentNullException.ThrowIfNull(world);
+        ArgumentNullException.ThrowIfNull(player);
+        var rows = TankDeathView.Rows(world).Select(row =>
+        {
+            Color c = TankSprites.GetPixelColor(1, row.Tank);
+            return new ScoreboardRow(row.Tank, row.Name, HudPalette.Hex(HudPalette.Rgba(c.R, c.G, c.B)),
+                row.Deaths.Select(d => $"{d.Clock} {d.Cause}").ToArray());
+        }).ToArray();
+        return new ScoreboardStatus(TankDeathView.Clock(world.MatchTime), player.Color, rows);
     }
 
     /// <summary>The reserve's stage tag and burn prompt, as the desktop shows them (<see cref="ReserveTags"/>).</summary>

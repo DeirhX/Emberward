@@ -6,6 +6,7 @@ import { PerfReadout } from "./perf.js";
 import { Simulation } from "./simulation.js";
 import { GuidanceView } from "./guidance.js";
 import { StatusView } from "./hud.js";
+import { ScoreboardView } from "./scoreboard.js";
 import { StripView } from "./strip.js";
 import { RelaySocket, defaultRelay } from "./net.js";
 import { LoadProgress } from "./progress.js";
@@ -63,6 +64,10 @@ const input = new GameInput(canvas, (action, direction) => {
     if (action === "tutorial" && playing) guidance.toggleTutorial();
     if (action === "thermal" && playing) setThermalView(!thermalView);
     if (action === "power" && playing) renderer.showPower = !renderer.showPower;
+    if (action === "scoreboard") {
+        scoreboard.show(direction && playing);
+        scoreboard.update(state?.scoreboard, state?.net);
+    }
     if (action === "enter" && net && state?.net && !state.net.started)
         netCommand("start");
     if (action === "netpause" && net && playing && state?.net?.started)
@@ -74,6 +79,7 @@ const input = new GameInput(canvas, (action, direction) => {
         );
 });
 const statusView = new StatusView(input);
+const scoreboard = new ScoreboardView();
 // A tap on the lit machine opens its upgrade panel (touch; input.js).
 input.tapMachine = (p) => renderer.machineAt(p);
 // The desktop's art strip in the bottom corners, where the screen is wide and there is a mouse (strip.js); the
@@ -597,6 +603,7 @@ function updateHud(f) {
     const stripMs = performance.now() - stripBegan;
     guidance.update(f.guidance, f.goal);
     updateNet(f.net);
+    scoreboard.update(f.scoreboard, f.net);
     renderer.pointerTarget = guidance.target;
     perf?.hud(performance.now() - began, stripMs);
 }

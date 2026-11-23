@@ -58,6 +58,7 @@ public sealed class SessionOverlay
         ("1-5 / 6-7", "Docked: buy base upgrades / tank upgrades with the base ore store"),
         ("H / F9", "Thermal view (enemy tunnels glow)"),
         ("G", "Charge labels over machines"),
+        ("Tab (hold)", "Scoreboard: when every tank died"),
         ("F, then 1-3", "Beside your relay, turret or gatling: open its upgrade panel, buy Tap / Sensor / Conduit, Rapid / Long or Spin / Scope"),
         ("Esc / P", "Pause"),
         ("N / L", "Paused: open the network menu / leave the network match"),

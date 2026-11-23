@@ -9,12 +9,23 @@ using Emberward.Desktop.Gui;
 /// <param name="BasePower">The base charge readout, present in an energy-network match.</param>
 /// <param name="MachineUpgrade">The machine next to the tank and its upgrade panel; null when none is in reach.</param>
 /// <param name="Reserve">The reserve's stage tag and burn prompt; null when there is nothing to say.</param>
+/// <param name="Scoreboard">What the scoreboard shows while Tab is held.</param>
 public sealed record BrowserFrame(
     int Seed, int Tick, int TickRate, PlayerStatus Player,
     SoundFrame Sounds, BuildOption[] Builds,
     UpgradeOption[] Upgrades, PlantPreview? Preview, GoalStatus? Goal, GuidanceStatus Guidance, HeatDial? Dial,
     NetStatus? Net = null, BaseCharge? BasePower = null, MachineUpgradeStatus? MachineUpgrade = null,
-    ReserveStatus? Reserve = null);
+    ReserveStatus? Reserve = null, ScoreboardStatus? Scoreboard = null);
+
+/// <summary>
+/// The scoreboard (<c>TankDeathView</c>, shared with the desktop): the match clock and every tank with the times it
+/// died. <c>You</c> is the player's tank. The page names a tank's driver from <see cref="NetStatus.Roster"/> in a
+/// network match.
+/// </summary>
+public sealed record ScoreboardStatus(string Clock, int You, ScoreboardRow[] Rows);
+
+/// <summary>A tank's row: its slot, colour name and colour (#rrggbb), and each death as "3:07 shot", oldest first.</summary>
+public sealed record ScoreboardRow(int Tank, string Name, string Color, string[] Deaths);
 
 /// <summary>
 /// The tank's reserve (<c>ReserveTags</c>, shared with the desktop): the stage tag drawn beside OFF NETWORK with its

@@ -21,6 +21,11 @@ export class GameInput {
         window.addEventListener("keydown", (e) => {
             if (e.target instanceof HTMLInputElement) return;
             if (this.enabled && movement.includes(e.code)) e.preventDefault();
+            // Tab held shows the scoreboard, instead of moving the focus.
+            if (this.enabled && e.code === "Tab") {
+                e.preventDefault();
+                if (!e.repeat) action("scoreboard", true);
+            }
             if (!e.repeat) {
                 if (e.code === "Escape") {
                     e.preventDefault();
@@ -53,7 +58,11 @@ export class GameInput {
             }
             if (this.enabled) this.keys.add(e.code);
         });
-        window.addEventListener("keyup", (e) => this.keys.delete(e.code));
+        window.addEventListener("keyup", (e) => {
+            this.keys.delete(e.code);
+            if (e.code === "Tab") action("scoreboard", false);
+        });
+        window.addEventListener("blur", () => action("scoreboard", false));
         canvas.addEventListener("pointermove", (e) => {
             if (!this.enabled) return;
             const r = canvas.getBoundingClientRect();

@@ -44,6 +44,7 @@
     <Compile Include="../Emberward.Desktop/Gui/ReserveTags.cs" Link="Gui/ReserveTags.cs" />
     <Compile Include="../Emberward.Desktop/Gui/OreLedgerView.cs" Link="Gui/OreLedgerView.cs" />
     <Compile Include="../Emberward.Desktop/Gui/MaterialsView.cs" Link="Gui/MaterialsView.cs" />
+    <Compile Include="../Emberward.Desktop/Gui/TankDeathView.cs" Link="Gui/TankDeathView.cs" />
     <Compile Include="../Emberward.Desktop/Gui/Guidance/**/*.cs" Link="Gui/Guidance/%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="../Emberward.Desktop/SlotStepper.cs" Link="SlotStepper.cs" />
     <Compile Include="../Emberward.Desktop/Config/NetworkTweaks.cs" Link="Config/NetworkTweaks.cs" />

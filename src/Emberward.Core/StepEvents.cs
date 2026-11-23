@@ -26,7 +26,10 @@ public enum StepEventKind
     /// <summary>Enemy fire took armor (shield or hull) off a tank's hull (not blocked by its respawn shield, nor, with the tank shield rule, by its shield). <see cref="StepEvent.Color"/> is the tank.</summary>
     TankHit,
 
-    /// <summary>A tank was destroyed. <see cref="StepEvent.Position"/> is where it died.</summary>
+    /// <summary>
+    /// A tank was destroyed. <see cref="StepEvent.Position"/> is where it died, <see cref="StepEvent.Cause"/> why (a
+    /// recall is one too).
+    /// </summary>
     TankDied,
 
     /// <summary>A destroyed tank came back at its base.</summary>
