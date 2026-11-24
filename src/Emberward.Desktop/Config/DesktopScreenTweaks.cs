@@ -69,6 +69,14 @@ public static class DesktopScreenTweaks
     public const float TankPlateFadeSeconds = 3.5f;
     /// <summary>How bright a plate left where its tank was last seen starts fading from (a plate over a tank in sight is 1).</summary>
     public const float TankPlateGhostOpacity = 0.8f;
+    /// <summary>
+    /// The smallest a plate's lettering gets, zoomed out: UI points (CSS pixels in the browser) a dot of its 5x7 font.
+    /// At one point a dot the name stands 7 points tall, the font at its native size, the smallest at which it stays crisp
+    /// and readable. At the usual zoom (6 points a cell, a dot a quarter cell) a dot is 1.5 points, so this only takes
+    /// over below 4 points a cell, where the plates used to fade out like the charge labels; it keeps them readable the
+    /// way the fixed-size ImGui name tags were, while growing no further than that over a far-zoomed map.
+    /// </summary>
+    public const float TankPlateMinDotPoints = 1f;
 
     // GPU post-processing / lighting tuning
     public const float PostVignetteStrength = 0.18f;

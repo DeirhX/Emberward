@@ -100,7 +100,7 @@ public sealed class EntityLayerBuilder
         OreLedger.CaptureStep(world, localSlot);
         _deposits.CaptureStep(world, localSlot, OreLedger);
         _powerups.CaptureStep(world);
-        _tankPlates.CaptureStep(world, localSlot, vision);
+        _tankPlates.CaptureStep(world, localSlot, vision, _motion);
     }
 
     /// <summary>

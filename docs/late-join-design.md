@@ -220,8 +220,10 @@ is then the mask before the first recorded tick.
 - **Vision and radar start at the seat.** `World.TrackVision` and `TrackRadar` are asked for when the seat is
   granted, and the terrain view switches from live to fogged then. The fog's memory of explored ground starts
   empty: the joiner arrives with a fresh map, not the bot's. (Vision is output only and not in the snapshot.)
-- **Names follow the roster.** `_slotNames` is fixed at `BeginNetMatch` today. It is rebuilt whenever the roster
-  or the mask changes, so "Bot" becomes the joiner's name on every screen at the tick of the handover.
+- **Names follow the roster.** Every screen asks a seat's name each frame from the roster and the mask
+  (`SlotNames.Seat` for the board, the toasts and the result line; `Game.NamePlayers` for the enemy name plates), so a
+  bot's seat, which reads `BOT n` (n its slot from 1), shows the joiner's name on every screen from the tick of the
+  handover.
 - **Screens.** Everyone, during a hold: "Ann is joining" where the pause notice goes. The joiner: "Joining:
   building the map", then "Joining: copying the match". Once seated: "You have taken over the bot in slot 3", in
   the slot's colour. The lobby's open slot reads "open: a bot plays until someone joins".
