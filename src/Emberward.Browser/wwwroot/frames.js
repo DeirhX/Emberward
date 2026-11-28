@@ -157,7 +157,6 @@ export async function startRuntime(dotnet, { config = {}, report = () => {}, byt
                 Boolean(data.thermalView),
                 data.powerLabelCellSize || 0,
                 data.labelCellSize || 0,
-                Boolean(data.due),
                 data.now || 0,
             );
             const { packet, hud, timing, steps } = delivered;

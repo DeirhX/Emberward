@@ -76,14 +76,28 @@ Properties:
   release, and only if there is none the oldest input, which it counts.
 - **The tick rate is a match setting**, not a constant in the relay: changing the simulation rate needs no new
   relay.
-- **Input delay** is uplink + the wait for the relay's next tick + the client's own step phase + downlink. The
-  client keeps no bundle back (`BundleBuffer.TargetDepth` is 0), so an input is simulated at the first local step
-  after its bundle arrives. Measured on localhost with `EMBERWARD_NET_LATENCY_LOG=1`: mean 44.6 ms, 91% of inputs
-  one tick (a depth of 1 gave a mean of 56.5 ms). Entity interpolation already hides one step.
-- **Pacing on the client.** `GameFrameCoordinator` today steps on the wall clock. In a net session it steps when
-  a bundle is available, and uses the existing "at most 4 steps to catch up" path when bundles arrive in a burst.
-  With no buffer, a bundle that arrives late stalls one step; a link with that much jitter may need
-  `TargetDepth` back at 1. If the buffer keeps growing the client steps faster until it is level.
+- **Input delay** is uplink + the wait for the relay's next tick + the client's own step phase + downlink + the
+  bundles the client keeps in hand. On a steady link it keeps none, so an input is simulated at the first local
+  step after its bundle arrives. Measured on localhost with `EMBERWARD_NET_LATENCY_LOG=1`: mean 44.6 ms, 91% of
+  inputs one tick (a fixed depth of 1 gave a mean of 56.5 ms). Entity interpolation already hides one step.
+- **Pacing on the client** (`PlayoutPacer`, in the protocol, so the desktop and the browser share it). Bundles
+  leave the relay evenly and reach a client unevenly: a Wi-Fi link holds a few back, then delivers them together.
+  Stepping on arrival, or on the clock with two steps after a late one, shows that as stutter in everything that
+  moves, the camera most of all (2026-11-28, a high-latency Wi-Fi link). So the client:
+  - **measures the link** from each bundle's arrival time, stamped where it is read off the socket: the latest
+    arrival of the last ten seconds behind the earliest, by the relay's clock, is the jitter. A jump of over a
+    second (a pause, a held join, a rejoin's replay) starts the measure again.
+  - **keeps that many bundles in hand** (`TargetDepth`, 0 to 4, less 8 ms of the client's own frame timing). It
+    rises at once and falls by one a second. Each bundle in hand is a tick of input delay, so a steady link keeps
+    0 and the HUD's network tag shows the depth when it is not (`NET 120 ms  +2`).
+  - **plays one tick a step, the step a little shorter or longer**: up to half as long while more bundles wait than
+    the target wants, up to a tenth longer while fewer do. A backlog drains and a cushion builds without a jump.
+  - **plays a late bundle the moment it comes.** A step due with nothing to play is owed: the desktop loop looks
+    again every 2 ms (`GameFrameCoordinator`'s pace), the browser every frame. Frames hold at the latest step
+    meanwhile, never moving ahead of it and snapping back. The time beyond the one owed step is dropped, so a late
+    tick is never followed by a second in the same frame.
+  - Far behind (over a second of ticks, after a rejoin or a long stall) it still replays as fast as a frame's
+    budget allows, as before.
 
 ### Input encoding
 
@@ -352,8 +366,8 @@ Each step is testable without the next.
    every machine (`BotTankAI.PickEnemy`). The recorded fingerprints are unchanged: the local player's aim is
    quantised in Desktop's stepper, which the fingerprint tests do not go through.
 2. **Lockstep in process** (done). `Emberward.Protocol` holds what client and relay share: `LockstepRoom` (the
-   relay's tick rule, input log and hash comparison), `TickBundle`, `BundleBuffer` (the client's buffer and
-   pacing rule) and `ILockstepLink` (the connection as the game sees it). `NetSession` in Desktop steps a world
+   relay's tick rule, input log and hash comparison), `TickBundle`, `BundleBuffer` (the client's buffer;
+   its pacing is now `PlayoutPacer`'s) and `ILockstepLink` (the connection as the game sees it). `NetSession` in Desktop steps a world
    from bundles. `NetSessionTests` runs four worlds through an in-memory relay with uneven delays, a client
    that stalls and bursts, and one that drops out, then checks the worlds are identical and that the relay's
    log rebuilds the same world. It needs no socket. Not yet wired into the game loop: that comes with the

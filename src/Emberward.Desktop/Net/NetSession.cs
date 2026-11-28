@@ -151,9 +151,6 @@ public sealed class NetSession
             WorldStateHash.ComputeSync(_world, _seats.Bots).Combined));
     }
 
-    /// <summary>How many steps to simulate now; see <see cref="BundleBuffer.StepsToTake"/>.</summary>
-    public int StepsToTake(int dueByClock, int maxSteps) => _buffer.StepsToTake(dueByClock, maxSteps);
-
     /// <summary>Simulates the next buffered tick. False when none is buffered.</summary>
     public bool TryStep()
     {

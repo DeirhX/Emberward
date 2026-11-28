@@ -142,8 +142,8 @@ public static partial class BrowserApi
     /// <summary>
     /// One display request: steps the simulation, builds a frame and hands it to <see cref="Deliver"/> before the
     /// promise resolves. A local match steps once if <paramref name="step"/>, with the input given. A network match
-    /// takes the input whenever it is given, and steps as the relay's ticks have arrived (<paramref name="due"/>:
-    /// the page's clock says a step is due). <paramref name="thermalView"/> is the player's thermal view (H,
+    /// takes the input whenever it is given, and steps as the relay's ticks have arrived, paced by
+    /// <paramref name="now"/> (<see cref="Emberward.Protocol.PlayoutPacer"/>). <paramref name="thermalView"/> is the player's thermal view (H,
     /// <see cref="BrowserSession.ThermalView"/>). <paramref name="powerLabelCellSize"/> is the displayed CSS size of a
     /// cell, or zero to hide the charge labels (G); <paramref name="labelCellSize"/> is the same size for the enemy tanks'
     /// name plates, which G does not hide. <paramref name="machineUpgrade"/> is the machine upgrade panel's
@@ -154,7 +154,7 @@ public static partial class BrowserApi
     [JSExport]
     public static Task Frame(bool step, int x, int y, bool fire, double aimX, double aimY, int build,
         int upgrade, bool recall, bool machineUpgrade, bool upgradeMachine, int width, int height, int scale, double alpha, double delta,
-        double time, bool thermalView, double powerLabelCellSize, double labelCellSize, bool due, double now)
+        double time, bool thermalView, double powerLabelCellSize, double labelCellSize, double now)
     {
         BrowserSession session = _net?.Session ?? _session ?? throw new InvalidOperationException("Start a match first.");
         session.ThermalView = thermalView;
@@ -166,7 +166,7 @@ public static partial class BrowserApi
         int steps = 0;
         if (_net is { } net)
         {
-            steps = net.Advance(input, due ? 1 : 0, TimeSpan.FromMilliseconds(now));
+            steps = net.Advance(input, TimeSpan.FromMilliseconds(now));
             // A step just taken is drawn from where it began: the ticks arrive by the relay's clock, not the page's.
             if (steps > 0)
                 alpha = 0;
@@ -181,8 +181,8 @@ public static partial class BrowserApi
         }
 
         long stepped = Stopwatch.GetTimestamp();
-        // A clock tick that took no world step (the relay's next tick has not arrived) leaves the world where it is drawn.
-        bool hold = _net != null && due && steps == 0;
+        // A step owed and not taken (the relay's next tick has not arrived) leaves the world where it is drawn.
+        bool hold = _net is { } owing && steps == 0 && owing.Room?.Pacer.Progress >= 1f;
         session.Scene.Render(width, height, scale, (float)alpha, (float)delta, (float)time, (float)powerLabelCellSize, hold,
             (float)labelCellSize);
         string? hud = null;
