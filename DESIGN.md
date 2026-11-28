@@ -865,7 +865,9 @@ The player sees only what their side sees, so that learning the shape of the wor
 - **Enemy name plates.** An enemy tank in sight carries a small plate above it with its driver's name in the tank's
   colour (the player's name in a network match, else `BOT n` or `PLAYER n` by slot). Once it drives out of sight the
   plate stays where it was last seen and fades out over 3.5 seconds, so the player keeps a hint of where it went; seen
-  again, the plate is with the tank at once, and a dead tank's plate goes. Friendly tanks and your own get none.
+  again, the plate is with the tank at once, and a dead tank's plate goes. Friendly tanks and your own get none; a
+  screen with no tank of its own (a spectator) labels every tank in sight. Zoomed out, the names stop shrinking at a
+  readable size instead of fading.
 - **Radar** *(Prototype)*. Every 4 seconds the tank sends a pulse: a faint ring that runs outward from where the
   tank stood, taking about 3 seconds to reach its full range of 150 cells, well past sight. Dirt and open ground let
   it through; rock, hot and frost rock, pyrite, another side's base walls, machines and tanks reflect it and stop it.

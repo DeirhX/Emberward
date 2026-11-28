@@ -274,6 +274,52 @@ public class BrowserNetMatchTests
         Assert.Equal(["Bob", "Ann", "BOT 3"], match.Status().Roster.Select(r => r.Name));
     }
 
+    /// <summary>
+    /// The lobby draws the world behind it with no enemy name plates (nor charge labels), as the desktop does
+    /// (<c>Game.InNetLobby</c>); the match, once started, has them.
+    /// </summary>
+    [Fact]
+    public void InTheLobby_ThePlatesAreHidden_AndOnceTheMatchStartsTheyAreNot()
+    {
+        var config = NetMatch.ProposeConfig(42, new Size(320, 200), LevelGenMode.Deterministic, 2);
+        var match = new BrowserNetMatch("room", "Ann", config);
+        Assert.False(match.InLobby);
+
+        Feed(match, new Welcome(0, config), new Roster(["Ann", "Bob"]));
+        Assert.True(match.InLobby);
+
+        Feed(match, new Start(0b11));
+        Assert.False(match.InLobby);
+
+        var lost = new BrowserNetMatch("room", "Ann", config);
+        Feed(lost, new Welcome(0, config), new Roster(["Ann", ""]));
+        lost.Lose("lost the connection to the relay.");
+        Assert.False(lost.InLobby);
+    }
+
+    /// <summary>
+    /// The players' names reach the enemy name plates from the room's roster as the match steps, before any frame is
+    /// built from those steps; a seat a bot drives keeps its <c>BOT n</c>.
+    /// </summary>
+    [Fact]
+    public void TheRostersNames_ReachTheNamePlates_AndABotsSeatIsANumberedBot()
+    {
+        var config = NetMatch.ProposeConfig(42, new Size(320, 200), LevelGenMode.Deterministic, 3);
+        var match = new BrowserNetMatch("room", "Ann", config);
+        Feed(match, new Welcome(1, config), new Roster(["Bob", "Ann", ""]), new Start(0b011),
+            Tick(0, [0u, 0u, 0u], 0b011));
+        Assert.Equal(1, match.Advance(default, dueByClock: 1, Now));
+        var session = match.Session!;
+        var plates = session.Scene.TankPlates;
+
+        // Seen without fog (as a spectator would), every rival's plate carries the name the match handed in.
+        plates.CaptureStep(session.World, session.LocalSlot, vision: null);
+
+        Assert.Equal("BOB", plates.Plates[0].Name);
+        Assert.False(plates.Plates[1].Active); // The player's own tank.
+        Assert.Equal("BOT 3", plates.Plates[2].Name);
+    }
+
     private static Tick Tick(int tick, System.Collections.Immutable.ImmutableArray<uint> inputs, int mask) =>
         new(new TickBundle(tick, inputs, mask));
 

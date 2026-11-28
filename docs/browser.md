@@ -226,7 +226,8 @@ as a rejoining player does.
 
 Not yet in the browser: the desync report file the desktop writes, and choosing a map size or seed for a new room
 from the page. The name plates over enemy tanks come from the shared entity layer (`BOT n` over a bot, as on the
-desktop), with the drivers' names from the relay (`BrowserNetMatch`). The board, the toasts and the result line call
+desktop), with the drivers' names from the relay (`BrowserNetMatch`); as on the desktop, the lobby draws the world
+without them or the charge labels (`BrowserNetMatch.InLobby`). The board, the toasts and the result line call
 a seat by its player's name and a bot's seat `BOT n`, as the desktop does (`SlotNames.Seat`).
 
 The header says **SAVED FOR OFFLINE** after the entire app, including the .NET runtime, has been cached, and

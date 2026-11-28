@@ -110,13 +110,16 @@ Core decides what is seen; the renderer only shows it.
   `EntityLayerBuilder.CaptureStep` (which takes the player's vision for it) from Core's answers: `Tank.IsRivalOf`
   (a side is a base; a match has no teams, so every other tank is a rival), `IsDead` and the tank sprites' fog rule
   (`Sight`). A rival in sight gets a plate above it, its name in the tank's colour on a dark backing with a rule
-  under it (`GlyphText` and plain `KindPowerLabel` quads), moving with the tank as drawn. Out of sight the plate stays
-  at the cell where the tank was last seen and fades from `DesktopScreenTweaks.TankPlateGhostOpacity` to nothing
+  under it (`GlyphText` and plain `KindPowerLabel` quads), moving with the tank as drawn. With no local tank (a
+  spectator) every living tank in sight gets one. Out of sight the plate stays where the tank was last drawn (the start
+  of its `EntityMotion` for the step it was lost in, or the last-seen cell if it teleported, so the plate neither jumps
+  nor gives the tank away) and fades from `DesktopScreenTweaks.TankPlateGhostOpacity` to nothing
   over `TankPlateFadeSeconds` (counted in steps, so a pause holds it); seen again anywhere, the record jumps to the
   tank at once, and a dead tank's record is cleared. Names are `BOT n` for a side the computer plays
   (`SlotNames.LocalBot`, as the board and the toasts say) and `PLAYER n` otherwise; in a network match `Game.NamePlayers` (and `BrowserNetMatch` in the browser) hands in the drivers' names
-  from the relay (`TankPlateQuads.SetPlayerName`), shown in capitals and cut at 16 characters. They fade out zoomed
-  out like the charge labels (`PowerLabels.ZoomFade`; `Build`'s `labelCellSize`, which G does not turn off). They
+  from the relay (`TankPlateQuads.SetPlayerName`), shown in capitals and cut at 16 characters. Zoomed out they do not
+  fade: a dot of their lettering never gets smaller than `DesktopScreenTweaks.TankPlateMinDotPoints` UI points
+  (`TankPlateQuads.DotSize`; `Build`'s `labelCellSize`, which G does not turn off and the network lobby sets to zero). They
   replace the ImGui name tags network matches drew before, and a timed match that is over shows none (the final
   standings have the view). Cost follows the number of tanks; nothing scans the map.
 - **Pyrite deposits.** `DepositQuads` reads each step's `OreUnloaded` and `RestartOreBurned` (Position is the

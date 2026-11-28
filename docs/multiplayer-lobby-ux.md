@@ -184,7 +184,8 @@ menu says, and the lobby shows it (§3.4).
   (`LobbyText.SettingsLine`: "Arcade match   4 tanks   map 320x200"); the seed and the relay's round trip are not
   in it yet.
 - **Swatches** are the slot colours, as today (`SlotColor`). Open slots are dimmed text. Bots get no name until the
-  match starts, when the name tags read "Bot", as today.
+  match starts; from then on a bot's seat is `BOT n` (n its slot from 1) on its name plate, the board, the toasts and
+  the result line, on the desktop and in the browser alike (`SlotNames.Seat`), as today.
 - **Ready state** comes from the relay (§7 `Roster.ReadyMask`): "building..." until that client has sent `Ready`.
   It answers the only real question in a lobby ("why hasn't it started?") without asking anyone to press anything.
 - **"you are Ann (2)"** when the relay changed the name, with "use this name to come back" (§2 item 7). The
