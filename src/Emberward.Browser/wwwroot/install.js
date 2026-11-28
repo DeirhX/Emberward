@@ -48,6 +48,7 @@ function updater(idle, versions) {
         waiting = null,
         asked = false,
         registered = null,
+        fallback = 0,
         lastCheck = performance.now();
     // What a hard reload does, for when the worker will not hand over: forget the worker and its caches, then load
     // the page from the network. The next load installs the new publish from scratch.
@@ -68,7 +69,8 @@ function updater(idle, versions) {
         if (!next || next.state === "redundant") location.reload();
         else next.postMessage({ type: "skip-waiting", force });
         // A hand-over takes a moment. When none came, the Update button must not do nothing.
-        if (force) setTimeout(reset, 4000);
+        clearTimeout(fallback);
+        if (force) fallback = setTimeout(reset, 4000);
     };
     button.onclick = () => {
         asked = true;
@@ -103,6 +105,8 @@ function updater(idle, versions) {
             const found = (worker) => {
                 versions.refresh();
                 if (!navigator.serviceWorker.controller) return;
+                // A newer version just installed: the hard reset would clear it along with the old one.
+                clearTimeout(fallback);
                 // A newer publish can replace one this page already asked for, which then never takes over.
                 waiting = worker;
                 asked = false;
