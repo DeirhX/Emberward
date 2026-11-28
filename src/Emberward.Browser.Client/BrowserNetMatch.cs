@@ -68,6 +68,12 @@ public sealed class BrowserNetMatch
 
     public NetSession? Net { get; private set; }
 
+    /// <summary>
+    /// The room is still gathering players: let in, not started, nothing gone wrong. As on the desktop
+    /// (<c>Game.InNetLobby</c>), the world behind the lobby is drawn without the enemy name plates and the charge labels.
+    /// </summary>
+    public bool InLobby => Room is { Started: false, Failure: null };
+
     /// <summary>Why the connection is over (refused, or lost), or null while it is alive.</summary>
     public string? Failure => Room?.Failure ?? _failure;
 

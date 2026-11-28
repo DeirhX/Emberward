@@ -183,8 +183,10 @@ public static partial class BrowserApi
         long stepped = Stopwatch.GetTimestamp();
         // A step owed and not taken (the relay's next tick has not arrived) leaves the world where it is drawn.
         bool hold = _net is { } owing && steps == 0 && owing.Room?.Pacer.Progress >= 1f;
-        session.Scene.Render(width, height, scale, (float)alpha, (float)delta, (float)time, (float)powerLabelCellSize, hold,
-            (float)labelCellSize);
+        // The lobby draws the world behind it bare, as the desktop does.
+        bool lobby = _net is { InLobby: true };
+        session.Scene.Render(width, height, scale, (float)alpha, (float)delta, (float)time,
+            lobby ? 0f : (float)powerLabelCellSize, hold, lobby ? 0f : (float)labelCellSize);
         string? hud = null;
         if (_hudStale)
         {
