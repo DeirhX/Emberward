@@ -41,7 +41,11 @@ public sealed class RoomClient : ILockstepLink
         _playerNames = Enumerable.Range(1, Config.Slots).Select(i =>
             string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Player {i}")).ToArray();
         _send = send;
+        Pacer = PlayoutPacer.ForRate(Config.TicksPerSecond);
     }
+
+    /// <summary>When to play the bundles that have arrived; it measures the link from their arrival times.</summary>
+    public PlayoutPacer Pacer { get; }
 
     /// <summary>The room this client is in.</summary>
     public string Room { get; }
@@ -116,7 +120,10 @@ public sealed class RoomClient : ILockstepLink
     {
         switch (message)
         {
-            case Tick tick: _bundles.Enqueue(tick.Bundle); break;
+            case Tick tick:
+                _bundles.Enqueue(tick.Bundle);
+                Pacer.Arrived(tick.Bundle.Tick, arrived);
+                break;
             case Roster roster:
                 Roster = roster.Names;
                 for (int i = 0; i < Math.Min(_playerNames.Length, Roster.Length); i++)
@@ -137,6 +144,8 @@ public sealed class RoomClient : ILockstepLink
                     _bundles.Enqueue(bundle);
                 break;
             case PauseState pause:
+                if (IsPaused != pause.Paused)
+                    Pacer.Forget(); // The relay's clock stood still: the next tick is not late.
                 IsPaused = pause.Paused;
                 PausedBySlot = pause.BySlot;
                 break;
@@ -149,6 +158,8 @@ public sealed class RoomClient : ILockstepLink
                 LatencyMs = (int)Math.Round((arrived - _pingSentAt).TotalMilliseconds);
                 break;
             case JoinHoldState hold:
+                if (JoiningName != hold.Name)
+                    Pacer.Forget();
                 JoiningName = hold.Name;
                 break;
             case Seated seated when Slot < 0:

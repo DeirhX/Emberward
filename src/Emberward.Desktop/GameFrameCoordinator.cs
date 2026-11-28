@@ -4,6 +4,12 @@ using System.Diagnostics;
 using Emberward.Desktop.Input;
 
 /// <summary>
+/// How a network match paces the loop's steps, asked every iteration: how long the next step should take, and
+/// whether one can be taken now (false while its bundle from the relay has not arrived).
+/// </summary>
+public readonly record struct StepPace(TimeSpan Step, bool CanStep);
+
+/// <summary>
 /// Owns the main loop. The simulation advances in fixed steps; frames are displayed either once per step
 /// (step-locked, for automated runs) or as often as the display allows, with each frame told how far it is
 /// between the last two steps so moving things can be drawn in between.
@@ -19,6 +25,9 @@ public sealed class GameFrameCoordinator
     // How long a Thread.Sleep(1) really takes on this machine (up to a full 15.6 ms timer tick on Windows). Starts
     // pessimistic and is measured as the loop runs.
     private double _sleepCostMs = 16.0;
+
+    // How often a loop waiting on a step it cannot take yet looks again: the step is taken this soon after it can be.
+    private const double StallPollMs = 2.0;
 
     /// <param name="renderBetweenSteps">
     /// Display frames between simulation steps, at most one per <paramref name="minRenderInterval"/>. When false a
@@ -37,6 +46,11 @@ public sealed class GameFrameCoordinator
     /// Displays a frame. The float is the step progress: 1 shows the latest step, lower values lie between the
     /// previous step (0) and the latest.
     /// </param>
+    /// <param name="pace">
+    /// A network match's pacing (<see cref="StepPace"/>), asked every iteration; null steps on the clock alone. A
+    /// step due that cannot be taken is owed and taken the moment it can, and frames hold at the latest step
+    /// meanwhile.
+    /// </param>
     public void Run(
         Func<bool> isRunning,
         Action requestStop,
@@ -48,7 +62,8 @@ public sealed class GameFrameCoordinator
         Action<FrameInputSnapshot, float> renderFrame,
         Action<TimeSpan> onFrameMeasured,
         Func<bool>? isPaused = null,
-        Action? onPausedFrame = null)
+        Action? onPausedFrame = null,
+        Func<StepPace>? pace = null)
     {
         while (isRunning())
         {
@@ -61,11 +76,24 @@ public sealed class GameFrameCoordinator
                 break;
             }
 
-            bool stepReady = _loopScheduler.HasReadyStep;
+            bool stalled = false;
+            if (pace != null)
+            {
+                StepPace now = pace();
+                _loopScheduler.Step = now.Step;
+                if (_loopScheduler.HasReadyStep && !now.CanStep)
+                {
+                    _loopScheduler.Stall();
+                    stalled = true;
+                }
+            }
+
+            bool stepReady = !stalled && _loopScheduler.HasReadyStep;
             if (!stepReady)
             {
-                double untilStepMs =
-                    _loopScheduler.TimeUntilNextStep.TotalMilliseconds - _frameTimer.Elapsed.TotalMilliseconds;
+                double untilStepMs = stalled
+                    ? StallPollMs
+                    : _loopScheduler.TimeUntilNextStep.TotalMilliseconds - _frameTimer.Elapsed.TotalMilliseconds;
                 double untilRenderMs = _renderBetweenSteps
                     ? (_minRenderInterval - _sinceRender.Elapsed).TotalMilliseconds
                     : double.MaxValue;
@@ -90,9 +118,17 @@ public sealed class GameFrameCoordinator
                 }
                 else
                 {
+                    // The first step was cleared by the pace above; a second in the same batch needs its own bundle.
+                    int taken = 0;
                     _loopScheduler.ConsumeReadySteps(
-                        onStep: () => advanceOneSimulationStep(frameInput),
-                        canContinue: isRunning);
+                        onStep: () =>
+                        {
+                            taken++;
+                            advanceOneSimulationStep(frameInput);
+                        },
+                        canContinue: () => isRunning() && (taken == 0 || pace?.Invoke().CanStep != false));
+                    if (pace != null)
+                        _loopScheduler.Stall();
                 }
                 composeFrame();
             }

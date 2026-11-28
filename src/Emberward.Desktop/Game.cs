@@ -220,6 +220,7 @@ public partial class Game : IDisposable
                     _worldPixelsChanged = true;
                 },
                 renderFrame: (frameInput, stepProgress) => RenderImGuiFrame(tanks, frameInput, stepProgress),
+                pace: _relay != null ? PaceNetSteps : null,
                 onFrameMeasured: elapsed =>
                 {
                     _drawProfile.TotalFrame += elapsed;

@@ -2,7 +2,7 @@ namespace Emberward.Desktop;
 
 public sealed class GameLoopScheduler
 {
-    private readonly TimeSpan _step;
+    private TimeSpan _step;
     private readonly int _maxCatchUpSteps;
     private TimeSpan _accumulator;
 
@@ -13,6 +13,31 @@ public sealed class GameLoopScheduler
     }
 
     public bool HasReadyStep => _accumulator >= _step;
+
+    /// <summary>
+    /// The time a step takes. A network match changes it from frame to frame to play the relay's bundles evenly
+    /// (<see cref="Emberward.Protocol.PlayoutPacer"/>).
+    /// </summary>
+    public TimeSpan Step
+    {
+        get => _step;
+        set
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(value, TimeSpan.Zero);
+            _step = value;
+        }
+    }
+
+    /// <summary>
+    /// A step is due but cannot be taken yet (its network bundle has not arrived): it stays owed, to be taken the
+    /// moment it can, and the time beyond it is dropped, so a late step is never followed by a second at once.
+    /// Displayed frames hold at the latest step meanwhile.
+    /// </summary>
+    public void Stall()
+    {
+        if (_accumulator > _step)
+            _accumulator = _step;
+    }
 
     /// <summary>Time left until the next simulation step is due (zero or negative when one is ready).</summary>
     public TimeSpan TimeUntilNextStep => _step - _accumulator;

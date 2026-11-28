@@ -168,10 +168,12 @@ public sealed class BrowserNetMatch
     /// as many ticks as fit in <see cref="NetworkTweaks.CatchUpBudgetMs"/>, silently and without sending input.
     /// </summary>
     /// <param name="input">The player's controls now. A build or upgrade press waits for a step to carry it.</param>
-    /// <param name="dueByClock">How many steps the page's clock says are due.</param>
-    /// <param name="now">The page's clock, as <see cref="Receive"/> is given it.</param>
+    /// <param name="now">
+    /// The page's clock, as <see cref="Receive"/> is given it. The room's <see cref="PlayoutPacer"/> keeps time by it
+    /// and says how many of the ticks that have arrived are due.
+    /// </param>
     /// <returns>How many ticks were simulated.</returns>
-    public int Advance(ControllerOutput input, int dueByClock, TimeSpan now)
+    public int Advance(ControllerOutput input, TimeSpan now)
     {
         if (Room is not { } room || Net is not { } net || Session is not { } session)
             return 0;
@@ -191,12 +193,12 @@ public sealed class BrowserNetMatch
 
         net.Receive();
         bool catchingUp = net.Buffered > NetworkTweaks.CatchUpTicks;
-        int steps = catchingUp ? int.MaxValue : net.StepsToTake(dueByClock, MaxStepsPerFrame);
+        int steps = catchingUp ? int.MaxValue : room.Pacer.StepsDue(now, net.Buffered, MaxStepsPerFrame);
         long started = Stopwatch.GetTimestamp();
         int taken = 0;
         while (taken < steps)
         {
-            if (catchingUp && (net.Buffered <= BundleBuffer.TargetDepth ||
+            if (catchingUp && (net.Buffered <= room.Pacer.TargetDepth ||
                 Stopwatch.GetElapsedTime(started).TotalMilliseconds > NetworkTweaks.CatchUpBudgetMs))
                 break;
             if (!net.TryStep())

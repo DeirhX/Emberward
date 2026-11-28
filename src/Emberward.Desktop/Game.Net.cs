@@ -52,6 +52,23 @@ public partial class Game
     }
 
     /// <summary>
+    /// How the frame loop paces a network match, asked every iteration: takes in what the relay has sent, so a late
+    /// bundle is played as soon as it is here, and says how long the next step should take
+    /// (<see cref="Emberward.Protocol.PlayoutPacer"/>). Only a running match waits for its bundles: in the lobby,
+    /// while the match is held and after a failure the clock runs on, for the script clock and the overlays.
+    /// </summary>
+    private StepPace PaceNetSteps()
+    {
+        if (_relay is not { } relay || _netSession is not { } session)
+            return new StepPace(Tweaks.World.AdvanceStep, CanStep: true);
+        relay.Pump();
+        session.Receive();
+        bool waiting = relay.Started && !relay.IsHeld && relay.Failure == null && relay.DesyncTick == null &&
+            session.Buffered == 0;
+        return new StepPace(relay.Pacer.StepLength(), CanStep: !waiting);
+    }
+
+    /// <summary>
     /// The network match's share of one clock step: takes in what the relay sent and simulates the ticks that are
     /// due, sending one input for each. With nothing from the relay the world waits.
     /// </summary>
@@ -77,13 +94,16 @@ public partial class Game
 
         session.Receive();
         // Far behind (just rejoined, or stalled): replay as many ticks as fit in the frame's budget, silently and
-        // without sending input, until the present is in reach again.
+        // without sending input, until the present is in reach again. Otherwise one tick a clock step: the pacer
+        // sets the clock (PaceNetSteps), so a backlog drains by steps a little shorter, never by two at once.
         bool catchingUp = session.Buffered > NetworkTweaks.CatchUpTicks;
-        int steps = catchingUp ? int.MaxValue : session.StepsToTake(dueByClock: 1, MaxCatchUpSimulationSteps);
+        int steps = catchingUp ? int.MaxValue : 1;
+        if (!catchingUp && session.Buffered > 0)
+            relay.Pacer.Stepped(session.Buffered);
         long started = Stopwatch.GetTimestamp();
         for (int i = 0; i < steps; i++)
         {
-            if (catchingUp && (session.Buffered <= BundleBufferTarget ||
+            if (catchingUp && (session.Buffered <= relay.Pacer.TargetDepth ||
                 Stopwatch.GetElapsedTime(started).TotalMilliseconds > NetworkTweaks.CatchUpBudgetMs))
                 break;
             if (!_simulationStepper.AdvanceNetStep(
@@ -106,7 +126,6 @@ public partial class Game
         }
     }
 
-    private const int BundleBufferTarget = Emberward.Protocol.BundleBuffer.TargetDepth;
     private bool _desyncReported;
     private bool _netPauseLogged;
     private readonly int _faultTick =
@@ -198,7 +217,10 @@ public partial class Game
         {
             if (relay.LatencyMs is int ms)
                 HudTheme.DrawTag(ImGui.GetForegroundDrawList(), anchor + new Vector2(0f, 8f),
-                    string.Create(CultureInfo.InvariantCulture, $"NET {ms} ms"),
+                    // The bundles kept in hand against an uneven link: each adds a tick of input delay.
+                    relay.Pacer.TargetDepth == 0
+                        ? string.Create(CultureInfo.InvariantCulture, $"NET {ms} ms")
+                        : string.Create(CultureInfo.InvariantCulture, $"NET {ms} ms  +{relay.Pacer.TargetDepth}"),
                     ms < 80 ? HudTheme.Good : ms < 160 ? HudTheme.Warn : HudTheme.Danger, 13f);
             return;
         }

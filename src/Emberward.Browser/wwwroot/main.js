@@ -662,15 +662,12 @@ function animate(now) {
     if (playing && !busy && !document.hidden && wanted) {
         let request;
         if (net) {
-            // A network match steps as the relay's ticks arrive: the controls go with every request, and a step
-            // is drawn from the time the request that took it was sent.
-            const due = accumulator >= dt;
-            if (due) accumulator -= dt;
+            // A network match steps as the relay's ticks arrive, paced by the page's clock in the worker: the
+            // controls go with every request, and a step is drawn from the time the request that took it was sent.
             request = {
                 ...net.socket.take(),
                 command: net.command,
                 input: input.read(),
-                due,
                 now,
                 alpha: Math.min(1, (now - net.stepAt) / dt),
             };

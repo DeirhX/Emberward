@@ -93,6 +93,9 @@ public sealed class RelayConnection : ILockstepLink, IDisposable
     /// <inheritdoc cref="RoomClient.LatencyMs"/>
     public int? LatencyMs => _room.LatencyMs;
 
+    /// <summary>When to play the bundles that have arrived (<see cref="PlayoutPacer"/>).</summary>
+    public PlayoutPacer Pacer => _room.Pacer;
+
     /// <inheritdoc cref="RoomClient.DesyncTick"/>
     public int? DesyncTick => _room.DesyncTick;
 

@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Net.WebSockets;
 using Emberward.Browser.Client;
 using Emberward.Core;
+using Emberward.Core.Config;
 using Emberward.Core.Input;
 using Emberward.Core.LevelGen;
 using Emberward.Core.Match;
@@ -22,6 +23,9 @@ using Emberward.Relay;
 public class BrowserNetMatchTests
 {
     private static readonly TimeSpan Now = TimeSpan.Zero;
+
+    /// <summary><paramref name="steps"/> of the match's steps after <see cref="Now"/>, by the page's clock.</summary>
+    private static TimeSpan After(int steps) => Now + Tweaks.World.AdvanceStep * steps;
 
     [Theory]
     [InlineData(2, 320, 200, LevelGenMode.Deterministic, 1)]
@@ -131,13 +135,15 @@ public class BrowserNetMatchTests
         Assert.True(lobby.Roster[1].You);
 
         // No bundle, no step, whatever the clock says.
-        Assert.Equal(0, match.Advance(default, dueByClock: 1, Now));
+        Assert.Equal(0, match.Advance(default, Now));
         Assert.Equal(0, match.Session.World.AdvanceCount);
 
         Feed(match, new Start(0b11), Tick(0, [0u, 0u, 0u], 3), Tick(1, [0u, 0u, 0u], 7));
         match.TakeOutgoing();
         var press = new ControllerOutput { BuildPrimary = true };
-        Assert.Equal(2, match.Advance(press, dueByClock: 1, Now));
+        // Ticks that arrive together are played a step apart by the page's clock, not at once (PlayoutPacer); a
+        // few steps later both have been.
+        Assert.Equal(2, match.Advance(press, After(4)));
         Assert.Equal(2, match.Session.World.AdvanceCount);
         Assert.Equal(0b111, match.Net!.HumanMask);
         Assert.Null(match.Net.Bots[2]);
@@ -155,9 +161,9 @@ public class BrowserNetMatchTests
         Feed(match, new Welcome(0, config), new Roster(["Ann", ""]), new Start(0b01));
         match.TakeOutgoing();
 
-        Assert.Equal(0, match.Advance(new ControllerOutput { Upgrade = 2 }, 1, Now));
+        Assert.Equal(0, match.Advance(new ControllerOutput { Upgrade = 2 }, Now));
         Feed(match, Tick(0, [0u, 0u], 1), Tick(1, [0u, 0u], 1), Tick(2, [0u, 0u], 1));
-        Assert.Equal(3, match.Advance(default, 1, Now));
+        Assert.Equal(3, match.Advance(default, After(5)));
 
         var upgrades = match.TakeOutgoing().Select(b => MessageCodec.Decode(b)).OfType<Input>()
             .Select(i => ControllerOutputCodec.Decode(i.Encoded).Upgrade).ToArray();
@@ -179,14 +185,14 @@ public class BrowserNetMatchTests
 
         // Held over frames that simulate nothing, the key is one press, not one a frame.
         for (int frame = 0; frame < 5; frame++)
-            Assert.Equal(0, match.Advance(recall, 1, Now));
+            Assert.Equal(0, match.Advance(recall, Now));
         Feed(match, Tick(0, [0u, 0u], 1), Tick(1, [0u, 0u], 1), Tick(2, [0u, 0u], 1));
-        Assert.Equal(3, match.Advance(default, 1, Now));
+        Assert.Equal(3, match.Advance(default, After(5)));
         Assert.Equal("True,False,False", Sent());
 
         // Held while ticks run, it stays down on every tick (the reserve's burn repeats on a held key).
         Feed(match, Tick(3, [0u, 0u], 1), Tick(4, [0u, 0u], 1), Tick(5, [0u, 0u], 1));
-        Assert.Equal(3, match.Advance(recall, 1, Now));
+        Assert.Equal(3, match.Advance(recall, After(12)));
         Assert.Equal("True,True,True", Sent());
     }
 
@@ -231,14 +237,14 @@ public class BrowserNetMatchTests
         var config = NetMatch.ProposeConfig(42, new Size(320, 200), LevelGenMode.Deterministic, 2);
         var match = new BrowserNetMatch("room", "Ann", config);
         Feed(match, new Welcome(0, config), new Roster(["Ann", "Bob"]), new Start(0b11), Tick(0, [0u, 0u], 3));
-        match.Advance(default, 1, Now);
+        match.Advance(default, Now);
         match.Lose("lost the connection to the relay.");
 
         var status = match.Status();
         Assert.True(status.Bad);
         Assert.StartsWith("Disconnected: lost the connection to the relay. Join again", status.Notice, StringComparison.Ordinal);
         Feed(match, Tick(1, [0u, 0u], 3));
-        Assert.Equal(0, match.Advance(default, 1, Now));
+        Assert.Equal(0, match.Advance(default, After(1)));
     }
 
     [Fact]
@@ -258,7 +264,8 @@ public class BrowserNetMatchTests
         Assert.Equal(("Bob", ""), (match.Session!.Names(0), match.Session.Names(2)));
 
         Feed(match, new Start(0b011), Tick(0, [0u, 0u, 0u], 0b011), Tick(1, [0u, 0u, 0u], 0b011));
-        Assert.Equal(2, match.Advance(default, dueByClock: 1, Now));
+        Assert.Equal(1, match.Advance(default, Now));
+        Assert.Equal(1, match.Advance(default, After(4)));
         var frame = BrowserFrameBuilder.Capture(match.Session!, includeEvents: false, net: match);
 
         var arcade = frame.Arcade;
@@ -308,7 +315,7 @@ public class BrowserNetMatchTests
         var match = new BrowserNetMatch("room", "Ann", config);
         Feed(match, new Welcome(1, config), new Roster(["Bob", "Ann", ""]), new Start(0b011),
             Tick(0, [0u, 0u, 0u], 0b011));
-        Assert.Equal(1, match.Advance(default, dueByClock: 1, Now));
+        Assert.Equal(1, match.Advance(default, Now));
         var session = match.Session!;
         var plates = session.Scene.TankPlates;
 
@@ -412,7 +419,7 @@ public class BrowserNetMatchTests
                         ShootPrimary = tick % 5 == 0,
                         AimDirection = DirectionF.FromAngle(tick * 0.05f),
                         BuildPrimary = tick == 30,
-                    }, dueByClock: 1, clock.Elapsed);
+                    }, clock.Elapsed);
 
                 desktop.Pump();
                 desktopSession.Receive();
