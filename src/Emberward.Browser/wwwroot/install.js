@@ -47,11 +47,28 @@ function updater(idle, versions) {
     let controlled = !!navigator.serviceWorker.controller,
         waiting = null,
         asked = false,
+        registered = null,
         lastCheck = performance.now();
+    // What a hard reload does, for when the worker will not hand over: forget the worker and its caches, then load
+    // the page from the network. The next load installs the new publish from scratch.
+    const reset = async () => {
+        try {
+            for (const registration of await navigator.serviceWorker.getRegistrations())
+                await registration.unregister();
+            for (const key of await caches.keys()) await caches.delete(key);
+        } catch {
+            // Reloading still gives the player the newest page when the browser refuses either.
+        }
+        location.reload();
+    };
     const ask = (force) => {
+        // The worker remembered may have been replaced by a newer one since: ask the one the browser holds now.
+        const next = registered?.waiting ?? waiting;
         // Another tab may have moved to the new version already; then only this page is left to reload.
-        if (!waiting) location.reload();
-        else waiting.postMessage({ type: "skip-waiting", force });
+        if (!next || next.state === "redundant") location.reload();
+        else next.postMessage({ type: "skip-waiting", force });
+        // A hand-over takes a moment. When none came, the Update button must not do nothing.
+        if (force) setTimeout(reset, 4000);
     };
     button.onclick = () => {
         asked = true;
@@ -82,6 +99,7 @@ function updater(idle, versions) {
     });
     return {
         watch(registration) {
+            registered = registration;
             const found = (worker) => {
                 versions.refresh();
                 if (!navigator.serviceWorker.controller) return;
